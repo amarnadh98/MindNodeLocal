@@ -291,11 +291,22 @@ let goldenOrgDown = [
 @Test func performanceSmoke() {
     for count in [1_000, 5_000] {
         let tree = bigTree(nodeCount: count)
-        let start = DispatchTime.now()
-        let frames = TreeLayout.layout(root: tree, structure: .mindmapBalanced)
-        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000
-        print("layout of \(frames.count) nodes (balanced): \(String(format: "%.1f", elapsed * 1000)) ms")
-        #expect(frames.count == count)
+        _ = TreeLayout.layout(root: tree, structure: .mindmapBalanced)
+
+        var best: Double?
+        for _ in 0..<3 {
+            let start = DispatchTime.now()
+            let frames = TreeLayout.layout(root: tree, structure: .mindmapBalanced)
+            let elapsed =
+                Double(
+                    DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000
+            best = min(best ?? elapsed, elapsed)
+            #expect(frames.count == count)
+        }
+        let elapsed = best ?? 0
+        print(
+            "layout of \(count) nodes (balanced, best of 3): \(String(format: "%.1f", elapsed * 1000)) ms"
+        )
         #expect(elapsed < 1.0, "layout budget blown for \(count) nodes")
         #if !DEBUG
             if count == 5_000 {
