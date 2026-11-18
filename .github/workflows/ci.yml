@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    name: swift test (${{ matrix.package }})
+    runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - MapCore
+          - MapLayout
+          - MapRender
+          - MapIO
+          - MapStudy
+          - MapAI
+          - MapLibrary
+          - CanvasKit
+          - ArborUI
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test --package-path Packages/${{ matrix.package }}
+
+  lint:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift-format
+        run: |
+          swift format lint --strict --configuration .swift-format -r Packages
+          swift format lint --strict --configuration .swift-format -r App
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: SwiftLint
+        run: swiftlint lint --reporter github-actions
+
+  xcode:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Test
+        run: xcodebuild -scheme Arbor -destination 'platform=macOS' test

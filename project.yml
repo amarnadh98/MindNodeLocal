@@ -1,0 +1,78 @@
+name: Arbor
+options:
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+packages:
+  MapCore:
+    path: Packages/MapCore
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  Arbor:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+    resources:
+      - path: App/Resources
+    dependencies:
+      - package: MapCore
+    info:
+      path: App/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Arbor
+        CFBundleName: Arbor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Arbor Map
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.arbor.map
+            LSTypeIsPackage: true
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.arbor.map
+            UTTypeDescription: Arbor Map
+            UTTypeConformsTo:
+              - com.apple.package
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - arbor
+    entitlements:
+      path: App/Resources/Arbor.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+  ArborTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - App/Tests
+    dependencies:
+      - target: Arbor
+    settings:
+      base:
+        PRODUCT_NAME: ArborTests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Arbor.app/Contents/MacOS/Arbor
+        BUNDLE_LOADER: $(TEST_HOST)
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Arbor:
+    build:
+      targets:
+        Arbor: all
+    test:
+      targets:
+        - ArborTests

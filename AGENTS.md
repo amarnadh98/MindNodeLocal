@@ -17,11 +17,12 @@ Read **[SPEC.md](SPEC.md)** first. It is the source of truth. Build milestone by
 - **Privacy:** no telemetry, and no network calls except those SPEC §12 allows.
 - **Definition of Done:** SPEC §14.1. That includes tests, undo, menus and keyboard, light and dark mode, VoiceOver, and performance budgets.
 
-## Commands (fill in during M0)
+## Commands
 ```bash
 swift test --package-path Packages/MapCore
+xcodegen generate  # once after cloning, and after every project.yml edit
 xcodebuild -scheme Arbor -destination 'platform=macOS' test
-swift format lint -r Packages App
+swift format lint --strict -r Packages App
 ```
 
 ## Process

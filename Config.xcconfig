@@ -1,0 +1,13 @@
+// BUNDLE_ID_PREFIX is owner-configurable (SPEC §11.9): set your real prefix here before shipping.
+APP_DISPLAY_NAME = Arbor
+PRODUCT_NAME = Arbor
+BUNDLE_ID_PREFIX = com.example
+PRODUCT_BUNDLE_IDENTIFIER = com.example.arbor
+DOCUMENT_TYPE_UTI = com.arbor.map
+DOCUMENT_EXTENSION = arbor
+THEME_UTI = com.arbor.theme
+THEME_EXTENSION = arbortheme
+URL_SCHEME = x-arbor
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+MACOSX_DEPLOYMENT_TARGET = 26.0
