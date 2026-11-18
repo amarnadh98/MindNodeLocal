@@ -12,85 +12,73 @@ enum Contours {
 
     /// Merges two band sets, taking the outer boundary value (`take` = max
     /// for bottom contours, min for top contours) wherever bands overlap.
-    /// Event sweep over all band edges; linear in the input size.
+    /// Both inputs must be sorted and internally non-overlapping — an
+    /// invariant this function maintains for its outputs. Linear two-pointer
+    /// sweep, no sorting, no intermediate allocations.
     static func merge(
-        _ first: [Band], _ second: [Band], take: (CGFloat, CGFloat) -> CGFloat
+        _ a: [Band], _ b: [Band], take: (CGFloat, CGFloat) -> CGFloat
     ) -> [Band] {
-        guard !first.isEmpty else { return second }
-        guard !second.isEmpty else { return first }
+        guard !a.isEmpty else { return b }
+        guard !b.isEmpty else { return a }
 
-        struct Event: Comparable {
-            let at: CGFloat
-            let isEnd: Bool
-            let value: CGFloat
-
-            static func < (lhs: Event, rhs: Event) -> Bool {
-                if lhs.at != rhs.at { return lhs.at < rhs.at }
-                if lhs.isEnd != rhs.isEnd { return lhs.isEnd }
-                return lhs.value < rhs.value
-            }
-        }
-
-        var events: [Event] = []
-        events.reserveCapacity((first.count + second.count) * 2)
-        for band in first {
-            events.append(Event(at: band.lo, isEnd: false, value: band.value))
-            events.append(Event(at: band.hi, isEnd: true, value: band.value))
-        }
-        for band in second {
-            events.append(Event(at: band.lo, isEnd: false, value: band.value))
-            events.append(Event(at: band.hi, isEnd: true, value: band.value))
-        }
-        events.sort()
-
-        var active: [(value: CGFloat, count: Int)] = []
         var result: [Band] = []
-        var segmentStart: CGFloat?
-        var segmentValue: CGFloat?
+        var i = 0
+        var j = 0
+        var consumedA: CGFloat = -.infinity
+        var consumedB: CGFloat = -.infinity
 
-        func outerValue() -> CGFloat? {
-            var value: CGFloat?
-            for entry in active {
-                value = value.map { take($0, entry.value) } ?? entry.value
-            }
-            return value
-        }
-
-        func add(_ value: CGFloat) {
-            for index in active.indices where active[index].value == value {
-                active[index].count += 1
-                return
-            }
-            active.append((value, 1))
-        }
-
-        func remove(_ value: CGFloat) {
-            for index in active.indices where active[index].value == value {
-                let remaining = active[index].count - 1
-                if remaining > 0 {
-                    active[index].count = remaining
-                } else {
-                    active.remove(at: index)
-                }
-                return
-            }
-        }
-
-        for event in events {
-            if let start = segmentStart, event.at > start, let value = segmentValue {
-                if let last = result.last, last.hi == start, last.value == value {
-                    result[result.count - 1].hi = event.at
-                } else {
-                    result.append(Band(lo: start, hi: event.at, value: value))
-                }
-            }
-            if event.isEnd {
-                remove(event.value)
+        func emit(_ lo: CGFloat, _ hi: CGFloat, _ value: CGFloat) {
+            guard hi > lo else { return }
+            if let last = result.last, last.hi == lo, last.value == value {
+                result[result.count - 1].hi = hi
             } else {
-                add(event.value)
+                result.append(Band(lo: lo, hi: hi, value: value))
             }
-            segmentStart = event.at
-            segmentValue = outerValue()
+        }
+
+        while i < a.count, j < b.count {
+            let bandA = a[i]
+            let bandB = b[j]
+            let aStart = max(bandA.lo, consumedA)
+            let bStart = max(bandB.lo, consumedB)
+            let aEnd = bandA.hi
+            let bEnd = bandB.hi
+
+            if aStart < bStart {
+                emit(aStart, min(aEnd, bStart), bandA.value)
+                consumedA = min(aEnd, bStart)
+            } else if bStart < aStart {
+                emit(bStart, min(bEnd, aStart), bandB.value)
+                consumedB = min(bEnd, aStart)
+            }
+
+            let overlapLo = max(aStart, bStart)
+            let overlapHi = min(aEnd, bEnd)
+            if overlapHi > overlapLo {
+                emit(overlapLo, overlapHi, take(bandA.value, bandB.value))
+                consumedA = overlapHi
+                consumedB = overlapHi
+            }
+
+            if aEnd <= consumedA {
+                i += 1
+                consumedA = -.infinity
+            }
+            if bEnd <= consumedB {
+                j += 1
+                consumedB = -.infinity
+            }
+        }
+
+        while i < a.count {
+            emit(max(a[i].lo, consumedA), a[i].hi, a[i].value)
+            consumedA = -.infinity
+            i += 1
+        }
+        while j < b.count {
+            emit(max(b[j].lo, consumedB), b[j].hi, b[j].value)
+            consumedB = -.infinity
+            j += 1
         }
         return result
     }

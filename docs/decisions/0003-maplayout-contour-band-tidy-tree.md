@@ -10,7 +10,7 @@ SPEC §9 mandates the non-layered tidy tree algorithm (A. van der Ploeg, 2014) a
 The M1 layout engine (`Packages/MapLayout/TreeLayout.swift`) implements tidy-tree *contour separation* with an explicit band representation instead of the paper's thread/ancestor pointer structure:
 
 - Each subtree carries `top`/`bottom` contours as arrays of `Band { lo, hi, value }` intervals along the separation axis.
-- Consecutive siblings are separated by a two-pointer walk of the accumulated outer contour against the new subtree's inner contour. Contour merging uses an event sweep over band edges; linear in the input size.
+- Consecutive siblings are separated by a two-pointer walk of the accumulated outer contour against the new subtree's inner contour. Contour merging is a linear two-pointer sweep over the two sorted, internally non-overlapping band lists — an invariant the merge maintains for its outputs — with no sorting and no intermediate allocations.
 - Balanced structure (F-LAY-1) partitions root children by pinned side, then greedily by predicted subtree height, preserving order; both sides are laid out with the one-sided engine and centered on the root.
 - Org up/down are transposes of the one-sided engine; left is its x-mirror.
 
@@ -20,7 +20,7 @@ Each sibling's candidate position starts at `cursor` — the previous subtree's 
 One consequence of the band form: a trimming optimization that drops accumulated bands below `cursor − gap` is **unsound** with centered subtrees (their negative `minY` reaches back into dropped columns) and produced overlaps in randomized stress tests; it was removed and replaced by a permanent seeded stress test (300 trees × all structures) so the class of bug cannot return.
 
 ## Measured result
-Release build, Apple Silicon (MacBook Air M-series): 1,000 nodes ≈ 2 ms, 5,000 nodes ≈ 7–8 ms for a full balanced layout — inside the SPEC §11.8 budget. CI enforces it in the `perf` job via `swift test -c release` (debug builds only check a generous bound because unoptimized Swift is ~8× slower).
+Release build, Apple Silicon (MacBook Air M-series): 1,000 nodes ≈ 1 ms, 5,000 nodes ≈ 4.6 ms for a full balanced layout (steady state, best of 3); the GitHub `xcode-27` shared runner measures ≈ 1.8× slower, still inside the SPEC §11.8 10 ms budget. CI enforces it in the `perf` job via `swift test -c release` (debug builds only check a generous bound because unoptimized Swift is ~8× slower).
 
 ## Alternatives rejected
 - **A literal port of the paper's thread/ancestor machinery.** It is the strictly-linear form, but the pointer-linked contour reconstruction is the most bug-prone part to write blind, and the band form already meets the measured budget with clear, testable invariants (no-overlap stress + goldens).
