@@ -1,8 +1,11 @@
 import AppKit
+import CanvasKit
+import MapCore
+import MapRender
 
 @MainActor
 final class DocumentWindowController: NSWindowController {
-    private let placeholder = PlaceholderCanvasView()
+    let canvas = CanvasView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
     init(document: NSDocument) {
         let window = NSWindow(
@@ -13,37 +16,43 @@ final class DocumentWindowController: NSWindowController {
         )
         window.title = document.displayName
         window.minSize = NSSize(width: 480, height: 360)
-        window.contentView = placeholder
+        window.contentView = canvas
         super.init(window: window)
         self.document = document
+
+        if let mapDocument = document as? MapDocument {
+            updateScene(from: mapDocument)
+        }
     }
 
     required init?(coder: NSCoder) {
         nil
     }
-}
 
-@MainActor
-final class PlaceholderCanvasView: NSView {
-    private let label = NSTextField(labelWithString: "")
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        label.alignment = .center
-        label.textColor = .secondaryLabelColor
-        label.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        label.stringValue = "Arbor M0 — the canvas arrives in M1"
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
+    override func windowDidLoad() {
+        super.windowDidLoad()
+        rebuildScene()
     }
 
-    required init?(coder: NSCoder) {
-        nil
+    /// Rebuilds and displays the canvas scene from the document's model,
+    /// then fits it into the viewport.
+    func rebuildScene() {
+        guard let mapDocument = document as? MapDocument,
+            let contentFrame = window?.contentRect(forFrameRect: window?.frame ?? .zero)
+        else {
+            return
+        }
+        canvas.frame = NSRect(origin: .zero, size: contentFrame.size)
+        updateScene(from: mapDocument)
+    }
+
+    private func updateScene(from document: MapDocument) {
+        let variant: ThemeVariant = document.effectiveAppearance == .dark ? .dark : .light
+        let scene = SceneGeometry.build(
+            model: document.model,
+            variant: variant,
+            measurer: SceneRenderer.sharedMeasurer)
+        canvas.scene = scene
+        canvas.zoomToFit()
     }
 }

@@ -10,6 +10,12 @@ configFiles:
 packages:
   MapCore:
     path: Packages/MapCore
+  MapLayout:
+    path: Packages/MapLayout
+  MapRender:
+    path: Packages/MapRender
+  CanvasKit:
+    path: Packages/CanvasKit
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -26,6 +32,9 @@ targets:
       - path: App/Resources
     dependencies:
       - package: MapCore
+      - package: MapLayout
+      - package: MapRender
+      - package: CanvasKit
     info:
       path: App/Resources/Info.plist
       properties:

@@ -9,7 +9,10 @@
 /* Begin PBXBuildFile section */
 		0ABBAAEAE36B685D722209B1 /* MapDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763A388A39D618FE613DD3B1 /* MapDocument.swift */; };
 		40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */; };
+		4196E094F43B370CE7E86DC7 /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = F54E21355F96F5AD144FD37A /* MapLayout */; };
+		4F9D4E223AB8F9EC50BFDA1F /* MapRender in Frameworks */ = {isa = PBXBuildFile; productRef = 7D38097FC3CDDAFD3DC25673 /* MapRender */; };
 		822CBFD727517F3BEE2C66FE /* MapDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */; };
+		BCE1A74E18AC59895789A289 /* CanvasKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2C2FAABF23A1E50C69E59904 /* CanvasKit */; };
 		C986615B78CA694E4DAA98F8 /* DocumentWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */; };
 		D1790FD36A1B6B934C01B694 /* MapCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2514B20D60A75A24AECF4DC7 /* MapCore */; };
 		F39B1DC08A3DF5433F14D703 /* AppIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */; };
@@ -28,13 +31,16 @@
 /* Begin PBXFileReference section */
 		0E9B7C130CAE3A129DCC2F11 /* MapCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapCore; path = Packages/MapCore; sourceTree = SOURCE_ROOT; };
 		2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentity.swift; sourceTree = "<group>"; };
+		48AB29C79C038696D981150A /* MapRender */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapRender; path = Packages/MapRender; sourceTree = SOURCE_ROOT; };
 		4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowController.swift; sourceTree = "<group>"; };
+		708B6FDF9A6823031DB30BE4 /* CanvasKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CanvasKit; path = Packages/CanvasKit; sourceTree = SOURCE_ROOT; };
 		763A388A39D618FE613DD3B1 /* MapDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDocument.swift; sourceTree = "<group>"; };
 		7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDocumentTests.swift; sourceTree = "<group>"; };
 		8AD7AB6F02EB2F451ED5586D /* ArborTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArborTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA463BCF16A91FEF44EE1FCC /* MapLayout */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapLayout; path = Packages/MapLayout; sourceTree = SOURCE_ROOT; };
 		CBAC62CC4DC9451138C0087B /* Arbor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Arbor.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		"TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_4788CA45-5A66-43AF-8F99-016015F28984" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +49,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				D1790FD36A1B6B934C01B694 /* MapCore in Frameworks */,
+				4196E094F43B370CE7E86DC7 /* MapLayout in Frameworks */,
+				4F9D4E223AB8F9EC50BFDA1F /* MapRender in Frameworks */,
+				BCE1A74E18AC59895789A289 /* CanvasKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,7 +81,10 @@
 		A311202756854626E7555D59 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				708B6FDF9A6823031DB30BE4 /* CanvasKit */,
 				0E9B7C130CAE3A129DCC2F11 /* MapCore */,
+				CA463BCF16A91FEF44EE1FCC /* MapLayout */,
+				48AB29C79C038696D981150A /* MapRender */,
 			);
 			path = Packages;
 			sourceTree = "<group>";
@@ -103,10 +115,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_11CD2614-6F17-467E-AAD6-8D1CA18CF0DF" /* MindNodeLocal */ = {
+		"TEMP_CA80ABAF-1E01-48A9-BC7B-A286D5210AD8" /* MindNodeLocal */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */,
+				"TEMP_4788CA45-5A66-43AF-8F99-016015F28984" /* Config.xcconfig */,
 			);
 			path = MindNodeLocal;
 			sourceTree = "<group>";
@@ -146,6 +158,9 @@
 			name = Arbor;
 			packageProductDependencies = (
 				2514B20D60A75A24AECF4DC7 /* MapCore */,
+				F54E21355F96F5AD144FD37A /* MapLayout */,
+				7D38097FC3CDDAFD3DC25673 /* MapRender */,
+				2C2FAABF23A1E50C69E59904 /* CanvasKit */,
 			);
 			productName = Arbor;
 			productReference = CBAC62CC4DC9451138C0087B /* Arbor.app */;
@@ -178,7 +193,10 @@
 			mainGroup = D456DBA015945693DC8C5A27;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				0B2DB006B66C456B468269E5 /* XCLocalSwiftPackageReference "Packages/CanvasKit" */,
 				160334E0FEF41679A143780A /* XCLocalSwiftPackageReference "Packages/MapCore" */,
+				5856C792BC20C353BAD35215 /* XCLocalSwiftPackageReference "Packages/MapLayout" */,
+				0649349A90C3B5F434835B82 /* XCLocalSwiftPackageReference "Packages/MapRender" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E229EC80D1677D4209FC0651 /* Products */;
@@ -271,7 +289,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_4788CA45-5A66-43AF-8F99-016015F28984" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -353,7 +371,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_4788CA45-5A66-43AF-8F99-016015F28984" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -442,9 +460,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		0649349A90C3B5F434835B82 /* XCLocalSwiftPackageReference "Packages/MapRender" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MapRender;
+		};
+		0B2DB006B66C456B468269E5 /* XCLocalSwiftPackageReference "Packages/CanvasKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CanvasKit;
+		};
 		160334E0FEF41679A143780A /* XCLocalSwiftPackageReference "Packages/MapCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MapCore;
+		};
+		5856C792BC20C353BAD35215 /* XCLocalSwiftPackageReference "Packages/MapLayout" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MapLayout;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -452,6 +482,18 @@
 		2514B20D60A75A24AECF4DC7 /* MapCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MapCore;
+		};
+		2C2FAABF23A1E50C69E59904 /* CanvasKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CanvasKit;
+		};
+		7D38097FC3CDDAFD3DC25673 /* MapRender */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MapRender;
+		};
+		F54E21355F96F5AD144FD37A /* MapLayout */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MapLayout;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
