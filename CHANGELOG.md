@@ -9,6 +9,15 @@
 - CI on GitHub Actions (`xcode-27` runners): per-package `swift test`, `xcodebuild test`, swift-format (strict) and SwiftLint.
 - `Config.xcconfig` + `AppIdentity` centralize app identity (SPEC §11.9).
 
+### Added (M1, in progress)
+- MapRepairer (review follow-up on PR #1): conservative structural repair per SPEC §8.2 — validate, repair what can be repaired, log, and still open. Wired into document loading; repairs mark the document dirty so they persist on the next save.
+- MapLayout engine: one-sided mind maps (right/left), balanced with pinned sides and greedy height partitioning, org charts (down/up); tidy non-layered sibling separation via contour bands (ADR-0003); golden frames, no-overlap/order/determinism invariants and a release-gated 5k-node budget test.
+
+### Fixed (review on PR #2)
+- Layout: removed the unsound contour trim — a later sibling whose subtree is centered on tall descendants has a negative `minY` and reaches back into trimmed columns, overlapping nodes. Added a permanent seeded stress test (300 random trees × all structures) that would have caught it.
+- Repair: unreachable cycles are now broken (lowest-ID member promoted to a root, then resync) instead of being left unreachable; repair order is deterministic (creation time, then ID) so the same broken file always repairs identically; duplicate `children` entries are detected, reported, and de-duplicated.
+- CI: new `perf` job runs MapLayout tests in release, enforcing the SPEC §11.8 10 ms budget.
+
 ### Fixed (review on PR #1)
 - Document creation/opening via `NSDocumentController`: `NSDocumentClass` is now declared in `CFBundleDocumentTypes`, and `MapDocument` no longer overrides `NSDocument.init(contentsOf:ofType:)`, so opened documents keep their `fileURL`, `fileType` and modification date. Tests now go through `NSDocumentController` instead of constructing the document directly.
 - Saves reuse the package wrapper (`fileWrapper(ofType:)` / `read(from: FileWrapper, ofType:)`) and replace only `map.json`/`meta.json`, so foreign and future entries (`assets/`, `study/reviews.jsonl`, `QuickLook/`) survive saves (SPEC §11.1).

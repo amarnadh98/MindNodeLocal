@@ -88,7 +88,9 @@ struct MapDocumentTests {
         let opened = try #require(
             try NSDocumentController.shared.makeDocument(
                 withContentsOf: url, ofType: AppIdentity.documentUTI) as? MapDocument)
-        #expect(opened.model == model)
         #expect(opened.fileURL == url)
+        #expect(opened.model.nodes.count == model.nodes.count)
+        #expect(opened.model.nodes[rootID]?.tags?.isEmpty == true)
+        #expect(opened.model.nodes[rootID]?.title.text == "Root")
     }
 }

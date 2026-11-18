@@ -45,6 +45,14 @@ jobs:
       - name: SwiftLint
         run: swiftlint lint --no-cache
 
+  perf:
+    name: release-mode budgets
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: MapLayout release tests (enforces the SPEC §11.8 10 ms budget)
+        run: swift test -c release --package-path Packages/MapLayout
+
   xcode:
     runs-on: xcode-27
     steps:

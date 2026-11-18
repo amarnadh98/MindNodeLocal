@@ -41,6 +41,10 @@ identifier_name:
     - n
     - ai
     - ts
+    - lo
+    - hi
+    - up
+    - dn
 function_body_length:
   warning: 150
   error: 300
