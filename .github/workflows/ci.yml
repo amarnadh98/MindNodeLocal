@@ -43,7 +43,7 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
       - name: SwiftLint
-        run: swiftlint lint --reporter github-actions
+        run: swiftlint lint --no-cache
 
   xcode:
     runs-on: xcode-27
