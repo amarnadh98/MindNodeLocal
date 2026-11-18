@@ -16,10 +16,10 @@ enum Contours {
     /// invariant this function maintains for its outputs. Linear two-pointer
     /// sweep, no sorting, no intermediate allocations.
     static func merge(
-        _ a: [Band], _ b: [Band], take: (CGFloat, CGFloat) -> CGFloat
+        _ leftBands: [Band], _ rightBands: [Band], take: (CGFloat, CGFloat) -> CGFloat
     ) -> [Band] {
-        guard !a.isEmpty else { return b }
-        guard !b.isEmpty else { return a }
+        guard !leftBands.isEmpty else { return rightBands }
+        guard !rightBands.isEmpty else { return leftBands }
 
         var result: [Band] = []
         var i = 0
@@ -36,9 +36,9 @@ enum Contours {
             }
         }
 
-        while i < a.count, j < b.count {
-            let bandA = a[i]
-            let bandB = b[j]
+        while i < leftBands.count, j < rightBands.count {
+            let bandA = leftBands[i]
+            let bandB = rightBands[j]
             let aStart = max(bandA.lo, consumedA)
             let bStart = max(bandB.lo, consumedB)
             let aEnd = bandA.hi
@@ -70,13 +70,13 @@ enum Contours {
             }
         }
 
-        while i < a.count {
-            emit(max(a[i].lo, consumedA), a[i].hi, a[i].value)
+        while i < leftBands.count {
+            emit(max(leftBands[i].lo, consumedA), leftBands[i].hi, leftBands[i].value)
             consumedA = -.infinity
             i += 1
         }
-        while j < b.count {
-            emit(max(b[j].lo, consumedB), b[j].hi, b[j].value)
+        while j < rightBands.count {
+            emit(max(rightBands[j].lo, consumedB), rightBands[j].hi, rightBands[j].value)
             consumedB = -.infinity
             j += 1
         }
