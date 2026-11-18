@@ -102,23 +102,28 @@ public enum BranchPath {
         for point in left.dropFirst() {
             path.addLine(to: point)
         }
-        addRoundCap(path, from: left.last ?? firstLeft, to: right.last ?? firstRight, radius: endWidth / 2)
+        addRoundCap(path, from: left.last ?? firstLeft, to: right.last ?? firstRight)
         for point in right.reversed() {
             path.addLine(to: point)
         }
-        addRoundCap(path, from: right.first ?? firstRight, to: firstLeft, radius: startWidth / 2)
+        addRoundCap(path, from: right.first ?? firstRight, to: firstLeft)
         path.closeSubpath()
         return path
     }
 
-    private static func addRoundCap(
-        _ path: CGMutablePath, from: CGPoint, to: CGPoint, radius: CGFloat
-    ) {
+    /// A semicircular cap joining the two offset edge points: centered on
+    /// their midpoint, radius half their distance, sweeping the outward
+    /// side (SPEC §7.4's round caps).
+    private static func addRoundCap(_ path: CGMutablePath, from edge: CGPoint, to other: CGPoint) {
+        let center = CGPoint(x: (edge.x + other.x) / 2, y: (edge.y + other.y) / 2)
+        let radius = hypot(other.x - edge.x, other.y - edge.y) / 2
+        guard radius > 0 else { return }
         path.addArc(
-            center: to, radius: max(0, radius),
-            startAngle: angle(of: from, relativeTo: to),
-            endAngle: angle(of: to, relativeTo: from) + .pi,
-            clockwise: false)
+            center: center,
+            radius: radius,
+            startAngle: angle(of: edge, relativeTo: center),
+            endAngle: angle(of: other, relativeTo: center),
+            clockwise: true)
     }
 
     private static func angle(of source: CGPoint, relativeTo center: CGPoint) -> CGFloat {

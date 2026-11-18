@@ -1,5 +1,9 @@
 import Foundation
 
+/// A styled range inside a node title (SPEC §8.3 allow-list). `range` is
+/// `[start, length]` in **UTF-16 units** — the indices `CFString` and
+/// `NSAttributedString` use — so surrogate-pair glyphs (emoji) count as
+/// one unit per the platform's text APIs.
 public struct Run: Codable, Sendable, Hashable {
     public var range: [Int]
     public var bold: Bool?
@@ -65,7 +69,7 @@ public struct NodeWidth: Codable, Sendable, Hashable {
     }
 }
 
-public enum NodeShape: String, Codable, Sendable {
+public enum NodeShape: String, Codable, Sendable, CaseIterable {
     case roundedRect
     case pill
     case rectangle

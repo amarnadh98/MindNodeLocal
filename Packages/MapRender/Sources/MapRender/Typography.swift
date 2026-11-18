@@ -6,8 +6,8 @@ import Foundation
 /// concurrency boundaries freely.
 public struct FontSpec: Sendable, Hashable {
     public let size: CGFloat
-    /// Core Text weight constant: 0.0 regular, 0.3 medium, 0.4 semibold,
-    /// 0.7 bold, and so on.
+    /// Core Text weight constant (verified against the resolved font):
+    /// 0.0 regular, 0.23 medium, 0.3 semibold, 0.4 bold.
     public let weight: CGFloat
     /// `nil` picks the system font family.
     public let family: String?
@@ -29,33 +29,30 @@ public struct FontSpec: Sendable, Hashable {
     }
 
     var ctFont: CTFont {
-        let base: CTFont
         if monospace {
-            base = CTFontCreateWithName("Menlo-Regular" as CFString, size, nil)
-        } else if let family {
-            base = CTFontCreateWithName(family as CFString, size, nil)
-        } else if weight == 0.0 {
-            base =
-                CTFontCreateUIFontForLanguage(.system, size, nil)
-                ?? CTFontCreateWithName("Helvetica" as CFString, size, nil)
-        } else {
-            let attributes = [
-                kCTFontSizeAttribute: size as NSNumber,
-                kCTFontWeightTrait: weight as NSNumber,
-            ]
-            let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
-            base = CTFontCreateWithFontDescriptor(descriptor, size, nil)
+            return CTFontCreateWithName("Menlo-Regular" as CFString, size, nil)
         }
-        if !italic {
-            return base
+        if let family {
+            return CTFontCreateWithName(family as CFString, size, nil)
         }
-        return CTFontCreateCopyWithSymbolicTraits(base, size, nil, .traitItalic, .traitItalic) ?? base
+        let system =
+            CTFontCreateUIFontForLanguage(.system, size, nil)
+            ?? CTFontCreateWithName("Helvetica" as CFString, size, nil)
+        guard weight != 0.0 else {
+            return applyItalic(to: system)
+        }
+        let traits: [CFString: Any] = [kCTFontWeightTrait: weight as NSNumber]
+        let attributes: [CFString: Any] = [kCTFontTraitsAttribute: traits]
+        let descriptor = CTFontDescriptorCreateCopyWithAttributes(
+            CTFontCopyFontDescriptor(system), attributes as CFDictionary)
+        let weighted = CTFontCreateWithFontDescriptor(descriptor, size, nil)
+        return applyItalic(to: weighted)
     }
 
-    func withBold(_ bold: Bool) -> FontSpec {
-        guard bold else { return self }
-        return FontSpec(
-            size: size, weight: max(weight, 0.4), family: family, italic: italic, monospace: monospace)
+    private func applyItalic(to font: CTFont) -> CTFont {
+        guard italic else { return font }
+        return CTFontCreateCopyWithSymbolicTraits(
+            font, size, nil, .traitItalic, .traitItalic) ?? font
     }
 }
 
@@ -68,8 +65,8 @@ public struct ThemeTypography: Sendable, Hashable {
     public let lineHeight: CGFloat
 
     public init(
-        root: FontSpec = FontSpec(size: 20, weight: 0.4),
-        level1: FontSpec = FontSpec(size: 16, weight: 0.3),
+        root: FontSpec = FontSpec(size: 20, weight: 0.3),
+        level1: FontSpec = FontSpec(size: 16, weight: 0.23),
         level2Plus: FontSpec = FontSpec(size: 14, weight: 0.0),
         lineHeight: CGFloat = 1.25
     ) {

@@ -92,6 +92,14 @@ struct BranchPathTests {
         #expect(box.contains(to))
         #expect(box.width >= 6 * 0.9)
     }
+
+    @Test func taperedRoundCapsExtendPastTheEndpoints() {
+        let from = CGPoint(x: 0, y: 0)
+        let to = CGPoint(x: 100, y: 0)
+        let path = BranchPath.tapered(from: from, to: to, startWidth: 6, endWidth: 6)
+        #expect(path.contains(CGPoint(x: 2.5, y: 0)), "start cap must bulge left of the anchor")
+        #expect(path.contains(CGPoint(x: 102.5, y: 0)), "end cap must bulge right of the anchor")
+    }
 }
 
 /// Collects a path's elements for assertions.

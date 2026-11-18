@@ -5,19 +5,15 @@ import MapCore
 
 /// The single source of truth for node text sizes (SPEC §9): the canvas,
 /// export and Quick Look all ask this measurer, so committed text never
-/// changes size. Measurement results are cached under a lock; the cache
-/// holds only value data, and `CTFont` instances are created per call.
+/// changes size. Every size — single-line or wrapped — comes out of the
+/// same CoreText layout call the drawer uses, and the cache keys on the
+/// whole `NodeTitle` (text *and* runs), so styling changes never return
+/// a stale measurement.
 public final class TextMeasurer: @unchecked Sendable {
     public struct CacheKey: Hashable, Sendable {
-        let text: String
+        let title: NodeTitle
         let font: FontSpec
         let maxWidth: CGFloat?
-
-        init(title: NodeTitle, font: FontSpec, maxWidth: CGFloat?) {
-            self.text = title.text
-            self.font = font
-            self.maxWidth = maxWidth
-        }
     }
 
     private var cache: [CacheKey: CGSize] = [:]
@@ -45,16 +41,16 @@ public final class TextMeasurer: @unchecked Sendable {
         return measured
     }
 
-    /// A title with no width constraint: one line, natural width.
+    /// A title with no width constraint: one line, natural width — measured
+    /// through the framesetter so the drawer lays out the identical line.
     public func singleLineSize(_ title: NodeTitle, font: FontSpec, lineHeight: CGFloat = 1.25) -> CGSize {
-        let line = CTLineCreateWithAttributedString(
-            attributed(title, font: font, color: CGColor.black, lineHeight: lineHeight))
-        let height = CGFloat(CTFontGetAscent(font.ctFont) + CTFontGetDescent(font.ctFont)) * lineHeight
         guard !title.text.isEmpty else {
+            let height =
+                CGFloat(
+                    CTFontGetAscent(font.ctFont) + CTFontGetDescent(font.ctFont)) * lineHeight
             return CGSize(width: 0, height: height.rounded(.up))
         }
-        let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-        return CGSize(width: width.rounded(.up), height: height.rounded(.up))
+        return frameSize(title, font: font, lineHeight: lineHeight, maxWidth: .greatestFiniteMagnitude)
     }
 
     private func measure(_ title: NodeTitle, font: FontSpec, maxWidth: CGFloat?) -> CGSize {
@@ -66,19 +62,28 @@ public final class TextMeasurer: @unchecked Sendable {
         guard needsWrap else {
             return single
         }
-        let attributed = attributed(title, font: font, color: CGColor.black, lineHeight: 1.25)
+        return frameSize(title, font: font, lineHeight: 1.25, maxWidth: maxWidth ?? .greatestFiniteMagnitude)
+    }
+
+    /// The framesetter layout both the measurer and the drawer agree on.
+    func frameSize(
+        _ title: NodeTitle, font: FontSpec, lineHeight: CGFloat, maxWidth: CGFloat
+    ) -> CGSize {
+        let attributed = attributed(title, font: font, color: CGColor.black, lineHeight: lineHeight)
         let setter = CTFramesetterCreateWithAttributedString(attributed)
-        let constraints = CGSize(
-            width: maxWidth ?? .greatestFiniteMagnitude,
-            height: .greatestFiniteMagnitude)
+        let constraints = CGSize(width: maxWidth, height: .greatestFiniteMagnitude)
         let fits = CTFramesetterSuggestFrameSizeWithConstraints(
-            setter, CFRange(location: 0, length: CFAttributedStringGetLength(attributed)), nil, constraints, nil)
+            setter,
+            CFRange(location: 0, length: CFAttributedStringGetLength(attributed)),
+            nil, constraints, nil)
         return CGSize(width: fits.width.rounded(.up), height: fits.height.rounded(.up))
     }
 
     /// Builds the Core Text string for a title: base font plus the
-    /// allow-listed run attributes (bold, italic, code, underline, strike,
-    /// color — SPEC §8.3). Pure CoreText; no AppKit types.
+    /// allow-listed run attributes (bold, italic, code, underline, size,
+    /// family, color — SPEC §8.3). Run traits compose into a single font
+    /// per range. Strikethrough is data-only here: it has no pure CoreText
+    /// attribute and draws with the canvas text-layer refinement.
     public func attributed(
         _ title: NodeTitle, font: FontSpec, color: CGColor, lineHeight: CGFloat
     ) -> CFAttributedString {
@@ -110,18 +115,8 @@ public final class TextMeasurer: @unchecked Sendable {
             guard runLength > 0 else { continue }
             let range = CFRange(location: start, length: runLength)
 
-            if run.bold == true {
-                CFAttributedStringSetAttribute(
-                    mutable, range, kCTFontAttributeName, font.withBold(true).ctFont)
-            }
-            if run.italic == true {
-                let italicFont = CTFontCreateCopyWithSymbolicTraits(
-                    font.ctFont, font.size, nil, .traitItalic, .traitItalic)
-                CFAttributedStringSetAttribute(mutable, range, kCTFontAttributeName, italicFont)
-            }
-            if run.code == true {
-                let mono = FontSpec(size: font.size, monospace: true)
-                CFAttributedStringSetAttribute(mutable, range, kCTFontAttributeName, mono.ctFont)
+            if let runFont = composedFont(base: font, run: run) {
+                CFAttributedStringSetAttribute(mutable, range, kCTFontAttributeName, runFont.ctFont)
             }
             if run.underline == true {
                 CFAttributedStringSetAttribute(
@@ -135,8 +130,23 @@ public final class TextMeasurer: @unchecked Sendable {
         return mutable
     }
 
-    /// Parses a `#RRGGBB` run color (SPEC §8.3). Strikethrough has no pure
-    /// CoreText attribute; it is drawn with the text-layer refinement.
+    /// Composes a run's font traits (bold weight, italic, code, size and
+    /// family overrides) with the base font into one `FontSpec`.
+    private func composedFont(base: FontSpec, run: Run) -> FontSpec? {
+        guard
+            run.bold == true || run.italic == true || run.code == true || run.size != nil
+                || run.font != nil
+        else { return nil }
+        return FontSpec(
+            size: run.size ?? base.size,
+            weight: run.bold == true ? max(base.weight, 0.4) : base.weight,
+            family: run.font ?? base.family,
+            italic: base.italic || (run.italic == true),
+            monospace: base.monospace || (run.code == true)
+        )
+    }
+
+    /// Parses a `#RRGGBB` run color (SPEC §8.3).
     private static func color(fromHexString raw: String) -> CGColor? {
         let digits = raw.hasPrefix("#") ? String(raw.dropFirst()) : raw
         guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
