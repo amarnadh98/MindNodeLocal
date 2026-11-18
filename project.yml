@@ -42,6 +42,7 @@ targets:
             LSItemContentTypes:
               - com.arbor.map
             LSTypeIsPackage: true
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.arbor.map
             UTTypeDescription: Arbor Map

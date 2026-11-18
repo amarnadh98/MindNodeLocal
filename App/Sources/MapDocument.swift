@@ -1,30 +1,29 @@
 import AppKit
 import MapCore
+import os
 
 @MainActor
 final class MapDocument: NSDocument {
     nonisolated(unsafe) private(set) var model = MapModel.emptyDocument()
     nonisolated(unsafe) private(set) var meta: PackageMeta?
+    nonisolated(unsafe) private var packageWrapper: FileWrapper?
 
     override init() {
         super.init()
         meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: model.docID)
     }
 
-    init(contentsOf url: URL, ofType typeName: String) throws {
-        let contents = try ArborPackage.readValidating(at: url)
+    override func read(from fileWrapper: FileWrapper, ofType typeName: String) throws {
+        let contents = try ArborPackage.read(from: fileWrapper)
         model = contents.model
         meta = contents.meta
-        super.init()
+        packageWrapper = fileWrapper
+        for error in contents.validationErrors {
+            packageLog.warning("Loaded package with violation: \(String(describing: error))")
+        }
     }
 
-    override func read(from url: URL, ofType typeName: String) throws {
-        let contents = try ArborPackage.readValidating(at: url)
-        model = contents.model
-        meta = contents.meta
-    }
-
-    override func write(to url: URL, ofType typeName: String) throws {
+    override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         let current = meta ?? PackageMeta(appVersion: AppIdentity.appVersion, docID: model.docID)
         let updated = PackageMeta(
             formatVersion: current.formatVersion,
@@ -33,8 +32,16 @@ final class MapDocument: NSDocument {
             modified: Date(),
             docID: model.docID
         )
-        try ArborPackage.write(model, meta: updated, to: url)
+        let root: FileWrapper
+        if let packageWrapper {
+            root = packageWrapper
+        } else {
+            root = try ArborPackage.makeFileWrapper(model: model, meta: updated)
+        }
+        try ArborPackage.updateFileWrapper(root, model: model, meta: updated)
+        packageWrapper = root
         meta = updated
+        return root
     }
 
     override static var autosavesInPlace: Bool { true }
@@ -47,3 +54,6 @@ final class MapDocument: NSDocument {
         addWindowController(DocumentWindowController(document: self))
     }
 }
+
+private let packageLog = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "arbor", category: "document")

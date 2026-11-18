@@ -34,7 +34,7 @@
 		7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDocumentTests.swift; sourceTree = "<group>"; };
 		8AD7AB6F02EB2F451ED5586D /* ArborTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArborTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CBAC62CC4DC9451138C0087B /* Arbor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Arbor.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		"TEMP_8AF17C4D-7701-4644-B8CC-A239EE4A7E1B" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,10 +103,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_8C1A3FEA-17D0-48D1-B4DA-C70B62B737F5" /* MindNodeLocal */ = {
+		"TEMP_11CD2614-6F17-467E-AAD6-8D1CA18CF0DF" /* MindNodeLocal */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_8AF17C4D-7701-4644-B8CC-A239EE4A7E1B" /* Config.xcconfig */,
+				"TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */,
 			);
 			path = MindNodeLocal;
 			sourceTree = "<group>";
@@ -271,7 +271,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_8AF17C4D-7701-4644-B8CC-A239EE4A7E1B" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -353,7 +353,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_8AF17C4D-7701-4644-B8CC-A239EE4A7E1B" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_B361D58C-6F8A-4143-B864-6B3C20541F1F" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

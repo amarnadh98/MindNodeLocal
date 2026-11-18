@@ -51,21 +51,19 @@ public enum MapDocumentCoder {
     }
 }
 
+/// `Date.ISO8601FormatStyle` is a Sendable value type, so one shared style
+/// instance serves every encode and decode without per-date formatter
+/// allocation (SPEC §11.8 open budget). Its parser accepts both fractional
+/// and plain ISO-8601 timestamps.
 enum CodableDate {
+    private static let style = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
     static func string(from date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: date)
+        date.formatted(style)
     }
 
     static func parse(_ raw: String) -> Date? {
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = fractional.date(from: raw) {
-            return date
-        }
-        let plain = ISO8601DateFormatter()
-        return plain.date(from: raw)
+        try? Date(raw, strategy: style)
     }
 }
 
