@@ -7,4 +7,5 @@ public enum ArborError: Error, Sendable, Equatable, Hashable {
     case invalidMapJSON(String)
     case invalidMetaJSON(String)
     case validationFailed([ValidationError])
+    case commandFailure(String)
 }
