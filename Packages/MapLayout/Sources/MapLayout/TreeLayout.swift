@@ -195,7 +195,6 @@ enum MindmapLayout {
             childrenBottom = Contours.merge(childrenBottom, shiftedBottom, take: max)
 
             cursor = childY + childPlaced.maxY
-            accumulatedBottom = accumulatedBottom.filter { $0.value > cursor - siblingGap }
             let mid = childY + (childPlaced.minY + childPlaced.maxY) / 2
             firstChildMid = firstChildMid ?? mid
             lastChildMid = mid

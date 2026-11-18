@@ -6,6 +6,7 @@ public enum ValidationError: Error, Sendable, Hashable {
     case rootIsNotRoot(id: String)
     case danglingParent(nodeID: String, parentID: String)
     case danglingChild(nodeID: String, childID: String)
+    case duplicateChild(nodeID: String, childID: String)
     case parentChildMismatch(nodeID: String, parentID: String)
     case cycle(nodeID: String)
     case unreachableNode(id: String)
@@ -64,7 +65,12 @@ public enum MapValidator {
                     errors.append(.parentChildMismatch(nodeID: id, parentID: parentID))
                 }
             }
+            var seenChildren = Set<String>()
             for childID in node.children {
+                if !seenChildren.insert(childID).inserted {
+                    errors.append(.duplicateChild(nodeID: id, childID: childID))
+                    continue
+                }
                 guard let child = model.nodes[childID] else {
                     errors.append(.danglingChild(nodeID: id, childID: childID))
                     continue

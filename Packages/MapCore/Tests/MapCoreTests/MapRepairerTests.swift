@@ -137,7 +137,7 @@ import Testing
     #expect(result.remaining.isEmpty)
 }
 
-@Test func rootCycleIsBrokenAndDetachedCycleIsReported() throws {
+@Test func cyclesAreBrokenAndEverythingBecomesReachable() throws {
     var model = try sampleTree()
     let rootID = model.roots[0]
     let firstChild = model.nodes[rootID]!.children[0]
@@ -157,11 +157,64 @@ import Testing
     let result = MapRepairer.repair(model)
 
     #expect(result.applied.contains { if case .clearedParentOfRoot(let id) = $0 { id == rootID } else { false } })
+    #expect(result.applied.contains { if case .brokeCycle = $0 { true } else { false } })
     #expect(result.model.nodes.count == model.nodes.count)
-    let detached = [nodeA, nodeB, nodeC]
+    #expect(result.remaining.isEmpty)
+
+    var reachable = Set<String>()
+    var stack = result.model.roots
+    while let current = stack.popLast() {
+        guard reachable.insert(current).inserted else { continue }
+        stack.append(contentsOf: result.model.nodes[current]?.children ?? [])
+    }
+    #expect(reachable.contains(nodeA))
+    #expect(reachable.contains(nodeB))
+    #expect(reachable.contains(nodeC))
+}
+
+@Test func repairIsDeterministicAcrossRuns() throws {
+    var model = try sampleTree()
+    for _ in 0..<6 {
+        let orphan = UUID().uuidString
+        model.nodes[orphan] = Node(id: orphan)
+    }
+    let rootID = model.roots[0]
+    for index in 0..<6 {
+        let hidden = UUID().uuidString
+        model.nodes[hidden] = Node(id: hidden, parent: rootID)
+    }
+
+    let first = MapRepairer.repair(model)
+    let second = MapRepairer.repair(model)
+    let third = MapRepairer.repair(model)
+
+    #expect(first.model == second.model)
+    #expect(first.applied == second.applied)
+    #expect(second.model == third.model)
+    #expect(second.applied == third.applied)
+}
+
+@Test func duplicateChildIsDetectedAndRepaired() throws {
+    var model = try sampleTree()
+    let rootID = model.roots[0]
+    let firstChild = model.nodes[rootID]!.children[0]
+    model.nodes[rootID]?.children.append(firstChild)
+
+    let validationErrors = MapValidator.validate(model)
     #expect(
-        result.remaining.contains {
-            if case .unreachableNode(let id) = $0 { detached.contains(id) } else { false }
+        validationErrors.contains {
+            if case .duplicateChild(let nodeID, _) = $0 { nodeID == rootID } else { false }
         })
-    #expect(result.remaining.contains { if case .cycle = $0 { true } else { false } })
+
+    let result = MapRepairer.repair(model)
+    #expect(
+        result.applied.contains {
+            if case .removedDuplicateChild(let nodeID, let childID) = $0 {
+                nodeID == rootID && childID == firstChild
+            } else {
+                false
+            }
+        })
+    #expect(result.model.nodes[rootID]?.children.filter { $0 == firstChild }.count == 1)
+    #expect(result.remaining.isEmpty)
 }

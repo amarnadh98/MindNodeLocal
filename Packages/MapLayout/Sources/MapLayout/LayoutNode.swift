@@ -9,7 +9,7 @@ public enum LayoutSide: String, Sendable {
 
 /// The input tree for layout: identifiers, measured sizes, pinned sides and
 /// child order. Sizes come from `TextMeasurer` in the calling layer.
-public struct LayoutNode: Sendable {
+public struct LayoutNode: Sendable, Equatable {
     public var id: String
     public var size: CGSize
     public var side: LayoutSide?
