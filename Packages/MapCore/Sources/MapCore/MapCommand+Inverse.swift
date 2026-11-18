@@ -38,7 +38,7 @@ extension MapCommand {
         case .deleteNodePromotingChildren(let id):
             return try deletePromotingInverse(id: id, model: model)
 
-        case .editText(let id, let title):
+        case .editText(let id, _):
             guard let node = model.nodes[id] else {
                 throw ArborError.commandFailure("missing node \(id)")
             }
@@ -132,13 +132,13 @@ extension MapCommand {
             }
             return .setOffset(id: id, offset: node.offset)
 
-        case .setConnections(let connections):
+        case .setConnections:
             return .setConnections(model.connections)
 
-        case .setBoundaries(let boundaries):
+        case .setBoundaries:
             return .setBoundaries(model.boundaries)
 
-        case .setSummaries(let summaries):
+        case .setSummaries:
             return .setSummaries(model.summaries)
         }
     }
