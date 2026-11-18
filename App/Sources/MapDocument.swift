@@ -18,8 +18,18 @@ final class MapDocument: NSDocument {
         model = contents.model
         meta = contents.meta
         packageWrapper = fileWrapper
-        for error in contents.validationErrors {
-            packageLog.warning("Loaded package with violation: \(String(describing: error))")
+        if !contents.validationErrors.isEmpty {
+            let repaired = MapRepairer.repair(contents.model)
+            model = repaired.model
+            for action in repaired.applied {
+                packageLog.warning("Repaired package: \(String(describing: action))")
+            }
+            for error in repaired.remaining {
+                packageLog.warning("Unrepaired violation: \(String(describing: error))")
+            }
+            if !repaired.applied.isEmpty {
+                updateChangeCount(.changeDone)
+            }
         }
     }
 
