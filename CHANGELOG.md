@@ -14,6 +14,13 @@
 - MapRepairer (review follow-up on PR #1): conservative structural repair per SPEC §8.2 — validate, repair what can be repaired, log, and still open. Wired into document loading; repairs mark the document dirty so they persist on the next save.
 - MapLayout engine: one-sided mind maps (right/left), balanced with pinned sides and greedy height partitioning, org charts (down/up); tidy non-layered sibling separation via contour bands (ADR-0003); golden frames, no-overlap/order/determinism invariants and a release-gated 5k-node budget test.
 
+### Fixed (review on PR #3)
+- Multi-id delete undo: anchors are deduplicated (an id listed twice restored twice) and sorted by `(parent, slot)` so selection order no longer corrupts sibling order; ids covered by an ancestor in the same selection restore inside the ancestor's snapshot instead of double-inserting.
+- `group` applies are all-or-nothing (working copy, assign on success), so a failed compound command can't leave a half-applied, un-undoable change.
+- Deletes and cross-parent moves now purge connections, boundaries and stale summaries that reference removed or moved nodes, and their inverses restore the pre-command lists via new `setConnections`/`setBoundaries`/`setSummaries` commands — no more silent data loss on save+reopen.
+- Leaf-creating commands normalize their payload (`children` cleared, stale `side` dropped on `addRoot`); `duplicate` stamps fresh timestamps and clears inherited FSRS review state.
+- Tests are fully seeded (reproducible from the failure's seed) and now generate connections, boundaries, summaries and multi-id deletes; the invariants property test asserts the full validator with no error-kind filter.
+
 ### Fixed (review on PR #2)
 - Layout: removed the unsound contour trim — a later sibling whose subtree is centered on tall descendants has a negative `minY` and reaches back into trimmed columns, overlapping nodes. Added a permanent seeded stress test (300 random trees × all structures) that would have caught it.
 - Repair: unreachable cycles are now broken (lowest-ID member promoted to a root, then resync) instead of being left unreachable; repair order is deterministic (creation time, then ID) so the same broken file always repairs identically; duplicate `children` entries are detected, reported, and de-duplicated.

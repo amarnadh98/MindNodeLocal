@@ -61,12 +61,20 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// Applies `commands` in order as one undoable step. The inverse undoes
     /// them in reverse.
     case group(name: String, commands: [MapCommand])
-    /// Sets the pinned side of a root child (F-LAY-1).
+    /// Sets the document's pinned side of a root child (F-LAY-1).
     case setSide(id: String, side: SidePin?)
     /// Sets the folded flag of `id` (F-LAY-14).
     case setFolded(id: String, folded: Bool)
     /// Sets the manual offset of `id` (F-LAY-11). `nil` clears it.
     case setOffset(id: String, offset: ModelOffset?)
+    /// Replaces the whole connection list. The delete commands use this to
+    /// strip references to removed nodes, and their inverses use it to
+    /// restore them.
+    case setConnections(_ connections: [Connection]?)
+    /// Replaces the whole boundary list (see `setConnections`).
+    case setBoundaries(_ boundaries: [Boundary]?)
+    /// Replaces the whole summary list (see `setConnections`).
+    case setSummaries(_ summaries: [Summary]?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -81,6 +89,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setSide: "Pin Side"
         case .setFolded: "Fold Node"
         case .setOffset: "Move Node"
+        case .setConnections, .setBoundaries, .setSummaries: "Delete Node"
         }
     }
 
@@ -96,18 +105,27 @@ public indirect enum MapCommand: Sendable, Equatable {
 
     /// Builds a duplication of `id`'s subtree with fresh ids, inserted as
     /// the next sibling (or next root). The returned `insertSubtrees`
-    /// command's inverse deletes the copy.
+    /// command's inverse deletes the copy. The copy gets fresh timestamps
+    /// and no inherited review state — a duplicate is a new node, not a
+    /// clone of the original's study history.
     public static func duplicate(id: String, in model: MapModel) throws -> MapCommand {
         guard let node = model.nodes[id] else {
             throw ArborError.commandFailure("missing node \(id)")
         }
         var mapping: [String: Node] = [:]
+        let now = Date()
 
         func copy(_ nodeID: String, parent: String?) -> String {
             let newID = UUID().uuidString
             var snapshot = model.nodes[nodeID]!
             snapshot.id = newID
             snapshot.parent = parent
+            snapshot.created = now
+            snapshot.modified = now
+            if var study = snapshot.study {
+                study.fsrs = nil
+                snapshot.study = study
+            }
             snapshot.children = model.nodes[nodeID]!.children.map { copy($0, parent: newID) }
             mapping[newID] = snapshot
             return newID

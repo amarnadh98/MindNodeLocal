@@ -6,10 +6,9 @@ extension MapCommand {
     // Command dispatchers are wide switches by design; the helpers they call stay small.
     // swiftlint:disable cyclomatic_complexity function_body_length
 
-    /// Applies this command. On success the structural invariants
-    /// (parent/child agreement) hold; a thrown failure leaves the model
-    /// unchanged or, for `.group`, partially applied — callers treat a
-    /// failed group as one broken step and do not register it for undo.
+    /// Applies this command. All-or-nothing: a thrown failure leaves the
+    /// model exactly as it was, and on success the structural invariants
+    /// (parent/child agreement, no dangling references) hold.
     public func apply(to model: inout MapModel) throws {
         switch self {
         case .addChild(let parentID, let index, let node):
@@ -21,6 +20,7 @@ extension MapCommand {
             }
             var inserted = node
             inserted.parent = parentID
+            inserted.children = []
             model.nodes[node.id] = inserted
             let insertion = Self.clampIndex(index, parent: parentID, model: model)
             model.nodes[parentID]?.children.insert(node.id, at: insertion)
@@ -34,6 +34,7 @@ extension MapCommand {
             }
             var inserted = node
             inserted.parent = anchor.parent
+            inserted.children = []
             model.nodes[node.id] = inserted
             if let parentID = anchor.parent {
                 let slot = slotOf(id: anchorID, parent: parentID, model: model)
@@ -61,6 +62,7 @@ extension MapCommand {
                 model.roots[rootIndex] = node.id
             }
             model.nodes[anchorID]?.parent = node.id
+            purgeStaleSummaries(in: &model)
 
         case .addRoot(let index, let node):
             guard model.nodes[node.id] == nil else {
@@ -68,11 +70,15 @@ extension MapCommand {
             }
             var inserted = node
             inserted.parent = nil
+            inserted.children = []
+            inserted.side = nil
             model.nodes[node.id] = inserted
             let insertion = Self.clampIndex(index, parent: nil, model: model)
             model.roots.insert(node.id, at: insertion)
 
         case .deleteSubtrees(let ids):
+            var removed = Set(ids)
+            removed.formUnion(Set(descendants(of: ids, in: model)))
             for id in ids {
                 guard let node = model.nodes[id] else { continue }
                 if let parentID = node.parent {
@@ -87,11 +93,14 @@ extension MapCommand {
             for id in ids {
                 model.nodes[id] = nil
             }
+            purgeSecondaryReferences(to: removed, in: &model)
 
         case .deleteNodePromotingChildren(let id):
             guard let node = model.nodes[id] else {
                 throw ArborError.commandFailure("missing node \(id)")
             }
+            var removed = Set([id])
+            removed.formUnion(Set(descendants(of: node.children, in: model)))
             let slot = slotOf(id: id, parent: node.parent, model: model)
             for childID in node.children {
                 model.nodes[childID]?.parent = node.parent
@@ -102,6 +111,7 @@ extension MapCommand {
                 model.roots.replaceSubrange(rootIndex...rootIndex, with: node.children)
             }
             model.nodes[id] = nil
+            purgeSecondaryReferences(to: removed, in: &model)
 
         case .editText(let id, let title):
             guard model.nodes[id] != nil else {
@@ -135,6 +145,7 @@ extension MapCommand {
                 let insertion = Self.clampIndex(index, parent: nil, model: model)
                 model.roots.insert(id, at: insertion)
             }
+            purgeStaleSummaries(in: &model)
 
         case .reorderSibling(let id, let delta):
             guard let node = model.nodes[id] else {
@@ -162,12 +173,14 @@ extension MapCommand {
                 model.nodes[id]?.parent = nil
                 let rootSlot = model.roots.firstIndex(of: parentID) ?? model.roots.count
                 model.roots.insert(id, at: rootSlot + 1)
+                purgeStaleSummaries(in: &model)
                 return
             }
             let parentSlot = slotOf(id: parentID, parent: grandParentID, model: model)
             model.nodes[parentID]?.children.remove(at: slot)
             model.nodes[id]?.parent = grandParentID
             model.nodes[grandParentID]?.children.insert(id, at: parentSlot + 1)
+            purgeStaleSummaries(in: &model)
 
         case .demote(let id):
             guard let node = model.nodes[id], let parentID = node.parent else {
@@ -183,6 +196,7 @@ extension MapCommand {
             model.nodes[parentID]?.children.remove(at: slot)
             model.nodes[id]?.parent = previous
             model.nodes[previous]?.children.append(id)
+            purgeStaleSummaries(in: &model)
 
         case .detach(let id):
             guard let node = model.nodes[id], let parentID = node.parent else {
@@ -191,6 +205,7 @@ extension MapCommand {
             model.nodes[parentID]?.children.removeAll { $0 == id }
             model.nodes[id]?.parent = nil
             model.roots.append(id)
+            purgeStaleSummaries(in: &model)
 
         case .insertSubtrees(let mapping, let anchors):
             for (id, node) in mapping.sorted(by: { $0.key < $1.key }) {
@@ -207,9 +222,11 @@ extension MapCommand {
             }
 
         case .group(_, let commands):
+            var working = model
             for command in commands {
-                try command.apply(to: &model)
+                try command.apply(to: &working)
             }
+            model = working
 
         case .setSide(let id, let side):
             guard model.nodes[id] != nil else {
@@ -228,7 +245,60 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             model.nodes[id]?.offset = offset
+
+        case .setConnections(let connections):
+            model.connections = connections
+
+        case .setBoundaries(let boundaries):
+            model.boundaries = boundaries
+
+        case .setSummaries(let summaries):
+            model.summaries = summaries
         }
+    }
+
+    /// Strips every connection, boundary and summary that references a
+    /// removed node, so the model stays structurally valid after a delete.
+    /// The delete commands' inverses restore the pre-delete lists wholesale.
+    func purgeSecondaryReferences(to removed: Set<String>, in model: inout MapModel) {
+        guard !removed.isEmpty else { return }
+        let connections = (model.connections ?? []).filter { connection in
+            !removed.contains(connection.from) && !removed.contains(connection.to)
+        }
+        model.connections = connections.isEmpty ? nil : connections
+
+        var boundaries: [Boundary] = []
+        for boundary in model.boundaries ?? [] {
+            let nodes = boundary.nodes.filter { !removed.contains($0) }
+            if nodes.isEmpty { continue }
+            if nodes.count == boundary.nodes.count {
+                boundaries.append(boundary)
+            } else {
+                boundaries.append(Boundary(id: boundary.id, nodes: nodes, title: boundary.title, style: boundary.style))
+            }
+        }
+        model.boundaries = boundaries.isEmpty ? nil : boundaries
+
+        let summaries = (model.summaries ?? []).filter { summary in
+            !removed.contains(summary.node) && !removed.contains(summary.parent)
+                && !summary.range.contains { removed.contains($0) }
+        }
+        model.summaries = summaries.isEmpty ? nil : summaries
+    }
+
+    /// Drops summaries whose range is no longer a run of the summary
+    /// parent's children (moves, promotions, demotions and detachments can
+    /// break them). The move commands' inverses restore the pre-move list.
+    func purgeStaleSummaries(in model: inout MapModel) {
+        let summaries = (model.summaries ?? []).filter { summary in
+            guard let parent = model.nodes[summary.parent] else { return false }
+            guard model.nodes[summary.node] != nil else { return false }
+            for rangeID in summary.range where !parent.children.contains(rangeID) {
+                return false
+            }
+            return true
+        }
+        model.summaries = summaries.isEmpty ? nil : summaries
     }
 
     // swiftlint:enable cyclomatic_complexity function_body_length
