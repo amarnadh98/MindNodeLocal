@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved.bak
+# Release artifacts
+*.dmg
+*.zip
+dist/
