@@ -17,8 +17,10 @@ final class DocumentWindowController: NSWindowController {
         window.title = document.displayName
         window.minSize = NSSize(width: 480, height: 360)
         window.contentView = canvas
+        // Note: addWindowController(_:) assigns .document, so this init
+        // must not set it first — assigning it here makes AppKit's insert
+        // a no-op and the document ends up with zero window controllers.
         super.init(window: window)
-        self.document = document
 
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
@@ -29,9 +31,18 @@ final class DocumentWindowController: NSWindowController {
         nil
     }
 
-    override func windowDidLoad() {
-        super.windowDidLoad()
-        updateScene(preserveCamera: false)
+    /// The document is only wired up after `addWindowController` returns,
+    /// and the window reaches its real content size once shown — so the
+    /// first scene build and fit run here, not in `init`.
+    override func showWindow(_ sender: Any?) {
+        if canvas.scene == nil {
+            updateScene(preserveCamera: false)
+        }
+        super.showWindow(sender)
+        if canvas.needsInitialFit {
+            canvas.zoomToFit()
+            canvas.needsInitialFit = false
+        }
     }
 
     /// Rebuilds the scene from the document's model at the view's

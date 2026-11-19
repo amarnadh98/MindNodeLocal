@@ -28,6 +28,12 @@
 - Repair: unreachable cycles are now broken (lowest-ID member promoted to a root, then resync) instead of being left unreachable; repair order is deterministic (creation time, then ID) so the same broken file always repairs identically; duplicate `children` entries are detected, reported, and de-duplicated.
 - CI: new `perf` job runs MapLayout tests in release, enforcing the SPEC §11.8 10 ms budget.
 
+### Fixed (re-review on PR #5)
+- Opened documents showed an empty canvas: the scene build had moved to `windowDidLoad`, which never fires for programmatically-constructed window controllers. The first build now runs in `showWindow(_:)` (document wired, window at its real size), with the initial zoom-to-fit.
+- Root cause found along the way: assigning `windowController.document` before `addWindowController(_:)` makes AppKit's insertion a no-op, leaving the document with zero window controllers — the assignment is removed (with a comment) and `addWindowController` owns it.
+- New hosted app test opens a `.arbor` package, shows the window, and asserts the canvas scene, the initial fit, and >500 drawn pixels.
+- View menu: hidden alternate Zoom In item with the `=` key equivalent, so ⌘= works even when a text field has focus.
+
 ### Fixed (review on PR #5)
 - Canvas actually renders: dropped the custom `CALayer` assignment (a layer-hosting view's delegate-less layer never draws); the view now draws into its standard backing layer.
 - Multi-root stacking by the tree's full extent — balanced subtrees extend above the root, so stacking by the root's own `minY` overlapped trees (regression-tested with a wide-root scenario).

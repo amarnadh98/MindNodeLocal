@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "View",
                 [
                     item("Zoom In", #selector(CanvasView.zoomInAction(_:)), "+"),
+                    item("Zoom In", #selector(CanvasView.zoomInAction(_:)), "=", hidden: true),
                     item("Zoom Out", #selector(CanvasView.zoomOutAction(_:)), "-"),
                     item("Actual Size", #selector(CanvasView.actualSizeAction(_:)), "0"),
                     item("Zoom to Fit", #selector(CanvasView.zoomToFitAction(_:)), "9"),
@@ -118,13 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func item(
-        _ title: String, _ action: Selector, _ key: String, option: Bool = false
+        _ title: String, _ action: Selector, _ key: String, option: Bool = false,
+        hidden: Bool = false
     ) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: key)
         menuItem.target = nil
         if option {
             menuItem.keyEquivalentModifierMask = [.command, .option]
         }
+        menuItem.isHidden = hidden
         return menuItem
     }
 }

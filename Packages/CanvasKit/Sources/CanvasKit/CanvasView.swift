@@ -31,6 +31,11 @@ public final class CanvasView: NSView {
 
     public private(set) var selection: Set<String> = []
 
+    /// True until the host has run the first `zoomToFit` against the
+    /// window's real on-screen content size (windows open at the creation
+    /// frame and resize with the window frame).
+    public var needsInitialFit = true
+
     /// Called after any selection change caused by canvas interaction.
     public var onSelectionChange: ((Set<String>) -> Void)?
 
