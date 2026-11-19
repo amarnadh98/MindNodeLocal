@@ -4,11 +4,14 @@ import MapCore
 import MapRender
 
 /// The mind-map canvas: a flipped `NSView` that renders a `CanvasScene`
-/// through a camera, drawing into its standard backing layer. Pan with
-/// two-finger scroll (content follows the fingers), zoom with pinch
-/// (anchored at the cursor), ⌘+/⌘−/⌘0/⌘9/⌘* step, fit and zoom-to-
-/// selection per F-CAN-2. Click and ⌘-click select, drag on empty canvas
-/// rubber-bands (F-CAN-4).
+/// through a camera and a virtualized Core Animation layer tree (SPEC
+/// §11.4 — `CanvasLayerTree`): the camera is a `sublayerTransform`, one
+/// pooled layer per visible node rasterized by the shared
+/// `NodeRenderer`, one shape layer per visible branch, and relayouts
+/// animate per §7.6. Pan with two-finger scroll (content follows the
+/// fingers), zoom with pinch (anchored at the cursor),
+/// ⌘+/⌘−/⌘0/⌘9/⌘* step, fit and zoom-to-selection per F-CAN-2. Click
+/// and ⌘-click select, drag on empty canvas rubber-bands (F-CAN-4).
 ///
 /// Zoom steps are exposed as methods so the View menu can target them
 /// with key equivalents (§14.1: reachable from menus); the canvas handles
@@ -25,16 +28,35 @@ public final class CanvasView: NSView {
             // The editing node's frame may have moved (or vanished) in
             // the rebuilt scene; the overlay follows or tears down.
             nodeTextEditor.reconcileWithScene()
+            applyScene(
+                animated: oldValue != nil && !isEditing && !nextApplyIsInstant)
+            nextApplyIsInstant = false
+            updateRubberBandLayer()
             needsDisplay = true
         }
+    }
+
+    /// Host entry for the §7.6 opt-outs: applies `newScene` with or
+    /// without the relayout animation (initial load and live typing
+    /// growth stay instant). Setting `scene` directly animates every
+    /// relayout — F-LAY-13 — except while an editing session is open.
+    public func setScene(_ newScene: CanvasScene, animated: Bool) {
+        if !animated {
+            nextApplyIsInstant = true
+        }
+        scene = newScene
     }
 
     public var camera: Camera {
         didSet {
             guard camera != oldValue else { return }
             clampCameraScale()
-            // Pan/zoom move the editing node on screen; the overlay is
-            // re-positioned, never re-rendered (SPEC §11.4).
+            // The camera is a sublayerTransform: pan and zoom move
+            // layers, never re-raster them (SPEC §11.4). The editing
+            // overlay is re-positioned, never re-rendered.
+            layerTree.updateCamera(
+                camera: camera, viewport: bounds.size, backingScale: backingScale)
+            ensureTreeHosted()
             nodeTextEditor.syncPosition()
             needsDisplay = true
             // F-CAN-8: the host debounces a view-state save per camera
@@ -54,6 +76,11 @@ public final class CanvasView: NSView {
     /// The inline editing overlay (SPEC §11.4); owns the TextKit 2 text
     /// view and the session state.
     public let nodeTextEditor = NodeTextEditor()
+
+    /// The virtualized layer tree (SPEC §11.4): camera transform,
+    /// pooled per-visible-node layers, branch shape layers, relayout
+    /// animation.
+    let layerTree = CanvasLayerTree()
 
     /// F-CAN-5: double-click on empty canvas → the host creates a
     /// floating root at this model point and enters edit mode.
@@ -92,16 +119,26 @@ public final class CanvasView: NSView {
     /// The F-CAN-2 zoom step list: ⌘+ and ⌘− snap to the next stop.
     public static let zoomSteps: [CGFloat] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 
-    private var grid = SpatialGrid()
-    private var rubberBandStart: CGPoint?
-    private var rubberBandRect: NSRect?
-    private var lastRenderedVariant: ThemeVariant?
+    var grid = SpatialGrid()
+    var rubberBandStart: CGPoint?
+    var rubberBandRect: NSRect?
+    /// The rubber band draws in a shape layer above the content tree
+    /// (the view's own drawing sits *under* its sublayers).
+    let rubberBandLayer = CAShapeLayer()
+    private var lastLayoutSize: CGSize = .zero
+    var nextApplyIsInstant = false
 
     public override init(frame frameRect: NSRect) {
         self.camera = Camera()
         super.init(frame: frameRect)
         wantsLayer = true
         nodeTextEditor.canvas = self
+        rubberBandLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        rubberBandLayer.strokeColor = NSColor.controlAccentColor.cgColor
+        rubberBandLayer.lineWidth = 1
+        rubberBandLayer.zPosition = 3
+        rubberBandLayer.isHidden = true
+        layerTree.root.addSublayer(rubberBandLayer)
     }
 
     @available(*, unavailable)
@@ -110,6 +147,12 @@ public final class CanvasView: NSView {
         super.init(coder: coder)
         wantsLayer = true
         nodeTextEditor.canvas = self
+        rubberBandLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        rubberBandLayer.strokeColor = NSColor.controlAccentColor.cgColor
+        rubberBandLayer.lineWidth = 1
+        rubberBandLayer.zPosition = 3
+        rubberBandLayer.isHidden = true
+        layerTree.root.addSublayer(rubberBandLayer)
     }
 
     public override var isFlipped: Bool { true }
@@ -125,33 +168,6 @@ public final class CanvasView: NSView {
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         onEffectiveAppearanceChange?()
-    }
-
-    // MARK: drawing
-
-    public override func draw(_ dirtyRect: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        guard let scene else { return }
-        SceneRenderer.draw(
-            scene: scene,
-            camera: camera,
-            selection: selection,
-            selectionColor: selectionColor,
-            editingNodeID: nodeTextEditor.editingNodeID,
-            in: context,
-            viewport: bounds.size)
-
-        if let rubberBandRect {
-            context.setFillColor(NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor)
-            context.fill(rubberBandRect)
-            context.setStrokeColor(NSColor.controlAccentColor.cgColor)
-            context.setLineWidth(1)
-            context.stroke(rubberBandRect)
-        }
-    }
-
-    private var selectionColor: CGColor {
-        NSColor.controlAccentColor.cgColor
     }
 
     // MARK: camera actions
@@ -256,6 +272,14 @@ public final class CanvasView: NSView {
 
     public override func layout() {
         super.layout()
+        ensureTreeHosted()
+        layerTree.root.frame = CGRect(origin: .zero, size: bounds.size)
+        if bounds.size != lastLayoutSize {
+            lastLayoutSize = bounds.size
+            // The viewport changed: re-cull for the new visible set.
+            layerTree.updateCamera(
+                camera: camera, viewport: bounds.size, backingScale: backingScale)
+        }
         needsDisplay = true
     }
 
@@ -378,6 +402,7 @@ public final class CanvasView: NSView {
             if let id = nodeID(at: point) {
                 selection = [id]
                 onSelectionChange?(selection)
+                syncSelectionRings()
                 beginEditing(nodeID: id)
                 rubberBandStart = nil
                 needsDisplay = true
@@ -399,6 +424,7 @@ public final class CanvasView: NSView {
                 selection = [id]
             }
             onSelectionChange?(selection)
+            syncSelectionRings()
             drag = .pending(
                 PendingDrag(
                     grabbedID: id,
@@ -411,9 +437,11 @@ public final class CanvasView: NSView {
             drag = nil
             rubberBandStart = point
             rubberBandRect = nil
+            updateRubberBandLayer()
             if !event.modifierFlags.contains(.command) {
                 selection = []
                 onSelectionChange?(selection)
+                syncSelectionRings()
             }
         }
         needsDisplay = true
@@ -429,6 +457,7 @@ public final class CanvasView: NSView {
         rubberBandRect = NSRect(
             x: min(start.x, point.x), y: min(start.y, point.y),
             width: abs(point.x - start.x), height: abs(point.y - start.y))
+        updateRubberBandLayer()
         needsDisplay = true
     }
 
@@ -441,6 +470,7 @@ public final class CanvasView: NSView {
         defer {
             rubberBandStart = nil
             rubberBandRect = nil
+            updateRubberBandLayer()
             needsDisplay = true
         }
         guard let start = rubberBandStart else { return }
@@ -460,6 +490,7 @@ public final class CanvasView: NSView {
             selection = hits
         }
         onSelectionChange?(selection)
+        syncSelectionRings()
     }
 
     /// ⌥/⌘ pressed or released during a drag (F-EDT-5); see
@@ -502,6 +533,7 @@ extension CanvasView {
     /// scene (deleted nodes, descendants of newly folded nodes).
     public func setSelection(_ ids: Set<String>) {
         selection = ids.filter { scene?.nodes[$0] != nil }
+        syncSelectionRings()
         needsDisplay = true
         onSelectionChange?(selection)
     }
@@ -511,6 +543,7 @@ extension CanvasView {
         let valid = selection.filter { scene?.nodes[$0] != nil }
         guard valid != selection else { return }
         selection = valid
+        syncSelectionRings()
         needsDisplay = true
         onSelectionChange?(selection)
     }

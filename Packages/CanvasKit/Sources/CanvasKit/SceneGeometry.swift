@@ -49,6 +49,44 @@ public struct CanvasScene {
     }
 }
 
+/// Per-build memoization. A scene rebuild resolves every node's style
+/// again; styles and branch colors are level-indexed (few dozen
+/// distinct values for thousands of nodes), so resolving them once per
+/// build keeps the keystroke → relayout path inside its §11.8 budget.
+final class BuildCaches {
+    struct StyleKey: Hashable {
+        let level: Int
+        let level1Index: Int
+    }
+
+    private let variant: ThemeVariant
+    private var styles: [StyleKey: ResolvedNodeStyle] = [:]
+    private var branchColors: [Int: CGColor] = [:]
+
+    init(variant: ThemeVariant) {
+        self.variant = variant
+    }
+
+    func style(level: Int, level1Index: Int) -> ResolvedNodeStyle {
+        let key = StyleKey(level: level, level1Index: level1Index)
+        if let cached = styles[key] {
+            return cached
+        }
+        let resolved = PaperTheme.resolvedStyle(level: level, level1Index: level1Index, variant: variant)
+        styles[key] = resolved
+        return resolved
+    }
+
+    func branchColor(level1Index: Int) -> CGColor {
+        if let cached = branchColors[level1Index] {
+            return cached
+        }
+        let resolved = PaperTheme.branchColor(level1Index: level1Index, variant: variant)
+        branchColors[level1Index] = resolved
+        return resolved
+    }
+}
+
 /// Builds a `CanvasScene` from a `MapModel`: measures every visible node
 /// once through the shared `TextMeasurer`, lays out each root's tree with
 /// `TreeLayout` (stacking multiple roots), resolves Paper-theme styles
@@ -68,13 +106,18 @@ public enum SceneGeometry {
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
         var cursorY: CGFloat = 0
+        let caches = BuildCaches(variant: variant)
 
         for rootID in model.roots {
             guard model.nodes[rootID] != nil else { continue }
             let structure = rootStructure(model, rootID: rootID)
+            // Depth and level-1 ancestry are recorded by the same walk
+            // that measures and prunes (they used to be a per-node chain
+            // walk — O(depth²) per node on a 5k rebuild).
+            var ancestry: [String: AncestryInfo] = [:]
             let layoutRoot = layoutTree(
-                model: model, rootID: rootID, measurer: measurer, variant: variant,
-                editingTitle: editingTitle)
+                model: model, rootID: rootID, measurer: measurer,
+                caches: caches, ancestry: &ancestry, editingTitle: editingTitle)
             guard let layoutRoot else { continue }
 
             let frames = TreeLayout.layout(
@@ -90,19 +133,16 @@ public enum SceneGeometry {
             var bottom = (frames[rootID]?.maxY ?? 0)
             for (id, frame) in frames {
                 guard let node = model.nodes[id] else { continue }
-                let info = ancestryInfo(model: model, id: id, rootID: rootID)
+                let info = ancestry[id] ?? AncestryInfo(depth: 0, level1AncestorID: id)
                 let offset = offsets[id] ?? .zero
                 let translated = frame.offsetBy(dx: offset.x, dy: offsetY + offset.y)
                 let level1Index =
-                    info.depth == 0
-                    ? 0
-                    : rootLevel1Index[info.level1AncestorID] ?? 0
+                    info.depth == 0 ? 0 : rootLevel1Index[info.level1AncestorID] ?? 0
                 let title = id == editingTitle?.id ? editingTitle?.title : node.title
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
-                    style: PaperTheme.resolvedStyle(
-                        level: info.depth, level1Index: level1Index, variant: variant),
+                    style: caches.style(level: info.depth, level1Index: level1Index),
                     title: title ?? node.title,
                     level: info.depth,
                     level1Index: level1Index,
@@ -114,7 +154,8 @@ public enum SceneGeometry {
 
             branches.append(
                 contentsOf: connectors(
-                    model: model, rootID: rootID, nodes: &nodes, variant: variant))
+                    model: model, rootID: rootID, nodes: &nodes,
+                    caches: caches))
 
             cursorY = bottom + rootStackGap
         }
@@ -140,17 +181,18 @@ public enum SceneGeometry {
 
     /// Builds the layout tree for one root: measured node sizes, folded
     /// subtrees pruned. The editing node measures its live draft title so
-    /// the node grows while typing (F-EDT-8).
+    /// the node grows while typing (F-EDT-8). The same walk records each
+    /// node's depth and level-1 ancestor.
     static func layoutTree(
         model: MapModel,
         rootID: String,
         measurer: TextMeasurer,
-        variant: ThemeVariant,
+        caches: BuildCaches,
+        ancestry: inout [String: AncestryInfo],
         editingTitle: (id: String, title: NodeTitle)? = nil
     ) -> LayoutNode? {
         func measuredSize(for node: Node, depth: Int) -> CGSize {
-            let style: ResolvedNodeStyle = PaperTheme.resolvedStyle(
-                level: depth, level1Index: 0, variant: variant)
+            let style = caches.style(level: depth, level1Index: 0)
             let maxWidth: CGFloat?
             if node.width?.mode == .fixed, let fixed = node.width?.value {
                 maxWidth = fixed
@@ -165,20 +207,26 @@ public enum SceneGeometry {
             return CGSize(width: width, height: height)
         }
 
-        func buildNode(_ id: String, depth: Int) -> LayoutNode? {
+        func buildNode(_ id: String, depth: Int, level1: String) -> LayoutNode? {
             guard let node: Node = model.nodes[id] else { return nil }
+            ancestry[id] = AncestryInfo(
+                depth: depth,
+                // The level-1 ancestor of a root (depth 0) and of a
+                // first-level node is the node itself.
+                level1AncestorID: depth <= 1 ? id : level1)
             let size = measuredSize(for: node, depth: depth)
             var children: [LayoutNode] = []
             if !node.folded {
+                let childLevel1 = depth == 0 ? id : (depth == 1 ? id : level1)
                 for childID in node.children {
-                    if let child = buildNode(childID, depth: depth + 1) {
+                    if let child = buildNode(childID, depth: depth + 1, level1: childLevel1) {
                         children.append(child)
                     }
                 }
             }
             return LayoutNode(id: id, size: size, side: side(of: node), children: children)
         }
-        return buildNode(rootID, depth: 0)
+        return buildNode(rootID, depth: 0, level1: rootID)
     }
 
     /// A node's manual offset, plus the accumulated offsets of its
@@ -206,30 +254,12 @@ public enum SceneGeometry {
         return sidePin == .left ? .left : .right
     }
 
+    /// Depth from the root and the level-1 ancestor that colors this
+    /// node's branch — recorded by the same recursion that measures
+    /// (`layoutTree`), so a rebuild never walks ancestor chains again.
     struct AncestryInfo {
         let depth: Int
         let level1AncestorID: String
-    }
-
-    /// Depth from the root and the level-1 ancestor that colors this
-    /// node's branch. The chain walk is short (tree depth), so the array
-    /// is cheap.
-    static func ancestryInfo(model: MapModel, id: String, rootID: String) -> AncestryInfo {
-        var chain: [String] = [id]
-        var current = id
-        while current != rootID {
-            guard let parent = model.nodes[current]?.parent,
-                parent != current, !chain.contains(parent)
-            else { break }
-            chain.append(parent)
-            current = parent
-        }
-        let depth = chain.count - 1
-        let level1 =
-            chain.first { candidate in
-                candidate != rootID && model.nodes[candidate]?.parent == rootID
-            } ?? id
-        return AncestryInfo(depth: depth, level1AncestorID: level1)
     }
 
     static func levelOneIndices(model: MapModel, rootID: String) -> [String: Int] {
@@ -245,7 +275,7 @@ public enum SceneGeometry {
         model: MapModel,
         rootID: String,
         nodes: inout [String: SceneNode],
-        variant: ThemeVariant
+        caches: BuildCaches
     ) -> [SceneBranch] {
         var result: [SceneBranch] = []
         let structure = rootStructure(model, rootID: rootID)
@@ -265,8 +295,7 @@ public enum SceneGeometry {
         func walk(_ id: String, parentInfo: (level: Int, index: Int)) {
             guard let node = model.nodes[id] else { return }
             let children = node.folded ? [] : node.children
-            let parentStyle = PaperTheme.resolvedStyle(
-                level: parentInfo.level, level1Index: parentInfo.index, variant: variant)
+            let parentStyle = caches.style(level: parentInfo.level, level1Index: parentInfo.index)
             for childID in children {
                 guard let childScene = nodes[childID] else { continue }
                 let direction: BranchDirection
@@ -295,8 +324,7 @@ public enum SceneGeometry {
                         axis: axis,
                         startWidth: widths.start,
                         endWidth: widths.end,
-                        color: PaperTheme.branchColor(
-                            level1Index: childScene.level1Index, variant: variant),
+                        color: caches.branchColor(level1Index: childScene.level1Index),
                         tapered: true))
                 walk(childID, parentInfo: (level: parentInfo.level + 1, index: childScene.level1Index))
             }
