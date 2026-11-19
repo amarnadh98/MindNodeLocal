@@ -1,4 +1,4 @@
-# ADR 0009: read-only zip via Apple's Compression framework instead of ZIPFoundation
+# ADR 0010: read-only zip via Apple's Compression framework instead of ZIPFoundation
 
 Date: 2026-11-19
 Status: accepted
