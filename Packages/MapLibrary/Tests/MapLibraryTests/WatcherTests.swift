@@ -58,9 +58,15 @@ import Testing
         #expect(source.folders == [URL(fileURLWithPath: "/tmp/maps")])
 
         source.emit([URL(fileURLWithPath: "/tmp/maps/changed.arbor")])
-        try await Task.sleep(for: .milliseconds(150))
+        // Poll instead of a fixed sleep: CI runners can be far slower
+        // than the 20 ms debounce.
+        let deadline = ContinuousClock.now + .seconds(5)
+        while received.batches.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(received.batches.count == 1)
-        #expect(received.batches[0] == [URL(fileURLWithPath: "/tmp/maps/changed.arbor")])
+        let batch = try #require(received.batches.first)
+        #expect(batch == [URL(fileURLWithPath: "/tmp/maps/changed.arbor")])
     }
 
     @Test func fseventsSourceRegistersFoldersAndTearsDown() {
