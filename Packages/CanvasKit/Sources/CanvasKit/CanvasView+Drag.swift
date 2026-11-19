@@ -11,6 +11,12 @@ enum DragState {
     case active(DragSession)
 }
 
+extension CanvasView {
+    /// True while a node drag (or its pending threshold) is active —
+    /// the contextual bar's hide-while-dragging contract (§6.3).
+    public var isDragging: Bool { drag != nil }
+}
+
 /// A mouse-down on a node, before the threshold decides click vs drag.
 struct PendingDrag {
     let grabbedID: String

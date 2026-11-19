@@ -4,10 +4,10 @@ import MapRender
 
 /// Branch-width resolution for `SceneGeometry`'s connectors, split out to
 /// keep the scene builder reviewable: the theme's §7.2 taper, plus the
-/// per-node branch overrides (F-STY-2 width/taper, ADR-0027).
+/// per-node branch overrides (F-STY-2 width/taper, ADR-0028).
 extension SceneGeometry {
     /// Branch widths after the child node's overrides (F-STY-2 branch
-    /// width/taper, ADR-0027): `branchWidth` sets the width — the start
+    /// width/taper, ADR-0028): `branchWidth` sets the width — the start
     /// of a taper, or the constant stroke of curved/straight/elbow —
     /// and `branchTaper` is the fall-off to the child end (floored at
     /// the §7.2 leaf width 2). The theme's own widths (precomputed by

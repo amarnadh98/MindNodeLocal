@@ -46,7 +46,7 @@ extension Theme {
     /// min/max width). The branch fields (`branchColor`, `branchWidth`,
     /// `branchTaper`, `branchLineStyle`) do **not** land here: they
     /// override the one connector drawn from the node's *parent* to the
-    /// node (ADR-0027), which `SceneGeometry` resolves while building
+    /// node (ADR-0028), which `SceneGeometry` resolves while building
     /// branch connectors.
     ///
     /// Unknown values (bad hexes, unrecognized alignment strings) are

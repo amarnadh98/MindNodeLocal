@@ -10,7 +10,7 @@ import Foundation
 /// Version 4 added four OPTIONAL fields — `NodeStylePatch.fontWeight`,
 /// `NodeStylePatch.fontItalic` (F-STY-2 text weight/italic),
 /// `NodeStylePatch.minWidth` and `ThemePatch.rainbowBranches` (F-STY-8's
-/// toggle as a document override, ADR-0027) — so `Migrations.v3ToV4`
+/// toggle as a document override, ADR-0028) — so `Migrations.v3ToV4`
 /// has nothing to back-fill: older files decode with `nil` and keep
 /// rendering exactly as before; the step only stamps the version so a
 /// save writes current-format files.

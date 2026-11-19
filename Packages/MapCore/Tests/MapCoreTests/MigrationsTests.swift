@@ -22,7 +22,7 @@ struct MigrationsTests {
         let migrated = try Migrations.migrate(v2, from: 2)
         let v3 = try decodeFixture("map-v3")
         // `migrate` always lands on the current version: the chain is
-        // v2 → v3 (stamp) → v4 (stamp, ADR-0027), so the expected value
+        // v2 → v3 (stamp) → v4 (stamp, ADR-0028), so the expected value
         // is the v3 fixture plus the v4 stamp.
         var expected = v3
         expected.formatVersion = ArborFormat.formatVersion
@@ -43,7 +43,7 @@ struct MigrationsTests {
     }
 
     @Test func v3FixtureMigratesToV4ByStampingOnly() throws {
-        // v3 → v4 (ADR-0027): the new fields (`NodeStylePatch.fontWeight`
+        // v3 → v4 (ADR-0028): the new fields (`NodeStylePatch.fontWeight`
         // / `fontItalic` / `minWidth`, `ThemePatch.rainbowBranches`) are
         // optional, so a v3 file migrates to itself plus the version.
         let v3 = try decodeFixture("map-v3-ai-policy")

@@ -97,9 +97,10 @@ struct LogicLayoutTests {
             rootID: tree.id, structure: .logicChartRight, dirty: nil, source: source)
         #expect(asChart.frames == chartFresh.frames)
         #expect(
-            asChart.frames != IncrementalLayout.update(
-                rootID: tree.id, structure: .mindmapRight, dirty: nil, source: source
-            ).frames,
+            asChart.frames
+                != IncrementalLayout.update(
+                    rootID: tree.id, structure: .mindmapRight, dirty: nil, source: source
+                ).frames,
             "the compact rhythm must actually differ from the mind map's")
     }
 }

@@ -21,7 +21,7 @@ extension CanvasLayerTree {
     }
 
     static func branchPath(_ branch: SceneBranch) -> CGPath {
-        // §7.4 line styles, after the child's branch override (ADR-0027):
+        // §7.4 line styles, after the child's branch override (ADR-0028):
         // tapered fills its offset polygon; curved/straight/elbow stroke;
         // `none` draws nothing.
         switch branch.lineStyle {

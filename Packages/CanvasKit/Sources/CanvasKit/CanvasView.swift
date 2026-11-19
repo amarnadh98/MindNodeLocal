@@ -223,12 +223,6 @@ public final class CanvasView: NSView {
     public override var acceptsFirstResponder: Bool { true }
 
     /// The theme variant matching this view's effective appearance.
-    public var effectiveVariant: ThemeVariant {
-        let names = [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]
-        let best = effectiveAppearance.bestMatch(from: names) ?? .aqua
-        return best == .darkAqua ? .dark : .light
-    }
-
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         onEffectiveAppearanceChange?()

@@ -8,6 +8,21 @@ import MapRender
 final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     let canvas = CanvasView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
+    /// The inspector pane (SPEC §4.1, F-STY-2/3/4/6): a trailing
+    /// inspector-style split item hosting SwiftUI, hidden by default
+    /// (visibility persisted in `DocumentPreferences`). Owns no model
+    /// state; every mutation is one `MapStore` command. Installed
+    /// lazily — see InspectorPaneController.
+    let inspector = InspectorPaneController()
+
+    /// §6.3: the contextual floating bar above a settled selection.
+    let contextualBar = ContextualBarController()
+
+    /// F-STY-4 live theme preview: the theme grid's hovered tile pins
+    /// the scene's theme WITHOUT touching the model (view-only; hover
+    /// never dirties the document). `nil` = the stored selection.
+    var previewThemeID: String?
+
     /// M4 (F-OUT): the outline pane — a second view on the same store.
     /// All outline logic lives in App/Sources/Outline/; the integration
     /// hooks are in DocumentWindowController+Outline.swift.
@@ -79,13 +94,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// DocumentWindowController+Recall.swift.
     var recallSessionBox: RecallSession?
 
-    /// The pasteboard flavours written by copy/cut (F-EDT-9): the
-    /// internal lossless payload plus the three interop texts. The
-    /// payload type is readable by the M3 media paste path too.
-    static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
-    static let markdownType = NSPasteboard.PasteboardType("net.daringfireball.markdown")
-    static let opmlType = NSPasteboard.PasteboardType("org.opml.opml")
-
     init(document: NSDocument) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
@@ -108,6 +116,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // delegate assignment.
         window.delegate = self
         installOutlineIntegration()
+        // The inspector reaches back into this controller (its store,
+        // canvas and window); the pane installs only after `super.init`.
+        inspector.host = self
+        contextualBar.attach(to: self)
 
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
@@ -120,9 +132,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // F-FOC: find rings re-pin at the new camera and dimming
             // re-applies to whatever the new viewport realized.
             self?.focusFind.cameraDidChange()
+            // §6.3: the contextual bar follows the selection under the
+            // camera.
+            self?.contextualBar.reposition()
         }
         canvas.onSelectionChange = { [weak self] ids in
             self?.canvasSelectionDidChange(ids)
+            // The inspector's snapshot follows the selection.
+            self?.inspector.refresh()
+            // §6.3: the contextual bar waits for the selection to
+            // settle.
+            self?.contextualBar.selectionDidChange()
             // Toolbar/menu validation follows the selection.
             self?.documentToolbar?.validateVisibleItems()
             // F-FOC: navigation inside focus moves the focus.
@@ -134,12 +154,21 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
         }
+        // §6.3: the bar hides while typing — the editing session's own
+        // hooks (commit and the live draft) carry this; a fresh selection
+        // change re-presents it after the settle delay.
         canvas.onEditingDraftChange = { [weak self] id, title in
             self?.editingDraftTitle = (id, title)
+            self?.contextualBar.dismiss()
             self?.updateDraftScene()
         }
         canvas.onCreateFloatingNode = { [weak self] point in
             self?.createFloatingNode(at: point)
+        }
+        // F-LAY-14: a folded node's count pill unfolds it — one undo
+        // step, the selection untouched.
+        canvas.onUnfoldPill = { [weak self] id in
+            self?.unfoldFromPill(id)
         }
         canvas.onDrop = { [weak self] command, selection in
             self?.performDragDrop(command, selection: selection)
@@ -210,6 +239,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // read-only banner from the first frame.
         installReadOnlyBannerIfNeeded()
         super.showWindow(sender)
+        // The inspector's first install (persisted preference) and
+        // snapshot; later refreshes ride selection and model changes.
+        inspectorWindowDidShow()
         // F-CAN-8: a stored view state restores the camera and the
         // (sanitized) selection INSTEAD of zoom-to-fit; only a document
         // with no sidecar (or a corrupt one) fits.
@@ -295,14 +327,20 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-FOC (find): the rendering model may temporarily unfold the
         // current match's folded ancestors — a view-level value copy,
         // never the document's model (FocusFindCoordinator).
-        let model = focusFind.renderingModel(base: mapDocument.store.model)
+        var model = focusFind.renderingModel(base: mapDocument.store.model)
+        // F-STY-4: a live theme preview (hover) overrides the stored
+        // selection for this build only — the model is untouched.
+        previewThemeOverride(for: &model)
         let previousCamera = canvas.camera
         let variant = currentVariant()
+        // F-LAY-12: the user-level spacing rhythm (the inspector's
+        // Layout pane is its editor).
+        let spacing = effectiveLayoutSpacing
         let cache: SceneBuildCache
-        if let existing = sceneCache, existing.variant == variant {
+        if let existing = sceneCache, existing.variant == variant, existing.spacing == spacing {
             cache = existing
         } else {
-            cache = SceneBuildCache(variant: variant)
+            cache = SceneBuildCache(variant: variant, spacing: spacing)
             sceneCache = cache
         }
         // M3 media: the document's thumbnail/SF-glyph/math lookup
@@ -313,6 +351,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             cache: cache,
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
+            spacing: spacing,
             showsTagPills: showsTagPills,
             prunedIDs: mediaCoordinator.prunedIDs(model: model),
             editingTitle: editingDraftTitle,
@@ -336,7 +375,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// (first scene, appearance flip).
     private func updateDraftScene() {
         guard let mapDocument = document as? MapDocument,
-            let cache = sceneCacheForCurrentVariant(),
+            let cache = sceneCacheFor(
+                variant: currentVariant(), spacing: effectiveLayoutSpacing),
             let id = editingDraftTitle?.id
         else {
             updateScene(preserveCamera: true)
@@ -348,6 +388,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             cache: cache,
             variant: currentVariant(),
             measurer: SceneRenderer.sharedMeasurer,
+            spacing: effectiveLayoutSpacing,
             dirty: [id],
             editingTitle: editingDraftTitle,
             theme: ThemeCatalog.shared.theme(for: model))
@@ -356,10 +397,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The document's scene cache when it matches the current variant
-    /// (light/dark), else nil — the caller falls back to a full rebuild.
+    /// and spacing, else nil — the caller falls back to a full rebuild.
     private func sceneCacheForCurrentVariant() -> SceneBuildCache? {
-        guard let cache = sceneCache, cache.variant == currentVariant() else { return nil }
-        return cache
+        sceneCacheFor(variant: currentVariant(), spacing: effectiveLayoutSpacing)
     }
 
     /// After any store change (perform, undo, redo): rebuild the scene —
@@ -393,6 +433,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 cache: cache,
                 variant: currentVariant(),
                 measurer: SceneRenderer.sharedMeasurer,
+                spacing: effectiveLayoutSpacing,
                 dirty: dirty,
                 editingTitle: editingDraftTitle,
                 theme: ThemeCatalog.shared.theme(for: model))
@@ -406,6 +447,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-TAG-3: the filter bar's document-driven popups (tags,
         // types, saved filters) follow the change.
         mediaCoordinator.refreshFilterBar()
+        // The inspector follows every store change (theme, appearance,
+        // structure, style edits included).
+        inspector.refresh()
+        // §6.3: the bar repositions against the rebuilt scene.
+        contextualBar.reposition()
         // F-FOC: refresh the find matches and the dimming against the
         // post-change model.
         focusFind.sceneDidChange()
@@ -460,6 +506,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// Swift through NSWindowController, hence no `override`.)
     func windowWillClose(_ notification: Notification) {
         saveViewStateNow()
+        contextualBar.dismiss()
     }
 
     /// Reopen restore: the stored camera and selection come back as they
@@ -479,42 +526,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             applyViewMode(state.activeView)
         }
         return true
-    }
-
-    // MARK: clipboard (F-EDT-9)
-
-    /// ⌘C: writes ALL flavours — the internal payload (the only lossless
-    /// one) plus plain text, Markdown and OPML — as one item. While a
-    /// node is being edited the overlay's text view is first responder
-    /// and answers `copy:` itself; these actions only see map-level
-    /// presses. (AppKit's `-copy:` & co. aren't exposed to Swift, hence
-    /// plain `@objc` declarations rather than overrides.)
-    @objc func copy(_ sender: Any?) {
-        guard !canvas.isEditing, let store, !canvas.selection.isEmpty else { return }
-        let model = store.model
-        let ids = canvas.selection.sorted()
-        guard let payload = try? PasteboardSerializer.payload(from: model, selection: ids) else {
-            return
-        }
-        let item = NSPasteboardItem()
-        item.setData(payload, forType: Self.payloadType)
-        item.setString(PasteboardSerializer.plainText(from: model, selection: ids), forType: .string)
-        item.setString(PasteboardSerializer.markdown(from: model, selection: ids), forType: Self.markdownType)
-        item.setString(PasteboardSerializer.opml(from: model, selection: ids), forType: Self.opmlType)
-        clipboard.clearContents()
-        clipboard.writeObjects([item])
-    }
-
-    /// ⌘X: copy, then ONE `deleteSubtrees` command — a single undo step
-    /// restores the whole cut.
-    @objc func cut(_ sender: Any?) {
-        guard !canvas.isEditing, let store, !canvas.selection.isEmpty else { return }
-        copy(sender)
-        let ids = topmostSelectedIDs(in: store.model)
-        guard !ids.isEmpty else { return }
-        let replacement = MapStore.selectionAfterDelete(
-            model: store.model, deletedIDs: ids, selection: canvas.selection)
-        perform(.deleteSubtrees(ids: ids)) { _ in replacement }
     }
 }
 
@@ -550,7 +561,7 @@ extension DocumentWindowController {
 
     /// Selection ids no other selected id is an ancestor of, so
     /// duplicate and delete-promote never act on a node twice.
-    private func topmostSelectedIDs(in model: MapModel) -> [String] {
+    func topmostSelectedIDs(in model: MapModel) -> [String] {
         selectedIDs.filter { id in
             var parent = model.nodes[id]?.parent
             while let parentID = parent {

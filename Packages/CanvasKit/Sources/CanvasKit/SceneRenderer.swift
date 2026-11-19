@@ -59,7 +59,7 @@ public enum SceneRenderer {
             let alpha = revealOverlay?.branchOpacity(parentID: branch.parentID, childID: branch.childID) ?? 1
             guard alpha > 0.01 else { continue }
             // §7.4 line styles after the child's branch override
-            // (ADR-0027), the same switch the layer tree uses.
+            // (ADR-0028), the same switch the layer tree uses.
             let path: CGPath
             switch branch.lineStyle {
             case .tapered:

@@ -347,7 +347,7 @@ public enum Migrations {
 
     /// v3 → v4: four optional fields join the schema —
     /// `NodeStylePatch.fontWeight`, `NodeStylePatch.fontItalic` and
-    /// `NodeStylePatch.minWidth` (F-STY-2, ADR-0027) and
+    /// `NodeStylePatch.minWidth` (F-STY-2, ADR-0028) and
     /// `ThemePatch.rainbowBranches` (F-STY-8's toggle as a document
     /// override) — all defaulting to `nil` (the pre-v4 behavior), so
     /// there is nothing to back-fill; the step only stamps the version

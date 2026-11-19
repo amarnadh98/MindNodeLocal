@@ -258,7 +258,8 @@ private enum ArborTestError: Error { case bitmapUnavailable }
 
 private func shapeBitmap(width: Int, height: Int) throws -> CGContext {
     let space = CGColorSpace(name: CGColorSpace.sRGB)
-    guard let context = CGContext(
+    guard
+        let context = CGContext(
             data: nil, width: width, height: height,
             bitsPerComponent: 8, bytesPerRow: width * 4,
             space: space ?? CGColorSpaceCreateDeviceRGB(),

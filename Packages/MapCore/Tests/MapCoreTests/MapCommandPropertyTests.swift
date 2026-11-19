@@ -266,7 +266,7 @@ struct CommandPropertyTests {
         return commands
     }
 
-    /// M2 style commands (F-STY-2/3/6/8, ADR-0027): merge/reset
+    /// M2 style commands (F-STY-2/3/6/8, ADR-0028): merge/reset
     /// patches, wholesale theme-selection snapshots, the rainbow
     /// override, appearance flips and structure overrides — exercised
     /// the same way, apply∘inverse identity over fuzzed trees.
@@ -287,10 +287,10 @@ struct CommandPropertyTests {
         commands.append(
             .setThemeSelection(
                 generator.next() % 3 == 0
-                ? nil
-                : ThemeSelection(
-                    id: even ? "ocean" : "paper",
-                    overrides: even ? ThemePatch(rainbowBranches: even) : nil)))
+                    ? nil
+                    : ThemeSelection(
+                        id: even ? "ocean" : "paper",
+                        overrides: even ? ThemePatch(rainbowBranches: even) : nil)))
         commands.append(
             .setThemeOverrides(overrides: even ? nil : ThemePatch(rainbowBranches: even)))
         commands.append(.setAppearance(mode: even ? .light : .dark))

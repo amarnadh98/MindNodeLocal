@@ -10,7 +10,7 @@ import Testing
 /// F-STY-2/F-STY-3 at the scene level: per-node style overrides resolve
 /// through `Theme.applyingOverrides` in `SceneGeometry` (measured sizes
 /// included — the size key carries the stored patch), branch overrides
-/// act on the connector from the node's parent to it (ADR-0027), the
+/// act on the connector from the node's parent to it (ADR-0028), the
 /// rainbow-branches document override collapses the palette, the
 /// document's theme overrides fold in, and nodes without overrides stay
 /// exactly at their theme-resolved values. The incremental suite proves
@@ -95,7 +95,7 @@ struct SceneStyleOverrideTests {
         #expect(abs(flooredWidth - (autoWidth + 120)) < 0.01)
     }
 
-    // MARK: branch overrides (ADR-0027: the connector INTO the node)
+    // MARK: branch overrides (ADR-0028: the connector INTO the node)
 
     @Test func branchOverridesActOnTheIncomingConnector() throws {
         var model = model()
@@ -343,8 +343,8 @@ struct SceneStyleOverrideTests {
     }
 }
 
-private extension CGRect {
-    func center() -> CGPoint {
+extension CGRect {
+    fileprivate func center() -> CGPoint {
         CGPoint(x: midX, y: midY)
     }
 }

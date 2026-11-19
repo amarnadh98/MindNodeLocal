@@ -3,7 +3,7 @@ import Foundation
 /// Per-node style overrides (F-STY-2, SPEC §8.2 `style` — only
 /// overridden properties persist). Colors are `#RRGGBB` or the fill
 /// keyword `"none"`; `alignment` and `branchLineStyle` are the raw
-/// enum strings. New in formatVersion 4 (ADR-0027): `fontWeight`
+/// enum strings. New in formatVersion 4 (ADR-0028): `fontWeight`
 /// (Core Text constant, 0 regular … 0.4 bold), `fontItalic` and
 /// `minWidth` — all optional, so v3 files decode unchanged.
 public struct NodeStylePatch: Codable, Sendable, Hashable {
