@@ -72,8 +72,9 @@ public enum SceneGeometry {
                 model: model, rootID: rootID, measurer: measurer, variant: variant)
             guard let layoutRoot else { continue }
 
-            let frames = TreeLayout.layout(
+            var frames = TreeLayout.layout(
                 root: layoutRoot, structure: structure, spacing: spacing)
+            applyManualOffsets(model: model, rootID: rootID, to: &frames)
             let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
             let offsetY = cursorY - treeMinY
             let rootLevel1Index = levelOneIndices(model: model, rootID: rootID)
@@ -126,6 +127,30 @@ public enum SceneGeometry {
             return .mindmapBalanced
         }
         return structure
+    }
+
+    /// Applies manual offsets after the auto layout (F-LAY-11): a
+    /// node's offset moves it and its whole subtree, and a descendant's
+    /// own offset accumulates on top. Invisible (folded-away) frames
+    /// don't exist yet, so they take their offsets when they appear.
+    static func applyManualOffsets(model: MapModel, rootID: String, to frames: inout LayoutResult) {
+        func walk(_ id: String, accumulated: CGSize) {
+            guard let node = model.nodes[id], var frame = frames[id] else { return }
+            var offset = accumulated
+            if let manual = node.offset {
+                offset.width += manual.x
+                offset.height += manual.y
+            }
+            if offset.width != 0 || offset.height != 0 {
+                frame.origin.x += offset.width
+                frame.origin.y += offset.height
+                frames[id] = frame
+            }
+            for childID in node.children {
+                walk(childID, accumulated: offset)
+            }
+        }
+        walk(rootID, accumulated: CGSize(width: 0, height: 0))
     }
 
     /// Builds the layout tree for one root: measured node sizes, folded

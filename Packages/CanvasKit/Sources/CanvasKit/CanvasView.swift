@@ -39,6 +39,21 @@ public final class CanvasView: NSView {
     /// Called after any selection change caused by canvas interaction.
     public var onSelectionChange: ((Set<String>) -> Void)?
 
+    /// The model the scene was built from, so drag-to-reparent can
+    /// resolve drop targets (F-EDT-5). Maintained by the host alongside
+    /// `scene`; the view reads it and never mutates it.
+    public var dragModel: MapModel?
+
+    /// Called with the one command a finished node drag produced (nil
+    /// when the drop resolved to nothing). The host performs it through
+    /// its MapStore — one undo step — and keeps the selection on the
+    /// given ids. The view never mutates the model.
+    public var onDrop: ((MapCommand?, Set<String>) -> Void)?
+
+    /// Drag state (F-EDT-5); the interaction logic lives in
+    /// CanvasView+Drag.swift.
+    var drag: DragState?
+
     /// Called when the system appearance changes, so the host can rebuild
     /// the scene for the new variant (dark mode is part of §14.1).
     public var onEffectiveAppearanceChange: (() -> Void)?
@@ -281,8 +296,16 @@ public final class CanvasView: NSView {
                 selection = [id]
             }
             onSelectionChange?(selection)
+            drag = .pending(
+                PendingDrag(
+                    grabbedID: id,
+                    startView: point,
+                    startModel: camera.modelPoint(for: point),
+                    optionDown: event.modifierFlags.contains(.option),
+                    commandDown: event.modifierFlags.contains(.command)))
             rubberBandStart = nil
         } else {
+            drag = nil
             rubberBandStart = point
             rubberBandRect = nil
             if !event.modifierFlags.contains(.command) {
@@ -294,8 +317,12 @@ public final class CanvasView: NSView {
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        guard let start = rubberBandStart else { return }
         let point = convert(event.locationInWindow, from: nil)
+        if handleMouseDragged(point) {
+            needsDisplay = true
+            return
+        }
+        guard let start = rubberBandStart else { return }
         rubberBandRect = NSRect(
             x: min(start.x, point.x), y: min(start.y, point.y),
             width: abs(point.x - start.x), height: abs(point.y - start.y))
@@ -303,13 +330,17 @@ public final class CanvasView: NSView {
     }
 
     public override func mouseUp(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if handleMouseUp(point) {
+            needsDisplay = true
+            return
+        }
         defer {
             rubberBandStart = nil
             rubberBandRect = nil
             needsDisplay = true
         }
         guard let start = rubberBandStart else { return }
-        let point = convert(event.locationInWindow, from: nil)
         let rect = CGRect(
             x: min(start.x, point.x), y: min(start.y, point.y),
             width: abs(point.x - start.x), height: abs(point.y - start.y))
@@ -326,6 +357,13 @@ public final class CanvasView: NSView {
             selection = hits
         }
         onSelectionChange?(selection)
+    }
+
+    /// ⌥/⌘ pressed or released during a drag (F-EDT-5); see
+    /// CanvasView+Drag.swift.
+    public override func flagsChanged(with event: NSEvent) {
+        handleFlagsChanged(event.modifierFlags)
+        super.flagsChanged(with: event)
     }
 }
 

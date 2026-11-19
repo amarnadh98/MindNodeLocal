@@ -25,6 +25,9 @@ final class DocumentWindowController: NSWindowController {
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
         }
+        canvas.onDrop = { [weak self] command, selection in
+            self?.performDragDrop(command, selection: selection)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -66,6 +69,8 @@ final class DocumentWindowController: NSWindowController {
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer)
         canvas.scene = scene
+        // The scene's source model, for drag-target resolution (F-EDT-5).
+        canvas.dragModel = model
         if preserveCamera {
             canvas.camera = previousCamera
         } else {
@@ -325,5 +330,16 @@ extension DocumentWindowController {
 
     @objc func deselectAction(_ sender: Any?) {
         canvas.setSelection([])
+    }
+
+    // MARK: drag drop (F-EDT-5)
+
+    /// A finished canvas drag hands over exactly one command: performed
+    /// through the store it is one undo step, and the selection stays on
+    /// the moved nodes. A nil command (cancelled drag, no-op drop, or
+    /// the connection TODO in CanvasView+Drag.swift) changes nothing.
+    func performDragDrop(_ command: MapCommand?, selection: Set<String>) {
+        guard let command else { return }
+        perform(command) { _ in selection }
     }
 }
