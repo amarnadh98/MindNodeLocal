@@ -1,4 +1,4 @@
-# ADR-0005: The inline editing overlay's contract
+# ADR-0006: The inline editing overlay's contract
 
 - **Status:** Accepted
 - **Date:** 2026-11-19

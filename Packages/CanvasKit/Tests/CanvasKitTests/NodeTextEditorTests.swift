@@ -235,7 +235,7 @@ struct NodeTextEditorTests {
     }
 
     @Test func emptyCommitKeepsTheBrandNewNode() throws {
-        // MindNode behaviour (ADR-0005): committing empty text on a fresh
+        // MindNode behaviour (ADR-0006): committing empty text on a fresh
         // node keeps the node instead of deleting it.
         var model = sceneModel()
         let fresh = "fresh"

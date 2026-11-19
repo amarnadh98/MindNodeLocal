@@ -187,7 +187,7 @@ public final class NodeTextEditor {
     /// Commits the live text as ONE `editText` command (via `onCommit`),
     /// then asks the host for the post-commit create. An empty commit of
     /// a brand-new node keeps the node — MindNode behaviour; the
-    /// "Central Idea" hint is a placeholder, not text (ADR-0005).
+    /// "Central Idea" hint is a placeholder, not text (ADR-0006).
     public func commit(next: PostCommitAction = .none) {
         guard let id = editingNodeID, !isCommitting else { return }
         isCommitting = true
