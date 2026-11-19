@@ -70,6 +70,24 @@ public enum PasteboardParser {
         return PastedSubtree(snapshot: snapshot, children: children, sourceDocID: payload.docID)
     }
 
+    // MARK: Paste placement
+
+    /// F-EDT-9 paste placement: the pasted subtrees land under the
+    /// document-order-FIRST selected node as its last children, or are
+    /// appended as roots when nothing is selected. An ancestor/descendant
+    /// selection collapses onto the ancestor's slot (its snapshot already
+    /// covers the descendant). Pure, so the host's menu wiring can be
+    /// thin and the rule itself headless-tested.
+    public static func pasteAnchor(
+        selection: [String], in model: MapModel
+    ) -> (parent: String?, index: Int) {
+        let top = PasteboardSerializer.normalizedSelection(in: model, selection: selection)
+        guard let first = top.first, let node = model.nodes[first] else {
+            return (nil, model.roots.count)
+        }
+        return (first, node.children.count)
+    }
+
     // MARK: Paste commands
 
     /// The command that pastes `subtrees` as children of `parent` at
