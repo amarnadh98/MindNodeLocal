@@ -8,7 +8,7 @@ public enum Grade: String, Sendable, CaseIterable, Codable {
     case easy
 
     /// The numeric grade used by the FSRS formulas (again = 1 … easy = 4).
-    var value: Int {
+    public var value: Int {
         switch self {
         case .again: 1
         case .hard: 2
@@ -18,7 +18,7 @@ public enum Grade: String, Sendable, CaseIterable, Codable {
     }
 
     /// Grades in ascending order of recall confidence.
-    static let ascending: [Grade] = [.again, .hard, .good, .easy]
+    public static let ascending: [Grade] = [.again, .hard, .good, .easy]
 }
 
 /// The FSRS-6 memory model: the pure math of stability and difficulty,

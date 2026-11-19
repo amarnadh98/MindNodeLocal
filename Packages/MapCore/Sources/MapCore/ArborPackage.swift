@@ -8,6 +8,22 @@ public struct PackageContents: Sendable {
     public let model: MapModel
     public let meta: PackageMeta
     public let validationErrors: [ValidationError]
+    /// Raw bytes of `study/reviews.jsonl` when the package has one
+    /// (SPEC §8.1). Opaque here — MapStudy owns the codec — and never
+    /// fatal to read: a truncated tail is the log's normal failure mode.
+    public let studyLogData: Data?
+
+    init(
+        model: MapModel,
+        meta: PackageMeta,
+        validationErrors: [ValidationError],
+        studyLogData: Data? = nil
+    ) {
+        self.model = model
+        self.meta = meta
+        self.validationErrors = validationErrors
+        self.studyLogData = studyLogData
+    }
 }
 
 /// Reads and writes the `.arbor` file package (SPEC §8.1).
@@ -17,6 +33,10 @@ public enum ArborPackage {
     public static let assetsEntryName = "assets"
     public static let studyEntryName = "study"
     public static let quickLookEntryName = "QuickLook"
+    /// The append-only FSRS review log inside the `study` directory
+    /// (SPEC §8.1). MapStudy owns its codec; the package layer only
+    /// moves the bytes.
+    public static let studyLogEntryName = "reviews.jsonl"
 
     /// Builds a complete package wrapper from scratch (new documents,
     /// importers). Regular saves should reuse the wrapper from the last read
@@ -86,8 +106,41 @@ public enum ArborPackage {
         return PackageContents(
             model: model,
             meta: meta,
-            validationErrors: MapValidator.validate(model)
+            validationErrors: MapValidator.validate(model),
+            studyLogData: studyLogData(from: root)
         )
+    }
+
+    /// Replaces `study/reviews.jsonl` inside an existing package wrapper,
+    /// creating the `study` directory when missing. A nil `data` removes
+    /// the log. The rest of the package is untouched (unchanged
+    /// `FileWrapper`s are reused, so autosave rewrites only what changed).
+    public static func setStudyLog(_ data: Data?, in root: FileWrapper) {
+        var study = entry(root, named: studyEntryName)
+        if study == nil {
+            let directory = FileWrapper(directoryWithFileWrappers: [:])
+            directory.preferredFilename = studyEntryName
+            root.addFileWrapper(directory)
+            study = directory
+        }
+        guard let study, study.isDirectory else { return }
+        if let existing = entry(study, named: studyLogEntryName) {
+            study.removeFileWrapper(existing)
+        }
+        if let data {
+            let log = FileWrapper(regularFileWithContents: data)
+            log.preferredFilename = studyLogEntryName
+            study.addFileWrapper(log)
+        }
+    }
+
+    /// The raw bytes of `study/reviews.jsonl`, or nil when the package
+    /// has no log yet. Never throws: a missing or unreadable log simply
+    /// reads as absent (the session treats that as an empty history).
+    private static func studyLogData(from root: FileWrapper) -> Data? {
+        guard let study = entry(root, named: studyEntryName), study.isDirectory else { return nil }
+        guard let log = entry(study, named: studyLogEntryName), log.isRegularFile else { return nil }
+        return log.regularFileContents
     }
 
     private static func replaceEntry(_ root: FileWrapper, name: String, contents: Data) {

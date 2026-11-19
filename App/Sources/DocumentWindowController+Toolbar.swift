@@ -321,6 +321,14 @@ extension DocumentWindowController {
             return canvas.isEditing || !canvas.selection.isEmpty
         case #selector(toggleFoldAction(_:)):
             return canvas.isEditing || foldSelectionState() != nil
+        case #selector(makeStudyDeckAction(_:)), #selector(setCardPolicyAction(_:)),
+            #selector(makeClozeAction(_:)), #selector(studyBranchAction(_:)),
+            #selector(studyDocumentAction(_:)), #selector(studyDueAction(_:)),
+            #selector(studyWeakestBranchAction(_:)), #selector(toggleMasteryOverlayAction(_:)),
+            #selector(showStudyDashboardAction(_:)):
+            // F-STD: the study menu's own validation (checkmark states,
+            // editing-sensitive enabling) lives with the actions.
+            return validateStudyMenuItem(menuItem)
         default:
             return validateFocusFindMenuItem(menuItem) ?? true
         }

@@ -226,6 +226,8 @@ public enum SceneGeometry {
             // A note can change the node's decorations (note badge), so
             // its own size is re-measured.
             .setNote(let id, _),
+            // A study deck/card change may add a badge: re-measure.
+            .setStudy(_, let id, _),
             .reorderSibling(let id, _),
             .detach(let id),
             .deleteNodePromotingChildren(let id):

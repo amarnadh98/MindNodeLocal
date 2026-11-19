@@ -8,7 +8,7 @@ where they live, and how to run them.
 |---|---|---|---|
 | 1 | Launch → New map → type root → ⇥ child → ⏎ siblings → drag a branch to reparent → ⌘S → quit → reopen: everything restored | **Automated (M1)** | `App/Tests/GoldenScenarioOneTests.swift` (hosted) |
 | 2 | Paste 40-line Markdown → map → Radial → theme → PDF export | Not yet — depends on paste (M1, partly covered by `ClipboardTests`), Radial (M2), themes (M2), export (M5) | — |
-| 3 | Select branch → Study Branch → 10 cards → mastery colors | Not yet — M7 (`MapStudy`) | — |
+| 3 | Select branch → Study Branch → 10 cards → mastery colors | **Automated (M7)** | `App/Tests/StudySessionTests.swift` (hosted) |
 | 4 | Present → auto slides → arrow keys + clicker → presenter notes | **Automated as far as one display can go (M6)** | `App/Tests/PresentationTests.swift` (hosted) |
 | 5 | Global hotkey → Quick Entry → indented list → Create Map | Not yet — M4 (`F-QEN`) | — |
 
@@ -102,3 +102,33 @@ job that does not gate merging. The plan (per SPEC §14's "UI: smoke")
 is to add an `ArborUITests` target in its own scheme — outside the CI
 `xcode` job — once a second scenario (2 or 5) is ready to share the
 launch cost.
+
+## Scenario 3: how it is automated (M7)
+
+`GoldenScenarioThreeTests.selectBranchStudyTenCardsMasteryColorsTheMap`
+(App/Tests/StudySessionTests.swift) runs the study scenario through the
+real app paths, hosted like scenario 1:
+
+- **Map**: the real document + window; the root typed through the
+  editing overlay, the deck branch and its ten noted cards through the
+  store's commands.
+- **Select a branch**: `CanvasView.setSelection`, then
+  `makeStudyDeckAction` — the Study menu's ⌥⌘S action — verified as one
+  exact undo step.
+- **Study Branch**: `studyBranchAction` opens the real
+  `StudySessionController` window; the session is driven by raw key
+  events on the session view (Space reveals — once, Space grades Good —
+  then 1–4 for the graded ladder, F-STD-4's keyboard-only contract).
+- **Asserts**: ten `ReviewLog` entries in the document's log (grades in
+  the scripted order), every card node's `study.fsrs` out of the new
+  state, the grading's deliberate absence from the undo stack (ADR-0015:
+  the one undo still available reverts the deck toggle and the grades
+  survive it), the document dirtied through the non-undoable write path,
+  and the mastery overlay — ⌥⌘H through `toggleMasteryOverlayAction` —
+  realizing tint marks for the ten cards and an aggregate ring on the
+  deck node.
+- The same file also covers grading persistence across save/reopen
+  (FSRS state + `study/reviews.jsonl`, including a truncated-tail read),
+  Make Cloze through the editor's selected range, and the overlay's
+  never-dirties contract.
+

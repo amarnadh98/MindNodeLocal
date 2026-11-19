@@ -38,6 +38,10 @@ public final class MapStore {
         case undo(MapCommand)
         /// The undo manager replayed a forward command.
         case redo(MapCommand)
+        /// A `performWithoutUndo` write (ADR-0015): the model changed and
+        /// the host must mark the document dirty itself — review grading
+        /// is history, not an edit, so no undo step exists for it.
+        case nonUndoable(MapCommand)
     }
 
     /// The current model; owned here, never mutated by views.
@@ -102,6 +106,24 @@ public final class MapStore {
         }
         lastForward = command
         onChange?(.perform(command))
+    }
+
+    /// Applies `command` as a deliberate NON-undoable write (ADR-0015).
+    /// The model changes, `onChange` fires with `.nonUndoable` (the host
+    /// marks the document dirty and the next autosave persists it), but
+    /// nothing registers with the undo manager: grading a flashcard is
+    /// recorded history — the review log entry it produced can never be
+    /// undone — so a grading must not leave an undo step that would
+    /// desync card state from the log. The command still goes through
+    /// the same all-or-nothing apply path; a throw leaves the model
+    /// untouched.
+    public func performWithoutUndo(_ command: MapCommand) throws {
+        var working = model
+        try command.apply(to: &working)
+        stampTouchedNodes(previous: model, in: &working)
+        model = working
+        endSession()
+        onChange?(.nonUndoable(command))
     }
 
     /// Runs when the undo manager undoes: applies `inverse` and

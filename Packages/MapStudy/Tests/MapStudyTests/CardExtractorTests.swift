@@ -13,7 +13,8 @@ struct CardExtractorTests {
         title: String,
         note: String? = nil,
         children: [String] = [],
-        card: CardPolicy? = nil
+        card: CardPolicy? = nil,
+        deck: Bool? = nil
     ) -> Node {
         Node(
             id: id,
@@ -21,7 +22,7 @@ struct CardExtractorTests {
             children: children,
             title: NodeTitle(text: title),
             note: (note == nil || note!.isEmpty) ? nil : note,
-            study: card.map { NodeStudy(card: $0) }
+            study: (card == nil && deck == nil) ? nil : NodeStudy(card: card ?? .auto, deck: deck)
         )
     }
 
@@ -36,10 +37,12 @@ struct CardExtractorTests {
 
     // MARK: - The auto rule (F-STD-1)
 
-    @Test func autoCardsNeedChildrenOrANote() {
+    @Test func autoCardsNeedChildrenOrANoteInsideADeck() {
         let model = map(
             [
-                node("root", title: "Biology", children: ["branch", "leaf", "noted"]),
+                // F-STD-1: only branches marked Study turn their subtrees
+                // into cards.
+                node("root", title: "Biology", children: ["branch", "leaf", "noted"], deck: true),
                 node("branch", parent: "root", title: "Cell", children: ["mito"]),
                 node("mito", parent: "branch", title: "Mitochondria"),
                 node("leaf", parent: "root", title: "Lonely leaf"),
@@ -67,10 +70,82 @@ struct CardExtractorTests {
         #expect(noted.back == "Has a note")
     }
 
+    @Test func withoutADeckOnlyExplicitAndClozeCardsExist() {
+        let model = map(
+            [
+                node("root", title: "Biology", children: ["plain", "forced", "cloze", "off"]),
+                node("plain", parent: "root", title: "Plain", children: ["p1"]),
+                node("p1", parent: "plain", title: "P1", note: "note"),
+                node("forced", parent: "root", title: "Forced", card: .on),
+                node("cloze", parent: "root", title: "The {{c1::mitochondrion}} works"),
+                node("off", parent: "root", title: "Off", note: "n", card: .off),
+            ],
+            roots: ["root"]
+        )
+        let ids = CardExtractor.extract(from: model).map(\.id)
+
+        // No deck: the auto rule yields nothing, explicit on still forces,
+        // cloze markup is its own intent, and off suppresses everything.
+        #expect(!ids.contains("root"))
+        #expect(!ids.contains("plain"))
+        #expect(!ids.contains("p1"))
+        #expect(ids.contains("forced"))
+        #expect(ids.contains("cloze#c1"))
+        #expect(!ids.contains("off"))
+    }
+
+    @Test func theDeckMarkItselfCountsAsInsideTheDeck() {
+        var model = map(
+            [
+                node("root", title: "Deck root", children: ["a"]),
+                node("a", parent: "root", title: "A", note: "n"),
+            ],
+            roots: ["root"]
+        )
+        // The deck node itself is "inside the branch marked Study".
+        model.nodes["root"]?.study = NodeStudy(card: .auto, deck: true)
+        #expect(CardExtractor.extract(from: model).map(\.id).contains("root"))
+    }
+
+    @Test func extractAllTreatsTheDocumentAsOneDeck() {
+        let model = map(
+            [
+                node("root", title: "Biology", children: ["plain", "noted"]),
+                node("plain", parent: "root", title: "Plain", children: ["p1"]),
+                node("noted", parent: "root", title: "Noted", note: "n"),
+            ],
+            roots: ["root"]
+        )
+        let ids = CardExtractor.extractAll(from: model).map(\.id)
+        // Study Document: every eligible node is a card, decks notwithstanding.
+        #expect(ids.contains("root"))
+        #expect(ids.contains("plain"))
+        #expect(ids.contains("noted"))
+    }
+
+    @Test func subtreeScopeIsAnImplicitDeckThatStopsAtItsBoundary() {
+        let model = map(
+            [
+                node("root", title: "Root", children: ["branch", "outside"]),
+                node("branch", parent: "root", title: "Branch", children: ["b1", "bare"]),
+                node("b1", parent: "branch", title: "B1", note: "n"),
+                node("bare", parent: "branch", title: "Bare"),
+                node("outside", parent: "root", title: "Outside", note: "n"),
+            ],
+            roots: ["root"]
+        )
+        // "Study Branch" on a node that never became a deck: its subtree
+        // is the session's deck.
+        let ids = CardExtractor.extract(from: model, subtreeRoot: "branch").map(\.id)
+        #expect(ids == ["branch", "b1"])
+        // A missing scope root yields nothing.
+        #expect(CardExtractor.extract(from: model, subtreeRoot: "nope").isEmpty)
+    }
+
     @Test func explicitPolicyOverridesAuto() {
         let model = map(
             [
-                node("root", title: "R", children: ["forced", "suppressed", "reversible"]),
+                node("root", title: "R", children: ["forced", "suppressed", "reversible"], deck: true),
                 // A bare leaf explicitly marked Card.
                 node("forced", parent: "root", title: "Forced", card: .on),
                 // A node with children explicitly marked Not a card.
@@ -177,7 +252,7 @@ struct CardExtractorTests {
     @Test func summaryCardsUseTheSummaryID() {
         let model = map(
             [
-                node("root", title: "Root", children: ["a", "b", "c", "summary"]),
+                node("root", title: "Root", children: ["a", "b", "c", "summary"], deck: true),
                 node("a", parent: "root", title: "Alpha", note: "n"),
                 node("b", parent: "root", title: "Beta", note: "n"),
                 node("c", parent: "root", title: "Gamma", note: "n"),
@@ -200,6 +275,14 @@ struct CardExtractorTests {
         // The summary node itself is a bare leaf: not a card under "auto".
         #expect(!cards.map(\.id).contains("summary"))
 
+        // A summary outside any deck is not an auto card, but an
+        // explicitly-marked summary node forces it.
+        var undocked = model
+        undocked.nodes["root"]?.study = NodeStudy(card: .auto)
+        #expect(!CardExtractor.extract(from: undocked).map(\.id).contains("sum-1"))
+        undocked.nodes["summary"]?.study = NodeStudy(card: .on)
+        #expect(CardExtractor.extract(from: undocked).map(\.id).contains("sum-1"))
+
         // The summary node can opt out; a stale summary is skipped.
         var optedOut = model
         optedOut.nodes["summary"]!.study = NodeStudy(card: .off)
@@ -208,6 +291,10 @@ struct CardExtractorTests {
         var stale = model
         stale.summaries = [Summary(id: "sum-2", parent: "root", range: ["a", "nope"], node: "summary")]
         #expect(!CardExtractor.extract(from: stale).map(\.id).contains("sum-2"))
+
+        // A branch session includes the summaries in its scope.
+        let scoped = CardExtractor.extract(from: model, subtreeRoot: "root").map(\.id)
+        #expect(scoped.contains("sum-1"))
     }
 
     // MARK: - Stable ids across unrelated edits
@@ -215,7 +302,7 @@ struct CardExtractorTests {
     @Test func cardIDsAreStableAcrossUnrelatedEdits() {
         var model = map(
             [
-                node("root", title: "Root", children: ["a", "b"]),
+                node("root", title: "Root", children: ["a", "b"], deck: true),
                 node("a", parent: "root", title: "A", children: ["a1"]),
                 node("a1", parent: "a", title: "{{c1::hidden}} detail", note: "note"),
                 node("b", parent: "root", title: "B", children: ["b1", "b2"]),
@@ -247,10 +334,10 @@ struct CardExtractorTests {
     @Test func cardsFollowOutlineOrder() {
         let model = map(
             [
-                node("r1", title: "One", children: ["c1", "c2"]),
+                node("r1", title: "One", children: ["c1", "c2"], deck: true),
                 node("c1", parent: "r1", title: "C1", note: "n"),
                 node("c2", parent: "r1", title: "C2", note: "n"),
-                node("r2", title: "Two", note: "n2"),
+                node("r2", title: "Two", note: "n2", deck: true),
             ],
             roots: ["r2", "r1"]
         )

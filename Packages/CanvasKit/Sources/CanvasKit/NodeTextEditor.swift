@@ -341,6 +341,33 @@ public final class NodeTextEditor {
         textView?.selectAll(nil)
     }
 
+    /// The live editor's selection as an NSRange over the title's UTF-16
+    /// units, or nil when no session is open. Hosts use it for actions
+    /// that operate on selected title text (F-STD-2 "Make Cloze").
+    public func selectedTitleRange() -> NSRange? {
+        guard let view = textView else { return nil }
+        let range = view.selectedRange()
+        return range.length > 0 ? range : nil
+    }
+
+    /// Sets the live editor's selection (host surface: menu actions and
+    /// hosted tests place the caret/selection over title text).
+    public func selectTitleRange(_ range: NSRange) {
+        textView?.setSelectedRange(range)
+    }
+
+    /// Replaces the live text with `title` (a host-side transformation
+    /// such as a cloze wrap, F-STD-2) and selects `selection`, keeping
+    /// the editing session open. The draft publishes through
+    /// `onDraftChange` like any keystroke, so the node grows live.
+    public func applyTitle(_ title: NodeTitle, selecting selection: NSRange) {
+        guard let view = textView, let font = baseFont, let color = baseColor else { return }
+        view.textStorage?.setAttributedString(
+            NodeTitleText.attributed(title, baseFont: font, baseColor: color))
+        view.selectedRange = selection
+        textDidChange()
+    }
+
     public func deleteInEditor(forward: Bool) {
         guard let view = textView else { return }
         if forward {

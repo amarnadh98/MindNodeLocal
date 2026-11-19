@@ -527,6 +527,15 @@ extension CanvasView {
 /// Selection maintenance for the editing loop (F-CAN-4: the selection
 /// stays valid after every model change).
 extension CanvasView {
+    /// F-STD-6: replaces the mastery overlay's marks (nil hides it).
+    /// Pure view state — never touches the model or the change count —
+    /// and cheap: the layer tree draws marks over the existing scene.
+    public func setMasteryMarks(_ marks: [String: MasteryMark]?) {
+        layerTree.masteryMarks = marks
+        guard let scene else { return }
+        layerTree.mastery.update(marks, scene: scene, camera: camera)
+    }
+
     /// Sets the selection, dropping ids that no longer exist in the
     /// scene (deleted nodes, descendants of newly folded nodes).
     public func setSelection(_ ids: Set<String>) {

@@ -81,6 +81,10 @@ public final class CanvasLayerTree {
     /// maps straight onto layer positions.
     public let root = CALayer()
     private let content = CALayer()
+    /// F-STD-6: the mastery overlay rides the content layer above node
+    /// rasters; the host assigns its marks table.
+    public let mastery = MasteryOverlay()
+    var masteryMarks: [String: MasteryMark]?
 
     var scene: CanvasScene?
     private var grid = SpatialGrid()
@@ -120,6 +124,7 @@ public final class CanvasLayerTree {
         root.masksToBounds = false
         content.isGeometryFlipped = true
         root.addSublayer(content)
+        mastery.attach(to: content)
     }
 
     // MARK: camera
@@ -232,6 +237,7 @@ public final class CanvasLayerTree {
             camera: camera, viewport: viewport, backingScale: backingScale,
             plan: plan, reduceMotion: context.reduceMotion)
         updateSelection(context.selection, color: context.selectionColor, camera: camera)
+        mastery.update(masteryMarks, scene: context.scene, camera: camera)
         scheduleSettleIfNeeded(camera: camera, backingScale: backingScale)
         lastScale = camera.scale
         return diff
@@ -255,6 +261,7 @@ public final class CanvasLayerTree {
             ring.transform = Self.modelSpaceTransform(for: camera)
             ring.lineWidth = 2.5 / camera.scale
         }
+        mastery.updateCamera(camera: camera)
         scheduleSettleIfNeeded(camera: camera, backingScale: backingScale)
         lastScale = camera.scale
     }
@@ -342,6 +349,7 @@ public final class CanvasLayerTree {
             ring.removeFromSuperlayer()
             selectionRings.removeValue(forKey: id)
         }
+        mastery.clear()
         scene = nil
     }
 

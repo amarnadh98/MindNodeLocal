@@ -3,6 +3,7 @@ import CanvasKit
 import MapCore
 import MapIO
 import MapRender
+import MapStudy
 import os
 
 @MainActor
@@ -14,6 +15,19 @@ final class MapDocument: NSDocument {
 
     /// The current model, owned by the store.
     var model: MapModel { store.model }
+
+    /// The document's append-only review history (SPEC §8.1, F-STD-3):
+    /// loaded from `study/reviews.jsonl` on open (tolerant of a
+    /// truncated tail), appended on every grade, written on every save.
+    /// Reviews are history, not edits — grading is deliberately not on
+    /// the user's undo stack (ADR-0015).
+    private(set) var reviewLog: [ReviewLog] = []
+
+    /// The FSRS scheduler at the document's desired retention
+    /// (`studySettings`, default 0.9 per F-STD-3).
+    var studyScheduler: FSRSScheduler {
+        FSRSScheduler(options: .init(studySettings: store.model.studySettings))
+    }
 
     nonisolated(unsafe) private(set) var meta: PackageMeta?
     nonisolated(unsafe) private var packageWrapper: FileWrapper?
@@ -94,6 +108,10 @@ final class MapDocument: NSDocument {
         // AppKit reads documents on the main thread (concurrent document
         // reading is off), so the hand-off to the main-actor store is safe.
         MainActor.assumeIsolated {
+            // The review log rides in the package (SPEC §8.1); a truncated
+            // tail is the log's normal interrupted-append failure and is
+            // tolerated by the codec.
+            reviewLog = Self.decodeReviewLog(contents.studyLogData)
             store.replaceModel(loaded)
             if repairedSomething {
                 updateChangeCount(.changeDone)
@@ -128,6 +146,9 @@ final class MapDocument: NSDocument {
         // refresh on the next explicit save.
         if !isAutosavingSave {
             DocumentQuickLook.attachPreviews(to: root, model: model, variant: quickLookVariant)
+        }
+        if !reviewLog.isEmpty, let encoded = try? ReviewLogCodec.encode(reviewLog) {
+            ArborPackage.setStudyLog(Data(encoded.utf8), in: root)
         }
         packageWrapper = root
         meta = updated
@@ -268,9 +289,47 @@ final class MapDocument: NSDocument {
     /// back/forward); counting performs here as well would leave a
     /// document undone back to its saved state still marked edited.
     private func storeDidChange(_ origin: MapStore.ChangeOrigin) {
+        if case .nonUndoable = origin {
+            // A grading write registered no undo group, so the undo
+            // integration can't see it — mark the document dirty here so
+            // the next autosave persists the FSRS state and the log
+            // (ADR-0015).
+            updateChangeCount(.changeDone)
+        }
         for case let controller as DocumentWindowController in windowControllers {
             controller.modelDidChange(origin: origin)
         }
+    }
+
+    // MARK: study grading (F-STD-3, ADR-0015)
+
+    /// Grades one card now: the node's stored FSRS state advances
+    /// through the store's NON-undoable write path (the review log
+    /// entry this produces can never be undone, so the state must not
+    /// carry an undo step either), and the review is appended to the
+    /// document's log. Returns the scheduled next card, or nil when the
+    /// card's node vanished or the write failed.
+    @discardableResult
+    func grade(card: MapStudy.Card, grade: Grade, now: Date = Date()) -> FSRSCard? {
+        guard let node = store.model.nodes[card.nodeID] else { return nil }
+        let current = StudyStates.cardState(for: card, in: node.study, now: now)
+        let review = studyScheduler.review(current, at: now, grade: grade)
+        let study = StudyStates.writing(review.card.persisted(), for: card, in: node.study)
+        do {
+            try store.performWithoutUndo(.setStudy(name: "Grade Card", id: card.nodeID, study: study))
+        } catch {
+            return nil
+        }
+        reviewLog.append(review.record(cardID: card.id))
+        return review.card
+    }
+
+    /// Decodes the package's raw review log bytes; anything undecodable
+    /// reads as an empty history (the log is disposable comfort data —
+    /// F-STD-3's state lives on the nodes).
+    private static func decodeReviewLog(_ data: Data?) -> [ReviewLog] {
+        guard let data, let text = String(data: data, encoding: .utf8) else { return [] }
+        return (try? ReviewLogCodec.decode(text)) ?? []
     }
 }
 

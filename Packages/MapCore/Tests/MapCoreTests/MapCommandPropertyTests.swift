@@ -124,6 +124,14 @@ struct CommandPropertyTests {
             .setFolded(id: nodeID, folded: generator.next() % 2 == 0),
             .setOffset(id: nodeID, offset: ModelOffset(x: 10, y: -5)),
             .setTheme(id: generator.next() % 2 == 0 ? "ocean" : nil),
+            .setStudy(
+                name: "Grade Card", id: nodeID,
+                study: NodeStudy(
+                    card: generator.next() % 2 == 0 ? .on : .auto,
+                    fsrs: FSRSState(due: fixedDate, reps: Int(generator.next() % 5)),
+                    fsrsByCard: generator.next() % 2 == 0
+                        ? ["r": FSRSState(due: fixedDate, state: .review)] : nil,
+                    deck: generator.next() % 2 == 0)),
             .recolorBranches(
                 assignments: [
                     PaletteIndexAssignment(
