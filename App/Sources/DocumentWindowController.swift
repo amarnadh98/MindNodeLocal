@@ -41,6 +41,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     // only touch points in this shared file. See
     // App/Sources/FocusFind/.
     let focusFind = FocusFindCoordinator()
+    /// M3 media: images, markers, attachments, sources and the filter
+    /// bar (DocumentWindowController+Media + MediaCoordinator.swift).
+    let mediaCoordinator = MediaCoordinator()
 
     private var viewStateSaveTask: Task<Void, Never>?
 
@@ -77,8 +80,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     var recallSessionBox: RecallSession?
 
     /// The pasteboard flavours written by copy/cut (F-EDT-9): the
-    /// internal lossless payload plus the three interop texts.
-    private static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
+    /// internal lossless payload plus the three interop texts. The
+    /// payload type is readable by the M3 media paste path too.
+    static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
     private static let markdownType = NSPasteboard.PasteboardType("net.daringfireball.markdown")
     private static let opmlType = NSPasteboard.PasteboardType("org.opml.opml")
 
@@ -154,6 +158,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-REL: connection interactions and the relation accessibility
         // hooks route through the same store paths as the menus.
         installRelationHandlers()
+        // M3 media: images, markers, attachments, sources, filters
+        // (DocumentWindowController+Media + MediaCoordinator).
+        mediaCoordinator.attach(self)
         // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
         installChrome()
     }
@@ -171,7 +178,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// §11.3): measured sizes and per-root layout state, filled by every
     /// full build and reused by `modelDidChange`'s small-change path.
     /// Variant-tagged: an appearance flip replaces it wholesale.
-    private var sceneCache: SceneBuildCache?
+    var sceneCache: SceneBuildCache?
 
     /// Above this many dirty ids the incremental path stops paying off;
     /// §11.5 additionally wants such large relayouts (> 2k dirty nodes)
@@ -298,12 +305,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             cache = SceneBuildCache(variant: variant)
             sceneCache = cache
         }
+        // M3 media: the document's thumbnail/SF-glyph/math lookup
+        // (MediaCoordinator) and the hide-mode filter's pruned ids.
+        mediaCoordinator.configureSceneMedia(cache)
         let scene = SceneGeometry.build(
             model: model,
             cache: cache,
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
             showsTagPills: showsTagPills,
+            prunedIDs: mediaCoordinator.prunedIDs(model: model),
             editingTitle: editingDraftTitle,
             theme: ThemeCatalog.shared.theme(for: model))
         canvas.scene = scene
@@ -370,7 +381,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             command = performed
         }
         let dirty = SceneGeometry.dirtyIDs(for: command, in: model)
-        if let dirty, let cache = sceneCacheForCurrentVariant(),
+        // F-TAG-3: hide mode prunes child lists, which the dirty path
+        // cannot see — every change takes the full rebuild while a
+        // hide-mode filter is active (a documented contract).
+        if let dirty, mediaCoordinator.prunedIDs(model: model) == nil,
+            let cache = sceneCacheForCurrentVariant(),
             dirty.count <= Self.incrementalDirtyLimit
         {
             let scene = SceneGeometry.update(
@@ -388,6 +403,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
         canvas.pruneSelection()
         outlineController.reloadPreservingSelection()
+        // F-TAG-3: the filter bar's document-driven popups (tags,
+        // types, saved filters) follow the change.
+        mediaCoordinator.refreshFilterBar()
         // F-FOC: refresh the find matches and the dimming against the
         // post-change model.
         focusFind.sceneDidChange()
@@ -508,6 +526,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// the plain paste adopts the target's theme (F-EDT-9).
     @objc func paste(_ sender: Any?) {
         guard !canvas.isEditing, let store else { return }
+        // F-CNT-2: an image on the pasteboard becomes the selection's
+        // node image (one grouped `setImage`) before the text flavors.
+        if mediaCoordinator.pasteImageIfPresent(clipboard) {
+            return
+        }
         let keepStyle =
             (sender as? NSMenuItem)?.keyEquivalentModifierMask.contains(.option) == true
         let anchor = PasteboardParser.pasteAnchor(selection: canvas.selection.sorted(), in: store.model)
@@ -617,20 +640,22 @@ extension DocumentWindowController {
     /// One editing commit: ONE `editText` command through the store
     /// (F-DOC-2), the session closed so the next edit of the same node is
     /// its own undo step, then the post-commit create (if any) with the
-    /// new node selected and in edit mode.
-    private func handleEditingCommit(id: String, title: NodeTitle, next: NodeTextEditor.PostCommitAction) {
+    /// new node selected and in edit mode. Internal: the hosted tests
+    /// drive the real commit path (the M3 smart-typing suites).
+    func handleEditingCommit(id: String, title: NodeTitle, next: NodeTextEditor.PostCommitAction) {
         editingDraftTitle = nil
         guard let store else { return }
         if store.model.nodes[id]?.title != title {
-            // F-EDT-10 smart typing: `#tag` tokens become document tags
-            // and strip from the title — ONE grouped command, so the
-            // whole create-and-assign is one undo step.
-            let parsed = SmartTyping.parseTags(in: title)
-            if parsed.tags.isEmpty {
+            // F-EDT-10 smart typing: one grouped command carries the
+            // whole parse — `#tag` tokens, the task prefixes, `$$math$$`,
+            // ``` code fences and the `--` note split — so the entire
+            // commit is one undo step.
+            let parse = SmartTyping.parseCommit(in: title)
+            if parse == SmartTyping.CommitParse(title: title) {
                 try? store.perform(.editText(id: id, title: title))
             } else {
                 try? store.perform(
-                    .smartTagCommit(id: id, title: parsed.title, names: parsed.tags, in: store.model))
+                    .smartCommit(id: id, parse: parse, in: store.model))
             }
         }
         // One undo step per edit session (F-DOC-2): close the typing

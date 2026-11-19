@@ -94,6 +94,20 @@ extension CanvasView {
         set { decorationActions.onQuickLookAttachments = newValue }
     }
 
+    /// Space on a selected node with an image (F-CNT-2): the host
+    /// opens Quick Look of the image.
+    public var onQuickLookImage: ((String) -> Void)? {
+        get { decorationActions.onQuickLookImage }
+        set { decorationActions.onQuickLookImage = newValue }
+    }
+
+    /// A finished file drop (CanvasView+Drop): the host performs the
+    /// image/attachment commands.
+    public var onDropFiles: ((_ urls: [URL], _ nodeID: String?) -> Void)? {
+        get { decorationActions.onDropFiles }
+        set { decorationActions.onDropFiles = newValue }
+    }
+
     /// The image resize drag's commit (F-CNT-2): the host performs one
     /// `setImage` with the new display size (aspect already handled
     /// here — ⇧/⌥ unlocked it during the drag).
@@ -440,6 +454,8 @@ final class DecorationActions {
     var onOpenSource: ((String) -> Void)?
     var onQuickLookAttachments: ((String) -> Void)?
     var onResizeImage: ((String, CGSize) -> Void)?
+    var onQuickLookImage: ((String) -> Void)?
+    var onDropFiles: ((_ urls: [URL], _ nodeID: String?) -> Void)?
     var highlight: HighlightMode?
     var filterMastery: MasteryReport?
     var filterNow = Date()

@@ -69,6 +69,14 @@ extension CanvasView {
     /// Typing a printable character on a single selected node replaces its
     /// text (F-EDT-2).
     func beginEditingSelection(prefill: String) {
+        // F-CNT-2: Space on a selected node that carries an image opens
+        // Quick Look (SPEC §5.4) instead of replacing the title.
+        if prefill == " ", selection.count == 1, let id = selection.first,
+            dragModel?.nodes[id]?.image != nil, let onQuickLookImage = onQuickLookImage
+        {
+            onQuickLookImage(id)
+            return
+        }
         guard selection.count == 1, let id = selection.first else { return }
         beginEditing(nodeID: id, prefill: prefill)
     }
