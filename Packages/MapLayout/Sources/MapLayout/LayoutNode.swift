@@ -31,6 +31,9 @@ public enum LayoutStructure: String, Sendable {
     case mindmapLeft = "mindmap.left"
     case orgDown = "orgchart.down"
     case orgUp = "orgchart.up"
+    /// F-LAY-4: children to the right, every level aligned at a shared
+    /// left edge — a compact horizontal outline.
+    case logicChartRight = "logic.right"
 }
 
 /// Layouts are in canvas space: the root's frame origin is `(0, 0)`, `x`
@@ -52,6 +55,8 @@ public enum TreeLayout {
             OrgLayout.layout(root: root, spacing: spacing, mirror: false)
         case .orgUp:
             OrgLayout.layout(root: root, spacing: spacing, mirror: true)
+        case .logicChartRight:
+            LogicLayout.layout(root: root, spacing: spacing)
         }
     }
 }
