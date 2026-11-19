@@ -25,16 +25,35 @@ final class DocumentWindowController: NSWindowController {
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
         }
+        canvas.onEditingCommit = { [weak self] id, title, next in
+            self?.handleEditingCommit(id: id, title: title, next: next)
+        }
+        canvas.onEditingDraftChange = { [weak self] id, title in
+            self?.editingDraftTitle = (id, title)
+            self?.updateScene(preserveCamera: true)
+        }
+        canvas.onCreateFloatingNode = { [weak self] point in
+            self?.createFloatingNode(at: point)
+        }
     }
 
     required init?(coder: NSCoder) {
         nil
     }
 
+    /// The live draft of an open editing session: the scene is rebuilt
+    /// with it so the node grows while typing (F-EDT-8). Cleared on
+    /// commit (the draft becomes the model's title).
+    var editingDraftTitle: (id: String, title: NodeTitle)?
+
     /// The document is only wired up after `addWindowController` returns,
     /// and the window reaches its real content size once shown — so the
     /// first scene build and fit run here, not in `init`.
     override func showWindow(_ sender: Any?) {
+        // F-CAN-3: seed the placeholder root before the first scene
+        // build, so a brand-new document opens with its centred root
+        // already editing.
+        let placeholderRootID = seedUntitledPlaceholderRoot()
         if canvas.scene == nil {
             updateScene(preserveCamera: false)
         }
@@ -43,28 +62,64 @@ final class DocumentWindowController: NSWindowController {
             canvas.zoomToFit()
             canvas.needsInitialFit = false
         }
+        if let rootID = placeholderRootID {
+            // Fitting a single empty node would zoom to 400%; sit at 100%
+            // with the node centered instead (F-CAN-3).
+            if let frame = canvas.scene?.nodes[rootID]?.frame {
+                canvas.camera = Camera(
+                    origin: CGPoint(
+                        x: frame.midX - canvas.bounds.midX,
+                        y: frame.midY - canvas.bounds.midY),
+                    scale: 1)
+            }
+            canvas.setSelection([rootID])
+            canvas.beginEditing(nodeID: rootID, placeholder: "Central Idea")
+        }
+    }
+
+    /// F-CAN-3: an untitled, still-empty document gets its placeholder
+    /// root. Model surgery, not a command: the fresh document stays
+    /// pristine (not edited, nothing to undo) until the user types. The
+    /// root's title stays empty — "Central Idea" is an editing hint, not
+    /// text.
+    private func seedUntitledPlaceholderRoot() -> String? {
+        guard let mapDocument = document as? MapDocument else { return nil }
+        guard mapDocument.fileURL == nil, mapDocument.model.roots.isEmpty else { return nil }
+        var model = mapDocument.model
+        let root = Node(id: UUID().uuidString)
+        model.nodes[root.id] = root
+        model.roots = [root.id]
+        mapDocument.store.replaceModel(model)
+        return root.id
+    }
+
+    /// The theme variant for the current model and system appearance.
+    private func currentVariant() -> ThemeVariant {
+        guard let mapDocument = document as? MapDocument else { return .light }
+        switch mapDocument.model.appearance {
+        case .dark:
+            return .dark
+        case .light:
+            return .light
+        case .auto, .none:
+            return canvas.effectiveVariant
+        }
     }
 
     /// Rebuilds the scene from the store's model at the view's effective
     /// appearance. The document's explicit override wins; `auto` follows
-    /// the system (and re-renders when it changes).
+    /// the system (and re-renders when it changes). An open editing
+    /// session's live draft overrides the editing node's title so the
+    /// node grows while typing (F-EDT-8).
     func updateScene(preserveCamera: Bool) {
         guard let mapDocument = document as? MapDocument else { return }
         let model = mapDocument.store.model
-        let variant: ThemeVariant
-        switch model.appearance {
-        case .dark:
-            variant = .dark
-        case .light:
-            variant = .light
-        case .auto, .none:
-            variant = canvas.effectiveVariant
-        }
         let previousCamera = canvas.camera
         let scene = SceneGeometry.build(
             model: model,
-            variant: variant,
-            measurer: SceneRenderer.sharedMeasurer)
+            variant: currentVariant(),
+            measurer: SceneRenderer.sharedMeasurer,
+            editingTitle: editingDraftTitle)
         canvas.scene = scene
         if preserveCamera {
             canvas.camera = previousCamera
@@ -74,10 +129,12 @@ final class DocumentWindowController: NSWindowController {
     }
 
     /// After any store change (perform, undo, redo): rebuild the scene
-    /// keeping the camera, and drop selection ids that fell out of it.
+    /// keeping the camera, drop selection ids that fell out of it, and
+    /// keep the window title on the auto-derived display name (F-EDT-14).
     func modelDidChange() {
         updateScene(preserveCamera: true)
         canvas.pruneSelection()
+        window?.title = document?.displayName ?? window?.title ?? ""
     }
 }
 
@@ -138,8 +195,9 @@ extension DocumentWindowController {
         }
     }
 
-    /// Builds one grouped add command over the selection and selects the
-    /// fresh nodes afterwards.
+    /// Builds one grouped add command over the selection, selects the
+    /// fresh nodes afterwards and — when exactly one was created, the
+    /// keyboard case — opens the new node in the editor (F-EDT-1).
     private func addCommand(_ make: (String, Node) -> MapCommand) {
         let anchors = selectedIDs
         let nodes = anchors.map { _ in Node(id: UUID().uuidString) }
@@ -150,35 +208,155 @@ extension DocumentWindowController {
         let created = Set(nodes.map(\.id))
         if let command = grouped("Add Node", commands) {
             perform(command) { _ in created }
+            if created.count == 1, let newID = created.first {
+                canvas.beginEditing(nodeID: newID)
+            }
         }
+    }
+
+    // MARK: inline editing (SPEC §11.4, F-EDT-1/2)
+
+    /// One editing commit: ONE `editText` command through the store
+    /// (F-DOC-2), the session closed so the next edit of the same node is
+    /// its own undo step, then the post-commit create (if any) with the
+    /// new node selected and in edit mode.
+    private func handleEditingCommit(id: String, title: NodeTitle, next: NodeTextEditor.PostCommitAction) {
+        editingDraftTitle = nil
+        guard let store else { return }
+        if store.model.nodes[id]?.title != title {
+            try? store.perform(.editText(id: id, title: title))
+        }
+        // One undo step per edit session (F-DOC-2): close the typing
+        // session so a second session on this node registers separately.
+        store.closeEditSession()
+        canvas.setSelection([id])
+
+        switch next {
+        case .none:
+            break
+        case .child:
+            createAfterCommit(anchor: id) { .addChild(parent: $0, index: nil, node: $1) }
+        case .siblingBelow:
+            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: false, node: $1) }
+        case .siblingAbove:
+            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: true, node: $1) }
+        case .insertParent:
+            createAfterCommit(anchor: id) { .insertParent(anchor: $0, node: $1) }
+        }
+    }
+
+    /// The create half of commit-and-create (F-EDT-1): one add command
+    /// relative to the just-committed node, then edit the fresh node.
+    private func createAfterCommit(anchor: String, _ make: (String, Node) -> MapCommand) {
+        let node = Node(id: UUID().uuidString)
+        perform(make(anchor, node)) { _ in [node.id] }
+        canvas.beginEditing(nodeID: node.id)
+    }
+
+    /// F-CAN-5: double-click on empty canvas creates a floating root
+    /// centered at that point. Roots carry no absolute position, so the
+    /// click point is stored as the root's manual `offset` from its auto
+    /// slot (SPEC §8.2); `SceneGeometry` applies offsets after auto
+    /// layout (also the F-LAY-11 groundwork). One undoable grouped
+    /// command, then edit mode.
+    private func createFloatingNode(at modelPoint: CGPoint) {
+        guard let store else { return }
+        let node = Node(id: UUID().uuidString)
+        // Probe the post-add layout for the new root's auto slot.
+        var probe = store.model
+        try? MapCommand.addRoot(index: nil, node: node).apply(to: &probe)
+        let probeScene = SceneGeometry.build(
+            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer)
+        let autoFrame = probeScene.nodes[node.id]?.frame ?? .zero
+        let offset = ModelOffset(
+            x: modelPoint.x - autoFrame.midX,
+            y: modelPoint.y - autoFrame.midY)
+        let command = MapCommand.group(
+            name: "Add Node",
+            commands: [
+                .addRoot(index: nil, node: node),
+                .setOffset(id: node.id, offset: offset),
+            ])
+        do {
+            try store.perform(command)
+        } catch {
+            return
+        }
+        canvas.setSelection([node.id])
+        canvas.beginEditing(nodeID: node.id)
     }
 
     // MARK: create (F-EDT-1)
 
+    /// ⏎/⌘⏎/F2 on a single selected node edits it instead (F-EDT-2);
+    /// while editing, the create keys commit and create (F-EDT-1).
+    @objc func editTitleAction(_ sender: Any?) {
+        if canvas.isEditing {
+            canvas.nodeTextEditor.selectAllText()
+            return
+        }
+        guard canvas.selection.count == 1, let id = canvas.selection.first else { return }
+        canvas.beginEditing(nodeID: id)
+    }
+
     @objc func addChildAction(_ sender: Any?) {
+        if canvas.isEditing {
+            canvas.commitEditing(next: .child)
+            return
+        }
         addCommand { .addChild(parent: $0, index: nil, node: $1) }
     }
 
     @objc func addSiblingBelowAction(_ sender: Any?) {
+        if canvas.isEditing {
+            canvas.commitEditing(next: .siblingBelow)
+            return
+        }
+        if canvas.selection.count == 1, let id = canvas.selection.first {
+            // F-EDT-2: ⏎ on a selected node enters edit mode.
+            canvas.beginEditing(nodeID: id)
+            return
+        }
         addCommand { .addSibling(anchor: $0, before: false, node: $1) }
     }
 
     @objc func addSiblingAboveAction(_ sender: Any?) {
+        if canvas.isEditing {
+            canvas.commitEditing(next: .siblingAbove)
+            return
+        }
         addCommand { .addSibling(anchor: $0, before: true, node: $1) }
     }
 
     @objc func insertParentAction(_ sender: Any?) {
+        if canvas.isEditing {
+            canvas.commitEditing(next: .insertParent)
+            return
+        }
         addCommand { .insertParent(anchor: $0, node: $1) }
     }
 
     @objc func addRootAction(_ sender: Any?) {
+        if canvas.isEditing {
+            // ⇧⏎ inside the text is a line break, not a new root (F-EDT-1).
+            canvas.nodeTextEditor.insertLineBreak()
+            return
+        }
         let node = Node(id: UUID().uuidString)
         perform(.addRoot(index: nil, node: node)) { _ in [node.id] }
+        canvas.beginEditing(nodeID: node.id)
     }
 
     // MARK: delete (F-EDT-4)
 
     @objc func deleteSubtreeAction(_ sender: Any?) {
+        if canvas.isEditing {
+            // ⌫/⌦ during editing edit the text; the Delete menu key
+            // equivalents must never delete the node being edited.
+            let forwardDelete = (sender as? NSMenuItem)?.keyEquivalent == "\u{f728}"
+            canvas.nodeTextEditor.deleteInEditor(forward: forwardDelete)
+            return
+        }
         guard let store, !canvas.selection.isEmpty else { return }
         let ids = topmostSelectedIDs(in: store.model)
         guard !ids.isEmpty else { return }
@@ -188,6 +366,11 @@ extension DocumentWindowController {
     }
 
     @objc func deleteNodeOnlyAction(_ sender: Any?) {
+        if canvas.isEditing {
+            let forwardDelete = (sender as? NSMenuItem)?.keyEquivalent == "\u{f728}"
+            canvas.nodeTextEditor.deleteInEditor(forward: forwardDelete)
+            return
+        }
         guard let store, !canvas.selection.isEmpty else { return }
         let ids = topmostSelectedIDs(in: store.model)
         guard !ids.isEmpty else { return }
@@ -202,7 +385,7 @@ extension DocumentWindowController {
     // MARK: move (F-EDT-6)
 
     @objc func duplicateAction(_ sender: Any?) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         var commands: [MapCommand] = []
         var copyRoots: [String] = []
         for id in topmostSelectedIDs(in: store.model) {
@@ -218,7 +401,7 @@ extension DocumentWindowController {
     }
 
     @objc func detachAction(_ sender: Any?) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         // Roots have nothing to detach from; the rest become new roots.
         let detachable = selectedIDs.filter { store.model.nodes[$0]?.parent != nil }
         let commands = detachable.map { MapCommand.detach(id: $0) }
@@ -236,7 +419,7 @@ extension DocumentWindowController {
     }
 
     private func reorder(delta: Int) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         var moves: [(id: String, slot: Int)] = []
         for id in selectedIDs {
             guard let node = store.model.nodes[id] else { continue }
@@ -268,7 +451,7 @@ extension DocumentWindowController {
     }
 
     private func restructure(promote: Bool) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         var commands: [MapCommand] = []
         for id in selectedIDs {
             guard let node = store.model.nodes[id], let parentID = node.parent else { continue }
@@ -288,7 +471,7 @@ extension DocumentWindowController {
     // MARK: fold (F-LAY-14)
 
     @objc func toggleFoldAction(_ sender: Any?) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         var commands: [MapCommand] = []
         for id in selectedIDs {
             // A leaf has nothing to fold.
@@ -303,11 +486,16 @@ extension DocumentWindowController {
     // MARK: select (F-CAN-4)
 
     @objc func selectAllAction(_ sender: Any?) {
+        if canvas.isEditing {
+            // ⌘A during editing selects the text, not the map.
+            canvas.nodeTextEditor.selectAllText()
+            return
+        }
         canvas.setSelection(canvas.scene.map { Set($0.nodes.keys) } ?? [])
     }
 
     @objc func selectChildrenAction(_ sender: Any?) {
-        guard let store else { return }
+        guard !canvas.isEditing, let store else { return }
         let children = Set(
             canvas.selection.flatMap { store.model.nodes[$0]?.children ?? [] })
         canvas.setSelection(children)
@@ -315,7 +503,7 @@ extension DocumentWindowController {
 
     /// The root of the selected node's tree.
     @objc func selectRootAction(_ sender: Any?) {
-        guard let store, let primary = selectedIDs.first else { return }
+        guard !canvas.isEditing, let store, let primary = selectedIDs.first else { return }
         var current = primary
         while let parent = store.model.nodes[current]?.parent {
             current = parent
@@ -324,6 +512,12 @@ extension DocumentWindowController {
     }
 
     @objc func deselectAction(_ sender: Any?) {
+        if canvas.isEditing {
+            // ⎋ commits; ⎋ again (this action, reached when nothing is
+            // editing) deselects (F-EDT-1).
+            canvas.commitEditing(next: .none)
+            return
+        }
         canvas.setSelection([])
     }
 }
