@@ -239,21 +239,21 @@ public enum DropTargetResolver {
             let stack = siblingStacking(of: parent, in: scene)
             for column in splitBySide(anchors: anchors, parentFrame: parentFrame, stack: stack) {
                 for position in column.indices.dropLast() {
-                    let a = column[position]
-                    let b = column[position + 1]
-                    guard let zone = gapZone(parentFrame: parentFrame, a: a, b: b, stack: stack),
+                    let before = column[position]
+                    let after = column[position + 1]
+                    guard let zone = gapZone(parentFrame: parentFrame, before: before, after: after, stack: stack),
                         zone.contains(point)
                     else { continue }
                     let boundary =
                         stack == .vertical
-                        ? (a.frame.maxY + b.frame.minY) / 2
-                        : (a.frame.maxX + b.frame.minX) / 2
+                        ? (before.frame.maxY + after.frame.minY) / 2
+                        : (before.frame.maxX + after.frame.minX) / 2
                     guard
                         let line = insertionLine(
                             parentFrame: parentFrame, anchors: column, stack: stack, boundary: boundary)
                     else { continue }
                     let candidate = GapCandidate(
-                        parent: parent, index: b.index, line: line,
+                        parent: parent, index: after.index, line: line,
                         distance: distance(from: point, to: line))
                     if let current = best {
                         let currentKey = (current.distance, current.parent, current.index)
@@ -268,34 +268,34 @@ public enum DropTargetResolver {
     }
 
     /// The hover-accepting rect between stacked siblings `a` (before) and
-    /// `b`, spanning the branch corridor from the parent's edge to just
+    /// `after`, spanning the branch corridor from the parent's edge to just
     /// past the children's outer edge.
     static func gapZone(
-        parentFrame: CGRect, a: Anchor, b: Anchor, stack: SiblingStack
+        parentFrame: CGRect, before: Anchor, after: Anchor, stack: SiblingStack
     ) -> CGRect? {
         switch stack {
         case .vertical:
-            let childrenRight = a.frame.midX >= parentFrame.midX
+            let childrenRight = before.frame.midX >= parentFrame.midX
             let xMin =
                 childrenRight
                 ? parentFrame.maxX
-                : min(a.frame.minX, b.frame.minX) - corridorPad
+                : min(before.frame.minX, after.frame.minX) - corridorPad
             let xMax =
                 childrenRight
-                ? max(a.frame.maxX, b.frame.maxX) + corridorPad
+                ? max(before.frame.maxX, after.frame.maxX) + corridorPad
                 : parentFrame.minX
-            return validRect(xMin: xMin, yMin: a.frame.maxY, xMax: xMax, yMax: b.frame.minY)
+            return validRect(xMin: xMin, yMin: before.frame.maxY, xMax: xMax, yMax: after.frame.minY)
         case .horizontal:
-            let childrenBelow = a.frame.midY >= parentFrame.midY
+            let childrenBelow = before.frame.midY >= parentFrame.midY
             let yMin =
                 childrenBelow
                 ? parentFrame.maxY
-                : min(a.frame.minY, b.frame.minY) - corridorPad
+                : min(before.frame.minY, after.frame.minY) - corridorPad
             let yMax =
                 childrenBelow
-                ? max(a.frame.maxY, b.frame.maxY) + corridorPad
+                ? max(before.frame.maxY, after.frame.maxY) + corridorPad
                 : parentFrame.minY
-            return validRect(xMin: a.frame.maxX, yMin: yMin, xMax: b.frame.minX, yMax: yMax)
+            return validRect(xMin: before.frame.maxX, yMin: yMin, xMax: after.frame.minX, yMax: yMax)
         }
     }
 
@@ -373,8 +373,8 @@ public enum DropTargetResolver {
         guard lengthSquared > 0 else {
             return hypot(point.x - line.start.x, point.y - line.start.y)
         }
-        let t = ((point.x - line.start.x) * dx + (point.y - line.start.y) * dy) / lengthSquared
-        let clamped = min(max(t, 0), 1)
+        let projection = ((point.x - line.start.x) * dx + (point.y - line.start.y) * dy) / lengthSquared
+        let clamped = min(max(projection, 0), 1)
         return hypot(
             point.x - line.start.x - clamped * dx,
             point.y - line.start.y - clamped * dy)
