@@ -204,7 +204,8 @@ extension NodeRenderer {
             x: rect.minX + (rect.width - width) / 2, y: rect.minY + (rect.height - height) / 2,
             width: width, height: height)
         var transform = CGAffineTransform(
-            translationX: fit.minX, y: fit.minY).scaledBy(x: scale, y: scale)
+            translationX: fit.minX, y: fit.minY
+        ).scaledBy(x: scale, y: scale)
         let scaled = sticker.path.copy(using: &transform) ?? sticker.path
 
         context.saveGState()

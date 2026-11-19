@@ -173,16 +173,16 @@ struct MediaDecorationTests {
         model.nodes["b"]?.attachments = [Attachment(asset: "ccdd.pdf", name: "Paper.pdf")]
 
         let scene = SceneGeometry.build(model: model, variant: .light, measurer: TextMeasurer())
-        let a = try #require(scene.nodes["a"])
-        #expect(a.decorations?.markers.count == 3)
-        #expect(a.decorations?.image?.asset == "aabb.png")
-        #expect(a.decorations?.source == "https://example.com/p")
+        let imageNode = try #require(scene.nodes["a"])
+        #expect(imageNode.decorations?.markers.count == 3)
+        #expect(imageNode.decorations?.image?.asset == "aabb.png")
+        #expect(imageNode.decorations?.source == "https://example.com/p")
         // The image is a layout input: the decorated node is the taller
         // and the wider one (marker row included).
-        let b = try #require(scene.nodes["b"])
-        #expect(b.decorations?.attachmentCount == 1)
-        #expect(a.frame.height > b.frame.height)
-        #expect(a.frame.width > b.frame.width)
+        let attachmentNode = try #require(scene.nodes["b"])
+        #expect(attachmentNode.decorations?.attachmentCount == 1)
+        #expect(imageNode.frame.height > attachmentNode.frame.height)
+        #expect(imageNode.frame.width > attachmentNode.frame.width)
     }
 
     @Test func mediaProviderResolvesImagesMarkersAndMath() throws {
@@ -205,20 +205,21 @@ struct MediaDecorationTests {
         // A math node measured through the glyph, not the source text.
         let measurer = TextMeasurer()
         let textWidth = measurer.nodeTitleSize(
-            model.nodes["b"]!.title, font: style().font, maxWidth: 280).width
+            model.nodes["b"]!.title, font: style().font, maxWidth: 280
+        ).width
         #expect(abs(textWidth - 42) > 0.5, "the glyph size and the plain-text width differ")
 
         // The same cache reuses the stored size: the math node is
         // exactly 42 (glyph) + padding wide.
         let scene = SceneGeometry.update(
             model: model, cache: cache, variant: .light, measurer: measurer, dirty: [])
-        let b = try #require(scene.nodes["b"])
-        #expect(abs(b.frame.width - (42 + b.style.paddingWidth * 2)) < 0.001)
+        let mathNode = try #require(scene.nodes["b"])
+        #expect(abs(mathNode.frame.width - (42 + mathNode.style.paddingWidth * 2)) < 0.001)
 
-        let a = try #require(scene.nodes["a"])
-        #expect(a.media?.image === thumb)
-        #expect(a.media?.markerImages["sf:star.fill"] === thumb)
-        #expect(a.media?.revision == 3)
+        let imageNode = try #require(scene.nodes["a"])
+        #expect(imageNode.media?.image === thumb)
+        #expect(imageNode.media?.markerImages["sf:star.fill"] === thumb)
+        #expect(imageNode.media?.revision == 3)
         // A revision bump re-rasters: the differ sees content change.
         cache.media?.revision = 4
         let bumped = SceneGeometry.update(
@@ -233,10 +234,10 @@ struct MediaDecorationTests {
         model.nodes["a"]?.math = true
         // No provider: the source text measures and draws (F-CNT-5).
         let scene = SceneGeometry.build(model: model, variant: .light, measurer: TextMeasurer())
-        let a = try #require(scene.nodes["a"])
-        #expect(a.decorations?.math == true)
-        #expect(a.media == nil)
-        #expect(a.frame.width > a.style.paddingWidth * 2)
+        let mathNode = try #require(scene.nodes["a"])
+        #expect(mathNode.decorations?.math == true)
+        #expect(mathNode.media == nil)
+        #expect(mathNode.frame.width > mathNode.style.paddingWidth * 2)
     }
 
     // MARK: hide-mode pruning (F-TAG-3)

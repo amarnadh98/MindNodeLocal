@@ -200,7 +200,8 @@ private struct SFSymbolCell: View {
             .foregroundStyle(.primary)
             .frame(width: 36, height: 36)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.4)))
+                RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.4))
+            )
             .contentShape(Rectangle())
             .onTapGesture(perform: onTap)
             .accessibilityLabel(Text("Marker \(name)"))

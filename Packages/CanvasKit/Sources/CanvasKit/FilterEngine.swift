@@ -169,28 +169,43 @@ public enum FilterEngine {
     public static func matches(
         _ filter: NodeFilter, nodeID: String, node: Node, mastery: MasteryReport?, now: Date
     ) -> Bool {
-        if !filter.tagIDs.isEmpty {
-            let carried = Set(node.tags ?? [])
-            if carried.isDisjoint(with: filter.tagIDs) {
-                return false
-            }
+        guard tagMatches(filter, node), taskMatches(filter, node),
+            contentMatches(filter, node), typeMatches(filter, node),
+            masteryMatches(filter, nodeID: nodeID, node: node, mastery: mastery),
+            dueMatches(filter, node, now: now), textMatches(filter, node)
+        else {
+            return false
         }
+        return true
+    }
 
+    /// `tag:` — any-of the carried ids (F-TAG-1 vocabulary).
+    static func tagMatches(_ filter: NodeFilter, _ node: Node) -> Bool {
+        guard !filter.tagIDs.isEmpty else { return true }
+        return !(Set(node.tags ?? []).isDisjoint(with: filter.tagIDs))
+    }
+
+    /// `is:` — the task states (F-TSK).
+    static func taskMatches(_ filter: NodeFilter, _ node: Node) -> Bool {
         switch filter.taskState {
-        case .task:
-            if node.task == nil { return false }
-        case .open:
-            if node.task == nil || node.task?.done == true { return false }
-        case .done:
-            if node.task?.done != true { return false }
-        case .notask:
-            if node.task != nil { return false }
         case nil:
-            break
+            return true
+        case .task:
+            return node.task != nil
+        case .open:
+            return node.task != nil && node.task?.done != true
+        case .done:
+            return node.task?.done == true
+        case .notask:
+            return node.task == nil
         }
+    }
 
+    /// `has:`/`no:` — the content flags (F-CNT-1/2/7).
+    static func contentMatches(_ filter: NodeFilter, _ node: Node) -> Bool {
         if let wanted = filter.hasNote {
-            let hasNonEmptyNote = node.note?
+            let hasNonEmptyNote =
+                node.note?
                 .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             if hasNonEmptyNote != wanted {
                 return false
@@ -204,41 +219,52 @@ public enum FilterEngine {
         {
             return false
         }
-
-        if let wanted = filter.nodeType?.lowercased(), (node.type ?? "").lowercased() != wanted {
-            return false
-        }
-
-        if let bucket = filter.mastery {
-            let own = mastery?.nodes[nodeID]?.bucket
-            let aggregate = mastery?.aggregates[nodeID]
-            let nodeBucket = own ?? (aggregate != nil ? MasteryBucket.bucket(retrievability: aggregate) : nil)
-            guard nodeBucket == bucket else { return false }
-        }
-
-        if let due = filter.due {
-            guard let raw = node.task?.due else { return false }
-            let day = dueDay(raw, now: now)
-            switch due {
-            case .any:
-                break
-            case .overdue:
-                guard day < 0 else { return false }
-            case .today:
-                guard day == 0 else { return false }
-            case .week:
-                guard day >= 0, day <= 7 else { return false }
-            }
-        }
-
-        if let words = filter.text?.trimmingCharacters(in: .whitespaces), !words.isEmpty {
-            let haystack = folded(node.title.text + "\n" + (node.note ?? ""))
-            if !words.split(separator: " ").allSatisfy({ haystack.contains(folded(String($0))) }) {
-                return false
-            }
-        }
-
         return true
+    }
+
+    /// `type:` — the node's lightweight type field.
+    static func typeMatches(_ filter: NodeFilter, _ node: Node) -> Bool {
+        guard let wanted = filter.nodeType?.lowercased() else { return true }
+        return (node.type ?? "").lowercased() == wanted
+    }
+
+    /// `mastery:` — the node's own bucket, or the subtree aggregate for
+    /// a branch (F-STD-6).
+    static func masteryMatches(
+        _ filter: NodeFilter, nodeID: String, node: Node, mastery: MasteryReport?
+    ) -> Bool {
+        guard let bucket = filter.mastery else { return true }
+        let own = mastery?.nodes[nodeID]?.bucket
+        let aggregate = mastery?.aggregates[nodeID]
+        let nodeBucket = own ?? (aggregate != nil ? MasteryBucket.bucket(retrievability: aggregate) : nil)
+        return nodeBucket == bucket
+    }
+
+    /// `due:` — the task's due day against `now`.
+    static func dueMatches(_ filter: NodeFilter, _ node: Node, now: Date) -> Bool {
+        guard let due = filter.due else { return true }
+        guard let raw = node.task?.due else { return false }
+        let day = dueDay(raw, now: now)
+        switch due {
+        case .any:
+            return true
+        case .overdue:
+            return day < 0
+        case .today:
+            return day == 0
+        case .week:
+            return day >= 0 && day <= 7
+        }
+    }
+
+    /// The free text — every word a substring of the folded title+note.
+    static func textMatches(_ filter: NodeFilter, _ node: Node) -> Bool {
+        guard let words = filter.text?.trimmingCharacters(in: .whitespaces), !words.isEmpty
+        else {
+            return true
+        }
+        let haystack = folded(node.title.text + "\n" + (node.note ?? ""))
+        return words.split(separator: " ").allSatisfy { haystack.contains(folded(String($0))) }
     }
 
     /// The matching node ids of the whole model.

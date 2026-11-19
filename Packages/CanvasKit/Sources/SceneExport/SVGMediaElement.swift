@@ -139,9 +139,11 @@ enum SVGMediaElement {
         case .fill:
             paint = " fill=\"\(color)\""
         case .stroke:
-            paint = " fill=\"none\" stroke=\"\(color)\" stroke-width=\"\(SVGSupport.number(sticker.lineWidth * scale))\""
+            paint =
+                " fill=\"none\" stroke=\"\(color)\" stroke-width=\"\(SVGSupport.number(sticker.lineWidth * scale))\""
         case .fillStroke:
-            paint = " fill=\"\(color)\" stroke=\"\(color)\" stroke-width=\"\(SVGSupport.number(sticker.lineWidth * scale))\""
+            paint =
+                " fill=\"\(color)\" stroke=\"\(color)\" stroke-width=\"\(SVGSupport.number(sticker.lineWidth * scale))\""
         }
         return "<path d=\"\(data)\"\(paint)/>"
     }

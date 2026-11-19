@@ -100,7 +100,10 @@ enum NoteMathParser {
         while let block = remainder.range(of: "$$") {
             if let end = remainder[block.upperBound...].range(of: "$$") {
                 appendText(&segments, remainder[..<block.lowerBound])
-                segments.append(.math(String(remainder[block.upperBound..<end.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)))
+                segments.append(
+                    .math(
+                        String(remainder[block.upperBound..<end.lowerBound]).trimmingCharacters(
+                            in: .whitespacesAndNewlines)))
                 remainder = remainder[end.upperBound...]
                 continue
             }

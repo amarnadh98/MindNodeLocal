@@ -362,10 +362,10 @@ struct MediaFeatureTests {
             return try #require(canvas.scene)
         }()
 
-        let a = try #require(scene.nodes["a"])
-        #expect(a.media?.image != nil, "the async decode must have landed")
-        let b = try #require(scene.nodes["b"])
-        #expect(b.media?.math != nil, "the math glyph must have resolved")
+        let imageNode = try #require(scene.nodes["a"])
+        #expect(imageNode.media?.image != nil, "the async decode must have landed")
+        let mathNode = try #require(scene.nodes["b"])
+        #expect(mathNode.media?.math != nil, "the math glyph must have resolved")
 
         // PDF + PNG through the SceneExport painters (the shared
         // NodeRenderer path).
@@ -390,16 +390,16 @@ struct MediaFeatureTests {
 /// a plain flag is race-free.
 @MainActor
 private final class DecodeExpectation {
-    private var count = 0
+    private var fulfilled = false
 
     func fulfill() {
-        count += 1
+        fulfilled = true
     }
 
     func wait(timeout: TimeInterval) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if count > 0 {
+            if fulfilled {
                 return
             }
             try await Task.sleep(for: .milliseconds(20))

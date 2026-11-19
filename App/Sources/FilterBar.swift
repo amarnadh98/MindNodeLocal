@@ -1,6 +1,7 @@
 import AppKit
 import CanvasKit
 import MapCore
+import MapStudy
 
 /// The F-TAG-3 filter bar (⇧⌥⌘F): one row combining text, one tag,
 /// task state, content flags, node type, mastery level and due date,
@@ -116,12 +117,21 @@ final class FilterBarView: NSView {
         popup.setAccessibilityLabel(accessibility)
     }
 
+    /// Empties a popup the way popups behave: removing the item array
+    /// from the end (index 0 each pass — `removeAllItems` resets the
+    /// selected index we want to preserve).
+    private func removeAllItems(of popup: NSPopUpButton) {
+        while popup.numberOfItems > 0 {
+            popup.menu?.removeItem(at: 0)
+        }
+    }
+
     // MARK: host surface
 
     /// Rebuilds the document-driven popups (tags, types, saved).
     func refresh(model: MapModel) {
         let selectedTag = tagPopup.indexOfSelectedItem
-        tagPopup.itemArray.forEach { tagPopup.menu?.removeItem($0) }
+        removeAllItems(of: tagPopup)
         tagPopup.addItem(withTitle: "Any tag")
         tagIDs = []
         for tag in model.tags ?? [] {
@@ -132,7 +142,7 @@ final class FilterBarView: NSView {
 
         let selectedType = typePopup.indexOfSelectedItem
         let types = Array(Set(model.nodes.values.compactMap(\.type))).sorted()
-        typePopup.itemArray.forEach { typePopup.menu?.removeItem($0) }
+        removeAllItems(of: typePopup)
         typePopup.addItem(withTitle: "Any type")
         for type in types {
             typePopup.addItem(withTitle: type.capitalized)
@@ -140,7 +150,7 @@ final class FilterBarView: NSView {
         typePopup.selectItem(at: min(max(selectedType, 0), typePopup.numberOfItems - 1))
 
         let selectedSaved = savedPopup.indexOfSelectedItem
-        savedPopup.itemArray.forEach { savedPopup.menu?.removeItem($0) }
+        removeAllItems(of: savedPopup)
         savedPopup.addItem(withTitle: "Save Filter…")
         savedPopup.menu?.items[0].action = #selector(savePressed)
         savedPopup.menu?.items[0].target = self
@@ -167,45 +177,73 @@ final class FilterBarView: NSView {
         onChange?(filter(), false)
     }
 
-    /// The filter the controls describe.
+    /// The filter the controls describe — one helper per popup keeps the
+    /// whole surface readable.
     private func filter() -> NodeFilter {
-        var filter = NodeFilter(text: textField.stringValue.isEmpty ? nil : textField.stringValue)
-        if tagPopup.indexOfSelectedItem > 0, tagPopup.indexOfSelectedItem - 1 < tagIDs.count {
-            filter.tagIDs = [tagIDs[tagPopup.indexOfSelectedItem - 1]]
-        }
+        let content = contentSelection()
+        return NodeFilter(
+            tagIDs: tagSelection(),
+            taskState: taskSelection(),
+            hasNote: content.note,
+            hasImage: content.image,
+            hasAttachment: content.attachment,
+            nodeType: typeSelection(),
+            mastery: masterySelection(),
+            due: dueSelection(),
+            text: textField.stringValue.isEmpty ? nil : textField.stringValue)
+    }
+
+    private func tagSelection() -> Set<String> {
+        let index = tagPopup.indexOfSelectedItem
+        guard index > 0, index - 1 < tagIDs.count else { return [] }
+        return [tagIDs[index - 1]]
+    }
+
+    private func taskSelection() -> NodeFilter.TaskState? {
         switch taskPopup.indexOfSelectedItem {
-        case 1: filter.taskState = .task
-        case 2: filter.taskState = .open
-        case 3: filter.taskState = .done
-        case 4: filter.taskState = .notask
-        default: break
+        case 1: return .task
+        case 2: return .open
+        case 3: return .done
+        case 4: return .notask
+        default: return nil
         }
+    }
+
+    /// The content popup picks exactly ONE of its flags.
+    private func contentSelection() -> (note: Bool?, image: Bool?, attachment: Bool?) {
         switch contentPopup.indexOfSelectedItem {
-        case 1: filter.hasNote = true
-        case 2: filter.hasNote = false
-        case 3: filter.hasImage = true
-        case 4: filter.hasImage = false
-        case 5: filter.hasAttachment = true
-        default: break
+        case 1: return (true, nil, nil)
+        case 2: return (false, nil, nil)
+        case 3: return (nil, true, nil)
+        case 4: return (nil, false, nil)
+        case 5: return (nil, nil, true)
+        default: return (nil, nil, nil)
         }
-        if typePopup.indexOfSelectedItem > 0, let raw = typePopup.selectedItem?.title.lowercased() {
-            filter.nodeType = raw
-        }
+    }
+
+    private func typeSelection() -> String? {
+        guard typePopup.indexOfSelectedItem > 0 else { return nil }
+        return typePopup.selectedItem?.title.lowercased()
+    }
+
+    private func masterySelection() -> MasteryBucket? {
         switch masteryPopup.indexOfSelectedItem {
-        case 1: filter.mastery = .strong
-        case 2: filter.mastery = .good
-        case 3: filter.mastery = .fading
-        case 4: filter.mastery = .forgotten
-        case 5: filter.mastery = .fresh
-        default: break
+        case 1: return .strong
+        case 2: return .good
+        case 3: return .fading
+        case 4: return .forgotten
+        case 5: return .fresh
+        default: return nil
         }
+    }
+
+    private func dueSelection() -> NodeFilter.Due? {
         switch duePopup.indexOfSelectedItem {
-        case 1: filter.due = .overdue
-        case 2: filter.due = .today
-        case 3: filter.due = .week
-        default: break
+        case 1: return .overdue
+        case 2: return .today
+        case 3: return .week
+        default: return nil
         }
-        return filter
     }
 
     // MARK: actions

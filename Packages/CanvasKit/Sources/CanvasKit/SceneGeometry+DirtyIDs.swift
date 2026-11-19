@@ -2,7 +2,8 @@ import MapCore
 
 /// The command → layout-dirty mapping for the incremental scene path
 /// (SPEC §11.3), split out of `SceneGeometry` to keep each file under
-/// the lint budgets.
+/// the lint budgets. The exhaustive switch is deliberately flat —
+/// every command kind reads in one place.
 extension SceneGeometry {
     /// The layout-dirty node ids for `command` applied to `model` (the
     /// post-command model): every node whose own layout inputs — measured
@@ -14,6 +15,7 @@ extension SceneGeometry {
     /// falls back to a full rebuild. Over-marking is always safe; the
     /// engine validates every reused entry's own size and child ids as
     /// a second line.
+    // swiftlint:disable:next cyclomatic_complexity
     public static func dirtyIDs(for command: MapCommand, in model: MapModel) -> Set<String>? {
         func withParent(_ id: String) -> Set<String> {
             var ids = Set<String>([id])

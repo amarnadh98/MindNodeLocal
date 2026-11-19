@@ -208,10 +208,10 @@ public enum SceneGeometry {
         theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
-            model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
-            cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil,
-            theme: theme)
+            BuildRequest(
+                model: model, variant: variant, measurer: measurer, spacing: spacing,
+                showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle, theme: theme),
+            cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil)
     }
 
     /// Full rebuild that also fills `cache`, so later small changes can
@@ -228,9 +228,10 @@ public enum SceneGeometry {
         theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
-            model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
-            cache: cache, dirty: nil, theme: theme)
+            BuildRequest(
+                model: model, variant: variant, measurer: measurer, spacing: spacing,
+                showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle, theme: theme),
+            cache: cache, dirty: nil)
     }
 
     /// Incremental rebuild after a small change (SPEC §11.3): reuses the
@@ -262,30 +263,43 @@ public enum SceneGeometry {
                 theme: theme)
         }
         return buildCore(
-            model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
-            cache: cache, dirty: dirty, theme: theme)
+            BuildRequest(
+                model: model, variant: variant, measurer: measurer, spacing: spacing,
+                showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle, theme: theme),
+            cache: cache, dirty: dirty)
     }
 
     // MARK: core build
 
+    /// Everything one build needs besides the cache and the dirty set —
+    /// a value so `buildCore` stays under the lint parameter budget.
+    struct BuildRequest {
+        let model: MapModel
+        let variant: ThemeVariant
+        let measurer: TextMeasurer
+        let spacing: LayoutSpacing
+        let showsTagPills: Bool
+        let prunedIDs: Set<String>?
+        let editingTitle: (id: String, title: NodeTitle)?
+        /// F-STY-5: an explicit theme (the editor's draft or a user
+        /// theme) wins over the document's built-in selection.
+        let theme: Theme?
+    }
+
     private static func buildCore(
-        model: MapModel,
-        variant: ThemeVariant,
-        measurer: TextMeasurer,
-        spacing: LayoutSpacing,
-        showsTagPills: Bool,
-        prunedIDs: Set<String>?,
-        editingTitle: (id: String, title: NodeTitle)?,
-        cache: SceneBuildCache,
-        dirty: Set<String>?,
-        theme explicitTheme: Theme? = nil
+        _ request: BuildRequest, cache: SceneBuildCache, dirty: Set<String>?
     ) -> CanvasScene {
+        let model = request.model
+        let variant = request.variant
+        let measurer = request.measurer
+        let spacing = request.spacing
+        let prunedIDs = request.prunedIDs
+        let editingTitle = request.editingTitle
         // F-STY-3/F-STY-4: styles resolve from the document's theme
         // selection (default Paper) at the current appearance variant.
         // F-STY-5: an explicit theme wins — the theme editor's draft and
         // the app's user-theme catalog both resolve before this point.
-        let theme = explicitTheme ?? BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
+        let theme = request.theme ?? BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
         var cursorY: CGFloat = 0
@@ -313,7 +327,8 @@ public enum SceneGeometry {
                     model: model, ancestry: ancestry, variant: variant,
                     measurer: measurer, caches: caches,
                     progress: progress, tagByID: tagByID,
-                    hasTagDefinitions: hasTagDefinitions, showsTagPills: showsTagPills,
+                    hasTagDefinitions: hasTagDefinitions,
+                    showsTagPills: request.showsTagPills,
                     pruned: prunedIDs,
                     editingTitle: editingTitle, cache: cache))
 
@@ -444,142 +459,6 @@ public enum SceneGeometry {
         return result
     }
 
-    /// Everything the per-node layout source needs besides the node id
-    /// (M3's content facts included): a value, so the closure factory's
-    /// signature stays under the lint budgets.
-    struct SourceInputs {
-        let model: MapModel
-        let ancestry: [String: AncestryInfo]
-        let variant: ThemeVariant
-        let measurer: TextMeasurer
-        let caches: BuildCaches
-        let progress: [String: TaskRatio]
-        let tagByID: [String: Tag]
-        let hasTagDefinitions: Bool
-        let showsTagPills: Bool
-        /// F-TAG-3 hide mode: ids kept out of the scene. The host must
-        /// rebuild fully when the pruned set changes (child lists are
-        /// layout inputs — the dirty path can't see filter flips).
-        let pruned: Set<String>?
-        let editingTitle: (id: String, title: NodeTitle)?
-        let cache: SceneBuildCache
-    }
-
-    /// The incremental layout source: measured sizes come from the
-    /// per-document cache (a miss measures once through the shared
-    /// `TextMeasurer` and stores), and children are the folded-pruned
-    /// child list. The editing node measures its live draft title so the
-    /// node grows while typing (F-EDT-8). M3: each measured node's
-    /// decorations are computed once here — recorded into the cache for
-    /// the scene assembly, folded into the size key (so a decoration
-    /// change never reuses a stale size) and into the size itself
-    /// through the shared `NodeRenderer.contentSize`.
-    static func layoutSource(_ inputs: SourceInputs) -> (String) -> LayoutSourceNode? {
-        { id in
-            guard let node: Node = inputs.model.nodes[id] else { return nil }
-            let depth = inputs.ancestry[id]?.depth ?? 0
-            let style = inputs.caches.style(level: depth, level1Index: 0)
-            let title = id == inputs.editingTitle?.id ? inputs.editingTitle?.title : node.title
-            // One decoration value per node: recorded for the scene and
-            // consumed by the measurement below (never computed twice).
-            let nodeDecorations = decoration(
-                for: node, ratio: inputs.progress.isEmpty ? nil : inputs.progress[id],
-                tagByID: inputs.tagByID, hasTagDefinitions: inputs.hasTagDefinitions,
-                showsTagPills: inputs.showsTagPills)
-            inputs.cache.decorations[id] = nodeDecorations
-            let key = SceneBuildCache.SizeKey(
-                id: id, title: title ?? node.title, themeID: inputs.caches.theme.id, level: depth,
-                variant: inputs.variant, width: node.width, decorations: nodeDecorations)
-            let textSize: CGSize
-            if let cached = inputs.cache.sizes[key] {
-                textSize = cached
-            } else if node.math == true,
-                let glyph = inputs.cache.media?.math?((title ?? node.title).text, style.font, style.textColor)
-            {
-                // F-CNT-5: a math node measures through the rendered
-                // glyph (the host's cache; a parse error never reaches
-                // here — the provider returns nil and the source text
-                // measures below).
-                inputs.cache.sizes[key] = glyph.size
-                textSize = glyph.size
-            } else {
-                let maxWidth: CGFloat?
-                if node.width?.mode == .fixed, let fixed = node.width?.value {
-                    maxWidth = fixed
-                } else {
-                    maxWidth = style.maxWidth
-                }
-                let measured = inputs.measurer.nodeTitleSize(
-                    title ?? node.title, font: style.font, maxWidth: maxWidth)
-                inputs.cache.sizes[key] = measured
-                textSize = measured
-            }
-            let contentSize = NodeRenderer.contentSize(
-                textSize: textSize, style: style, decorations: nodeDecorations)
-            let width = contentSize.width + style.paddingWidth * 2
-            let height = contentSize.height + style.paddingHeight * 2
-            return LayoutSourceNode(
-                id: id,
-                size: CGSize(width: width, height: height),
-                side: side(of: node),
-                childIDs: node.folded
-                    ? []
-                    : node.children.filter { inputs.pruned?.contains($0) != true })
-        }
-    }
-
-    /// One node's decoration value (M3): the task mark (a checkbox for a
-    /// leaf task, F-TSK-1; a progress ring when the subtree holds task
-    /// descendants, F-TSK-2), the note/link badges, the marker row, the
-    /// image block, the citation chip, the attachment badge and the tag
-    /// pills resolved from the document's tag table.
-    static func decoration(
-        for node: Node, ratio: TaskRatio?, tagByID: [String: Tag],
-        hasTagDefinitions: Bool, showsTagPills: Bool
-    ) -> NodeDecorations? {
-        var task: TaskMark?
-        if let ratio, ratio.total > 0 {
-            // Any node (task or not) with task descendants: the ring
-            // (F-TSK-2; `TaskProgress.index` holds exactly these).
-            task = .progress(completed: ratio.completed, total: ratio.total)
-        } else if node.task != nil {
-            // A task with no task descendants: its own checkbox
-            // (F-TSK-1).
-            task = .checkbox(done: node.task?.done ?? false)
-        }
-
-        var pills: [TagPill] = []
-        if showsTagPills, hasTagDefinitions {
-            pills = (node.tags ?? []).compactMap { tagID in
-                guard let tag = tagByID[tagID] else { return nil }
-                return TagPill(name: tag.name, colorHex: tag.color)
-            }
-        }
-
-        // F-CNT-3: the marker row before the title.
-        let markers = (node.markers ?? []).map { MarkerBadge(token: $0) }
-        // F-CNT-2: the image block (its display size is a layout input).
-        var image: ImageBlock?
-        if let stored = node.image, stored.size.count >= 2 {
-            image = ImageBlock(
-                asset: stored.asset,
-                size: CGSize(width: stored.size[0], height: stored.size[1]),
-                placement: stored.placement)
-        }
-
-        let value = NodeDecorations(
-            task: task,
-            hasNote: node.note != nil,
-            linkURL: node.link,
-            tags: pills,
-            markers: markers,
-            image: image,
-            math: node.math == true,
-            source: node.source?.url,
-            attachmentCount: node.attachments?.count ?? 0)
-        return value.isEmpty ? nil : value
-    }
-
     /// A node's manual offset, plus the accumulated offsets of its
     /// ancestors — the translation applied after auto layout (SPEC §9:
     /// "offset is added after auto layout; descendants move with it").
@@ -600,7 +479,7 @@ public enum SceneGeometry {
         return result
     }
 
-    private static func side(of node: Node) -> LayoutSide? {
+    static func side(of node: Node) -> LayoutSide? {
         guard let sidePin = node.side else { return nil }
         return sidePin == .left ? .left : .right
     }

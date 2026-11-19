@@ -101,6 +101,7 @@
 		A629364FBFD7420C999041BD /* StudySessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 692E56392D3D3D002F772423 /* StudySessionController.swift */; };
 		A7521B9999AA8D750453A189 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756FFDEF59A4A97A28C77EF8 /* SettingsTests.swift */; };
 		A897893AEDCC95F8F0244752 /* MediaCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 177C330ACC8F6931A41EA2A9 /* MediaCoordinator.swift */; };
+		AAE5EB1157B8CE5134499CF7 /* MediaCoordinator+Panels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC8F237B2D45C68454A6B31 /* MediaCoordinator+Panels.swift */; };
 		B28CF76C31C912679B3E09CB /* OutlineViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B924535A56DE8F007D316 /* OutlineViewTests.swift */; };
 		B6B3AC2ACC07AF9C2B50E2C0 /* ConceptIndexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DA1E969F4A07177F2A2468 /* ConceptIndexView.swift */; };
 		B73EE1F05DF96C0A909E9380 /* StudySessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD228F60FD2E82E4CDE6A93 /* StudySessionView.swift */; };
@@ -282,6 +283,7 @@
 		DB492EF3A441EBB949FA6C3A /* TaskDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailsSheet.swift; sourceTree = "<group>"; };
 		DD4A365881C69E9B4AF3AE22 /* DocumentWindowController+Tips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Tips.swift"; sourceTree = "<group>"; };
 		DE0F9BFC02649692080AE24A /* AIFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIFeatureTests.swift; sourceTree = "<group>"; };
+		DEC8F237B2D45C68454A6B31 /* MediaCoordinator+Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MediaCoordinator+Panels.swift"; sourceTree = "<group>"; };
 		E8E3A03ABCA1DAA2D1B193C0 /* ThemeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeEditorView.swift; sourceTree = "<group>"; };
 		EE7437BEC7881E13E8693B1E /* ClipboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardTests.swift; sourceTree = "<group>"; };
 		EF655F76CE45A2DCB91EEEBB /* ThemeScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeScreenshotTests.swift; sourceTree = "<group>"; };
@@ -291,7 +293,7 @@
 		F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindCoordinator.swift; sourceTree = "<group>"; };
 		FB73A03A348D9A4F91D9E528 /* SampleMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleMap.swift; sourceTree = "<group>"; };
 		FD17D79F4E90F384126B103B /* DocumentSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSafetyTests.swift; sourceTree = "<group>"; };
-		"TEMP_EA729994-8565-4F95-B986-E336FAC8353D" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_3A809D87-4E6D-4578-943D-56DCA873BFCE" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -371,6 +373,7 @@
 				637AC550227AA9D11BBA6DAB /* MathImageCache.swift */,
 				66CC9778CCA34229AAD02F4A /* MediaCaches.swift */,
 				177C330ACC8F6931A41EA2A9 /* MediaCoordinator.swift */,
+				DEC8F237B2D45C68454A6B31 /* MediaCoordinator+Panels.swift */,
 				8ECD6EF88CD48C1420C16622 /* MediaPickerController.swift */,
 				4F80AB976B4AA685BEC2B55B /* NotePopover.swift */,
 				54CB2D3023A7749ED2B0FECF /* SlidesSidebar.swift */,
@@ -612,10 +615,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_FEF2C9B4-38B2-4E2E-ABDD-D82536B3CB32" /* t3-4182c262-8124d61cb7c3692a */ = {
+		"TEMP_C22C731C-E2A8-4BEF-80EB-D337D27D698D" /* t3-4182c262-8124d61cb7c3692a */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_EA729994-8565-4F95-B986-E336FAC8353D" /* Config.xcconfig */,
+				"TEMP_3A809D87-4E6D-4578-943D-56DCA873BFCE" /* Config.xcconfig */,
 			);
 			path = "t3-4182c262-8124d61cb7c3692a";
 			sourceTree = "<group>";
@@ -832,6 +835,7 @@
 				0ABBAAEAE36B685D722209B1 /* MapDocument.swift in Sources */,
 				BA915D54E56135198996ED9E /* MathImageCache.swift in Sources */,
 				57CE147861FB6F8E445C2D48 /* MediaCaches.swift in Sources */,
+				AAE5EB1157B8CE5134499CF7 /* MediaCoordinator+Panels.swift in Sources */,
 				A897893AEDCC95F8F0244752 /* MediaCoordinator.swift in Sources */,
 				A39A47E32A0B21764FD2188A /* MediaPickerController.swift in Sources */,
 				363F0D4D5AD7C768101586BD /* MenuCommandListing.swift in Sources */,
@@ -934,7 +938,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_EA729994-8565-4F95-B986-E336FAC8353D" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_3A809D87-4E6D-4578-943D-56DCA873BFCE" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1017,7 +1021,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_EA729994-8565-4F95-B986-E336FAC8353D" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_3A809D87-4E6D-4578-943D-56DCA873BFCE" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

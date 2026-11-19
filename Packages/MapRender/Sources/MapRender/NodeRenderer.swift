@@ -129,7 +129,9 @@ public enum NodeRenderer {
             context.strokePath()
         }
 
-        drawTitle(style: style, title: title, decorations: decorations, media: media, measurer: measurer, in: context, frame: frame)
+        drawTitle(
+            style: style, title: title, decorations: decorations, media: media, measurer: measurer, in: context,
+            frame: frame)
         if let decorations, !decorations.isEmpty {
             let layout = decorationLayout(style: style, decorations: decorations, frame: frame)
             drawDecorations(

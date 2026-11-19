@@ -136,7 +136,8 @@ private struct NotePreview: View {
     /// tokenizer later).
     private func codeBlock(_ body: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(body.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, raw in
+            ForEach(Array(body.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) {
+                _, raw in
                 Text(String(raw.isEmpty ? " " : raw))
                     .font(.system(size: 12, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -144,9 +145,11 @@ private struct NotePreview: View {
         }
         .padding(8)
         .background(
-            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.6), lineWidth: 0.5))
+            RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.6), lineWidth: 0.5)
+        )
         .accessibilityLabel(Text("Code block"))
     }
 
@@ -240,7 +243,8 @@ private enum NoteBlocks {
                 if index > 0 {
                     blocks.append(contentsOf: rest[..<index].map { .line(String($0)) })
                 }
-                blocks.append(.math(after[..<end].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)))
+                blocks.append(
+                    .math(after[..<end].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)))
                 rest = Array(after[(end + 1)...])
             } else {
                 break

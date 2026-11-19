@@ -50,27 +50,26 @@ public struct SceneMediaProvider {
         for decorations: MapRender.NodeDecorations?, title: String, style: ResolvedNodeStyle
     ) -> NodeMedia? {
         guard let decorations else { return nil }
+        // Cheap checks first — the tint (a colorspace hop) only happens
+        // when something actually needs rasterizing.
+        let wantsImage = decorations.image != nil
+        let sfTokens = decorations.markers.filter { $0.token.hasPrefix("sf:") }
+        if !wantsImage && sfTokens.isEmpty && !decorations.math {
+            return nil
+        }
         let tint = style.borderColor ?? style.textColor
         var media = NodeMedia()
-        var carries = false
-
-        if let block = decorations.image {
-            media.image = image?(block.asset)
-            carries = true
+        if wantsImage {
+            media.image = image?(decorations.image!.asset)
         }
-        if !decorations.markers.isEmpty {
-            for marker in decorations.markers where marker.token.hasPrefix("sf:") {
-                if let glyph = self.marker?(marker.token, tint) {
-                    media.markerImages[marker.token] = glyph
-                }
+        for marker in sfTokens {
+            if let glyph = self.marker?(marker.token, tint) {
+                media.markerImages[marker.token] = glyph
             }
-            carries = carries || !media.markerImages.isEmpty
         }
         if decorations.math {
             media.math = math?(title, style.font, tint)
-            carries = carries || media.math != nil
         }
-        guard carries else { return nil }
         media.revision = revision
         return media
     }

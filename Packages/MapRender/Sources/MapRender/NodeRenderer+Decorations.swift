@@ -157,7 +157,8 @@ public enum NodeDecorationMetrics {
     /// Total trailing column width for these decorations.
     public static func trailingWidth(_ decorations: NodeDecorations?) -> CGFloat {
         guard let decorations else { return 0 }
-        let badges = (decorations.hasNote ? 1 : 0) + (decorations.linkURL != nil ? 1 : 0)
+        let badges =
+            (decorations.hasNote ? 1 : 0) + (decorations.linkURL != nil ? 1 : 0)
             + (decorations.source != nil ? 1 : 0) + (decorations.attachmentCount > 0 ? 1 : 0)
         guard badges > 0 else { return 0 }
         return badgeGap + CGFloat(badges) * badgeSize + CGFloat(badges - 1) * badgeGap
@@ -270,7 +271,8 @@ public struct NodeDecorationLayout {
 
         var markerRowRect: CGRect?
         if !decorations.markers.isEmpty {
-            let taskWidth = decorations.task == nil ? 0 : NodeDecorationMetrics.checkboxSize + NodeDecorationMetrics.leadingGap
+            let taskWidth =
+                decorations.task == nil ? 0 : NodeDecorationMetrics.checkboxSize + NodeDecorationMetrics.leadingGap
             markerRowRect = CGRect(
                 x: rect.minX + taskWidth,
                 y: titleRow.midY - NodeDecorationMetrics.markerSize / 2,
@@ -408,7 +410,8 @@ extension NodeRenderer {
             drawSourceChip(in: rect, in: context)
         }
         if let rect = layout.markerRowRect {
-            drawMarkerRow(decorations.markers, in: rect, color: fillColor, measurer: measurer, media: media, in: context)
+            drawMarkerRow(
+                decorations.markers, in: rect, color: fillColor, measurer: measurer, media: media, in: context)
         }
         if let rect = layout.imageRect {
             drawImageBlock(in: rect, media: media, in: context)
