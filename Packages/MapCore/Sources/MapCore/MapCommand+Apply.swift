@@ -122,6 +122,12 @@ extension MapCommand {
             }
             model.nodes[id]?.title = title
 
+        case .setNote(let id, let note):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.note = note
+
         case .moveNode(let id, let parentID, let index):
             guard let node = model.nodes[id] else {
                 throw ArborError.commandFailure("missing node \(id)")

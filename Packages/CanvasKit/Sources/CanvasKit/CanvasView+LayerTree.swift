@@ -64,6 +64,9 @@ extension CanvasView {
         context.editingNodeID = nodeTextEditor.editingNodeID
         context.diff = precomputedDiff
         layerTree.apply(context)
+        // F-FOC: rings follow the new frames and dimming re-applies
+        // (freshly realized layers start at full opacity).
+        overlays.sceneDidApply(self)
     }
 
     /// Selection rings follow every selection mutation (they live in

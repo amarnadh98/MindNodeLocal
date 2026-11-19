@@ -44,6 +44,12 @@ extension MapCommand {
             }
             return .editText(id: id, title: node.title)
 
+        case .setNote(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setNote(id: id, note: node.note)
+
         case .moveNode(let id, _, _):
             guard let node = model.nodes[id] else {
                 throw ArborError.commandFailure("missing node \(id)")
