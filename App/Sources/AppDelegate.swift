@@ -521,10 +521,6 @@ extension AppDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "Quit \(appName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        // Settings ▸ AI (F-AI-1): ⌘,.
-        appMenu.addItem(.separator())
-        appMenu.addItem(
-            withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
         appMenuItem.title = appName
         appMenuItem.submenu = appMenu
         return appMenuItem
@@ -538,14 +534,6 @@ extension AppDelegate {
         helpItem.title = "Help"
         helpItem.submenu = helpMenu
         return helpItem
-    }
-
-    // MARK: Settings ▸ AI (F-AI-1)
-
-    /// ⌘, opens Settings ▸ AI. The app had no settings window before
-    /// this milestone; AI is its first pane.
-    @objc func showSettings(_ sender: Any?) {
-        AISettingsPresenter.present()
     }
 
     private func menu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {

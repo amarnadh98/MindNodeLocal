@@ -64,12 +64,14 @@ struct SettingsView: View {
         HotkeySpec.quickEntryDefault.defaultsString
 
     @State private var selectedTab: SettingsTab = .general
+    /// Settings ▸ AI (F-AI-1): the AI slice's own pane, hosted as a tab.
+    @StateObject private var aiModel = AISettingsModel()
+    @State private var automaticUpdateChecks = AppUpdater.shared.automaticallyChecks
 
     var body: some View {
         TabView(selection: $selectedTab) {
             ForEach(SettingsTab.allCases) { tab in
-                Form { rows(for: tab) }
-                    .formStyle(.grouped)
+                tabContent(tab)
                     .tabItem { Label(tab.title, systemImage: tab.symbol) }
                     .tag(tab)
             }
@@ -81,6 +83,18 @@ struct SettingsView: View {
         .onChange(of: showsMinimap) { applyMinimapPreference(showsMinimap) }
         .onChange(of: menuBarExtra) {
             QuickEntryCoordinator.shared.setMenuBarExtra(menuBarExtra)
+        }
+    }
+
+    /// The AI tab hosts the AI slice's pane (its own grouped Form);
+    /// every other tab is a grouped Form of rows.
+    @ViewBuilder
+    private func tabContent(_ tab: SettingsTab) -> some View {
+        if tab == .ai {
+            AISettingsView().environmentObject(aiModel)
+        } else {
+            Form { rows(for: tab) }
+                .formStyle(.grouped)
         }
     }
 
@@ -96,7 +110,7 @@ struct SettingsView: View {
                 note: "Documents remember their theme; a new-document default ships with the themes slice.")
             unavailable("Default structure", note: "Only the balanced map structure is built so far.")
             unavailable("New-document location", note: "New maps stay in the standard Documents flow.")
-            unavailable("Open Library at launch", note: "The Library window ships with a later milestone.")
+            unavailable("Open Library at launch", note: "Open it from Window ▸ Library (⇧⌘L).")
         case .editing:
             wiredToggle("Smart typing", isOn: $smartTyping)
             wiredToggle("Spell check", isOn: $spellCheck)
@@ -124,17 +138,28 @@ struct SettingsView: View {
             unavailable("Daily limits", note: "Study settings are per document in this build.")
             unavailable("Desired retention", note: "Study settings are per document in this build.")
             unavailable("Learning steps", note: "Study settings are per document in this build.")
-            unavailable("Reminder time", note: "Study reminders ship with the study UI milestone.")
+            unavailable("Reminder time", note: "Set the daily reminder in the Study dashboard.")
         case .ai:
-            unavailable("Provider and keys", note: "AI features are not wired into the app yet.")
-            unavailable("AI off switch", note: "No AI call exists in this build — nothing sends data.")
-            unavailable("Privacy", note: "No network calls are made by this build (SPEC §12).")
+            EmptyView()  // Hosted by `tabContent(_:)`.
         case .integrations:
             unavailable("Reminders, MCP, URL scheme, Services", note: "Planned in a later milestone.")
         case .updates:
-            unavailable("Automatic check, beta channel", note: "Sparkle lands with the release milestone.")
+            // SPEC §12/§13 (ADR-0021): off by default; Sparkle reads the
+            // same defaults key.
+            Toggle(
+                "Automatically check for updates",
+                isOn: Binding(
+                    get: { automaticUpdateChecks },
+                    set: { value in
+                        automaticUpdateChecks = value
+                        AppUpdater.shared.setAutomaticallyChecks(value)
+                    }))
+            LabeledContent("Check now") {
+                Button("Check for Updates…") { AppUpdater.shared.checkForUpdates() }
+            }
+            unavailable("Beta channel", note: "Only the stable appcast is published.")
         case .advanced:
-            unavailable("Rebuild index", note: "The library index ships with the Library milestone.")
+            unavailable("Rebuild index", note: "Use Library ▸ Advanced ▸ Rebuild Index.")
             unavailable("Reset tips", note: "No tips store exists yet.")
             unavailable("Export diagnostics", note: "Planned in a later milestone.")
             unavailable("File-format pretty-print", note: "map.json is always written pretty-printed.")
