@@ -208,30 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "d", modifiers: [.command, .shift]),
                     .separator(),
                 ]))
-        mainMenu.addItem(
-            menu(
-                "Insert",
-                [
-                    // F-REL-1: ⌘L enters connect mode from the single
-                    // selection (the next node click creates the
-                    // connection); with two selected it connects them.
-                    item(
-                        "Connection",
-                        #selector(DocumentWindowController.addConnectionAction(_:)),
-                        "l"),
-                    // F-REL-2: a boundary around the selection's
-                    // grouped subtrees.
-                    item(
-                        "Boundary",
-                        #selector(DocumentWindowController.addBoundaryAction(_:)),
-                        "g", modifiers: [.command, .option]),
-                    // F-REL-3: a summary over the selection's sibling
-                    // span — the summary node opens for editing.
-                    item(
-                        "Summary",
-                        #selector(DocumentWindowController.addSummaryAction(_:)),
-                        "]", modifiers: [.command, .shift]),
-                ]))
+        mainMenu.addItem(insertMenuItem())
         mainMenu.addItem(
             menu(
                 "Select",
@@ -509,6 +486,33 @@ extension AppDelegate {
                 #selector(DocumentWindowController.highlightTasksAction(_:)),
                 ""),
         ]
+    }
+
+    /// Insert (F-REL-1/2/3).
+    private func insertMenuItem() -> NSMenuItem {
+        menu(
+            "Insert",
+            [
+                // F-REL-1: ⌘L enters connect mode from the single
+                // selection (the next node click creates the
+                // connection); with two selected it connects them.
+                item(
+                    "Connection",
+                    #selector(DocumentWindowController.addConnectionAction(_:)),
+                    "l"),
+                // F-REL-2: a boundary around the selection's
+                // grouped subtrees.
+                item(
+                    "Boundary",
+                    #selector(DocumentWindowController.addBoundaryAction(_:)),
+                    "g", modifiers: [.command, .option]),
+                // F-REL-3: a summary over the selection's sibling
+                // span — the summary node opens for editing.
+                item(
+                    "Summary",
+                    #selector(DocumentWindowController.addSummaryAction(_:)),
+                    "]", modifiers: [.command, .shift]),
+            ])
     }
 
     /// Study (F-STD-1/2/4/6/7, SPEC §6.1).
