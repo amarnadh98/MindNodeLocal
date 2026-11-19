@@ -8,6 +8,12 @@ import os
 
 @MainActor
 final class MapDocument: NSDocument {
+    /// Posted after every successful save (F-LIB-3: the Library index
+    /// observes it and reindexes the saved package incrementally).
+    /// Nonisolated (plain `Sendable` values) so any context can observe.
+    nonisolated static let didSaveNotification = Notification.Name("MapDocumentDidSave")
+    nonisolated static let savedFileURLKey = "fileURL"
+
     /// The single editing gateway (SPEC §11.3): the store owns the model
     /// and every mutation goes through it as a `MapCommand` with an
     /// inverse registered on the undo manager.
@@ -166,6 +172,11 @@ final class MapDocument: NSDocument {
         currentSaveOperation = saveOperation
         defer { currentSaveOperation = nil }
         try super.writeSafely(to: url, ofType: typeName, for: saveOperation)
+        // F-LIB-3: the library coordinator reindexes this package.
+        NotificationCenter.default.post(
+            name: MapDocument.didSaveNotification,
+            object: self,
+            userInfo: [MapDocument.savedFileURLKey: url])
     }
 
     /// True while an autosave operation drives the current write.

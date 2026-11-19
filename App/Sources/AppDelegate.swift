@@ -1,13 +1,26 @@
 import AppKit
 import CanvasKit
 import MapIO
+import MapLibrary
 import UniformTypeIdentifiers
 
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// The Library window's wiring (F-LIB): index, watcher, template
+    /// store and the one window. Created at launch so saves are
+    /// observed from the first document on.
+    private var libraryCoordinator: LibraryCoordinator?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMenu()
+        libraryCoordinator = LibraryCoordinator()
+    }
+
+    /// Window ▸ Library (⇧⌘L, SPEC §4). AppKit calls delegate actions on
+    /// the main thread; the annotation is for the compiler.
+    @MainActor @objc func showLibraryAction(_ sender: Any?) {
+        libraryCoordinator?.showLibrary()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -378,6 +391,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu(
                 "Window",
                 [
+                    item(
+                        "Library", #selector(AppDelegate.showLibraryAction(_:)),
+                        "L", modifiers: [.command, .shift]),
+                    .separator(),
                     item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),
                     item("Zoom", #selector(NSWindow.performZoom(_:)), ""),
                     .separator(),

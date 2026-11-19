@@ -18,7 +18,10 @@ let package = Package(
         ),
         .testTarget(
             name: "MapLibraryTests",
-            dependencies: ["MapLibrary"],
+            dependencies: [
+                "MapLibrary",
+                .product(name: "MapCore", package: "MapCore"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

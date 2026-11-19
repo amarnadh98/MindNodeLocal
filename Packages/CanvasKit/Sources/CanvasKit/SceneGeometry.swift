@@ -256,6 +256,9 @@ public enum SceneGeometry {
             // The layout frames don't move; offsets apply after layout,
             // and the list replacements are not layout inputs.
             return []
+        case .setLink:
+            // Links are content, not layout geometry.
+            return []
         }
     }
 
