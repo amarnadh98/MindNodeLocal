@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import MapCore
+import MapRender
 
 /// One VoiceOver row for a visible scene node (SPEC §11.6).
 ///
@@ -58,7 +59,8 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
         setAccessibilityLabel(text.isEmpty ? "Empty node" : text)
         setAccessibilityValue(
             Self.valueText(
-                nodeID: nodeID, model: model, taskText: hooks.taskProgressText?(nodeID)))
+                nodeID: nodeID, model: model, taskText: hooks.taskProgressText?(nodeID),
+                decorations: node.decorations))
         setAccessibilitySelected(isSelected)
         let folded = model?.nodes[nodeID]?.folded ?? false
         setAccessibilityDisclosed(!folded)
@@ -76,8 +78,12 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
     }
 
     /// The row's subtree description (SPEC §11.6: "3 children,
-    /// collapsed" — with tasks, "…, task 2 of 5 done" via the hook).
-    static func valueText(nodeID: String, model: MapModel?, taskText: String?) -> String {
+    /// collapsed" — with M3's decorations appended: task state and
+    /// progress, the tag names, note/link presence; plus the
+    /// task-progress hook for hosts that don't model decorations).
+    static func valueText(
+        nodeID: String, model: MapModel?, taskText: String?, decorations: NodeDecorations?
+    ) -> String {
         let node = model?.nodes[nodeID]
         let base: String
         switch node?.children.count ?? 0 {
@@ -88,8 +94,38 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
         case let count:
             base = "\(count) children, \(node?.folded == true ? "collapsed" : "expanded")"
         }
-        guard let taskText, !taskText.isEmpty else { return base }
-        return base + ", " + taskText
+        var parts = [base]
+        if let decorations {
+            parts.append(contentsOf: Self.decorationText(decorations))
+        } else if let taskText, !taskText.isEmpty {
+            parts.append(taskText)
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    /// The VoiceOver text of a node's decorations: "task, done" /
+    /// "task, open" / "task 7 of 12 done", the tag names, "has note",
+    /// "has link" (SPEC §11.6, minimally extending ADR-0007's row).
+    static func decorationText(_ decorations: NodeDecorations) -> [String] {
+        var parts: [String] = []
+        switch decorations.task {
+        case .checkbox(let done):
+            parts.append(done ? "task, done" : "task, open")
+        case .progress(let completed, let total):
+            parts.append("task \(completed) of \(total) done")
+        case nil:
+            break
+        }
+        if !decorations.tags.isEmpty {
+            parts.append("tags " + decorations.tags.map(\.name).joined(separator: " "))
+        }
+        if decorations.hasNote {
+            parts.append("has note")
+        }
+        if decorations.linkURL != nil {
+            parts.append("has link")
+        }
+        return parts
     }
 
     /// The custom actions this row offers (SPEC §11.6): Add Child, Add

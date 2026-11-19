@@ -335,7 +335,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Bold", NSSelectorFromString("toggleBoldAction:"), "b"),
                     item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
                     item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
-                ]))
+                    .separator(),
+                ] + contentFormatItems()))
         mainMenu.addItem(
             menu(
                 "View",
@@ -395,6 +396,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Mastery Overlay", #selector(DocumentWindowController.toggleMasteryOverlayAction(_:)),
                         "h", modifiers: [.command, .option]),
+                    .separator(),
+                    // F-TAG-1: the tag pills under titles are
+                    // toggleable per user; the checkmark mirrors the
+                    // persisted preference.
+                    item(
+                        "Show Tag Pills", #selector(DocumentWindowController.showTagPillsAction(_:)),
+                        ""),
                 ]))
         mainMenu.addItem(studyMenuItem())
         mainMenu.addItem(
@@ -417,6 +425,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // Menu-building helpers, split out to keep the class body small.
 extension AppDelegate {
+    /// M3 content (SPEC §6.1 Content): notes, links, tasks and tags —
+    /// the Format menu's section after the rich-text items, validated by
+    /// selection (see DocumentWindowController's NSMenuItemValidation).
+    private func contentFormatItems() -> [NSMenuItem] {
+        [
+            item(
+                "Note",
+                #selector(DocumentWindowController.noteAction(_:)),
+                "K", modifiers: [.command, .shift]),
+            item(
+                "Link…",
+                #selector(DocumentWindowController.linkAction(_:)),
+                "k"),
+            item(
+                "Open Link",
+                #selector(DocumentWindowController.openLinkAction(_:)),
+                "K", modifiers: [.command, .option]),
+            .separator(),
+            item(
+                "Task on/off",
+                #selector(DocumentWindowController.toggleTaskAction(_:)),
+                "T", modifiers: [.command, .shift]),
+            item(
+                "Complete Task",
+                #selector(DocumentWindowController.completeTaskAction(_:)),
+                "T", modifiers: [.command, .control]),
+            item(
+                "Task Details…",
+                #selector(DocumentWindowController.taskDetailsAction(_:)),
+                ""),
+            item(
+                "Tags…",
+                #selector(DocumentWindowController.tagsAction(_:)),
+                "T", modifiers: [.command, .option]),
+            .separator(),
+            item(
+                "Highlight Tag…",
+                #selector(DocumentWindowController.tagHighlightAction(_:)),
+                ""),
+            item(
+                "Highlight Tasks",
+                #selector(DocumentWindowController.highlightTasksAction(_:)),
+                ""),
+        ]
+    }
+
     /// Study (F-STD-1/2/4/6/7, SPEC §6.1).
     private func studyMenuItem() -> NSMenuItem {
         menu(

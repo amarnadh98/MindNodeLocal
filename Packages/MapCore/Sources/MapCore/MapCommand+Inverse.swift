@@ -178,7 +178,60 @@ extension MapCommand {
 
         case .setTitle:
             return .setTitle(model.title)
+
+        case .setTask(let ids, _):
+            // Exact per-node snapshot of the pre-state task values.
+            return try snapshotTaskCommands(ids: ids, model: model)
+
+        case .setTaskDone(let ids, _):
+            return try snapshotTaskCommands(ids: ids, model: model)
+
+        case .setTaskDetails(let id, _, _, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setTaskValue(id: id, task: node.task)
+
+        case .setTaskValue(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setTaskValue(id: id, task: node.task)
+
+        case .setTags:
+            return .setTags(model.tags)
+
+        case .toggleTag(let ids, _, _):
+            // Exact per-node snapshot of the pre-state tag lists.
+            var commands: [MapCommand] = []
+            for id in ids {
+                guard let node = model.nodes[id] else {
+                    throw ArborError.commandFailure("missing node \(id)")
+                }
+                commands.append(.setNodeTags(id: id, tags: node.tags))
+            }
+            return .group(name: displayName, commands: commands)
+
+        case .setNodeTags(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setNodeTags(id: id, tags: node.tags)
         }
+    }
+
+    /// The exact inverse for the multi-id task commands: one
+    /// `setTaskValue` snapshot per node, grouped into a single undo
+    /// step (nil restores "not a task").
+    private func snapshotTaskCommands(ids: [String], model: MapModel) throws -> MapCommand {
+        var commands: [MapCommand] = []
+        for id in ids {
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            commands.append(.setTaskValue(id: id, task: node.task))
+        }
+        return .group(name: displayName, commands: commands)
     }
 
     // swiftlint:enable cyclomatic_complexity

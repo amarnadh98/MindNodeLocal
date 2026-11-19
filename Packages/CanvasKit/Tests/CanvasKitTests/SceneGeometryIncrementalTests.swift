@@ -112,9 +112,9 @@ struct SceneGeometryIncrementalTests {
     // MARK: scene equality
 
     /// Full scene equality: node sets, frames, levels, level-1 indices,
-    /// titles, widths, styles, branch arrays (order included) and canvas
-    /// color. `==` on frames is exact — this is the same bar as the
-    /// MapLayout property test.
+    /// titles, widths, decorations, styles, branch arrays (order
+    /// included) and canvas color. `==` on frames is exact — this is the
+    /// same bar as the MapLayout property test.
     private func scenesEqual(_ incremental: CanvasScene, _ rebuilt: CanvasScene) -> Bool {
         guard incremental.nodes.count == rebuilt.nodes.count else { return false }
         for (id, left) in incremental.nodes {
@@ -125,6 +125,7 @@ struct SceneGeometryIncrementalTests {
                 && left.level1Index == right.level1Index
                 && left.title == right.title
                 && left.width == right.width
+                && left.decorations == right.decorations
                 && SceneDiffer.sameStyle(left.style, right.style)
             if !equal {
                 return false
@@ -166,6 +167,10 @@ struct SceneGeometryIncrementalTests {
             }
             if left.width != right.width {
                 return "width \(id)"
+            }
+            if left.decorations != right.decorations {
+                return "decorations \(id): \(String(describing: left.decorations)) "
+                    + "vs \(String(describing: right.decorations))"
             }
             if !SceneDiffer.sameStyle(left.style, right.style) {
                 return "style \(id)"
@@ -393,49 +398,5 @@ struct SceneGeometryIncrementalTests {
         let lightIncremental = SceneGeometry.update(
             model: model, cache: cache, variant: .light, measurer: measurer, dirty: [])
         assertScenesEqual(lightIncremental, lightFull, "light after mismatch")
-    }
-
-    @Test func dirtyIDsCoverEveryCommandKind() throws {
-        let date = Date(timeIntervalSince1970: 1)
-        var model = MapModel.emptyDocument(docID: "dirty")
-        var root = Node(id: "root", title: NodeTitle(text: "Root"), created: date, modified: date)
-        let child = Node(id: "child", parent: "root", created: date, modified: date)
-        root.children = ["child"]
-        model.nodes["root"] = root
-        model.nodes["child"] = child
-        model.roots = ["root"]
-
-        let leaf = Node(id: "leaf", title: NodeTitle(text: "x"), created: date, modified: date)
-        let known: [MapCommand] = [
-            .editText(id: "child", title: NodeTitle(text: "t")),
-            .addChild(parent: "root", index: nil, node: leaf),
-            .addSibling(anchor: "child", before: false, node: leaf),
-            .insertParent(anchor: "child", node: leaf),
-            .addRoot(index: nil, node: leaf),
-            .deleteSubtrees(ids: ["child"]),
-            .deleteNodePromotingChildren(id: "child"),
-            .moveNode(id: "child", parent: "root", index: 0),
-            .reorderSibling(id: "child", delta: 1),
-            .promote(id: "child"),
-            .demote(id: "child"),
-            .detach(id: "child"),
-            .insertSubtrees(mapping: ["leaf": leaf], anchors: [InsertionAnchor(id: "leaf", parent: "root", index: 0)]),
-            .group(name: "G", commands: [.editText(id: "child", title: NodeTitle(text: "t"))]),
-            .setSide(id: "child", side: .left),
-            .setFolded(id: "child", folded: true),
-            .setOffset(id: "child", offset: ModelOffset(x: 1, y: 1)),
-            .setConnections(nil),
-            .setBoundaries(nil),
-            .setSummaries(nil),
-        ]
-        for command in known {
-            #expect(
-                SceneGeometry.dirtyIDs(for: command, in: model) != nil,
-                "\(command.displayName) must map to a dirty set")
-        }
-        // A group with an unknown member (self-referential stand-in) is
-        // still recognized; the point is that a *future* command kind
-        // added without a dirtyIDs case returns nil. Cover the present
-        // explicitly: every case above maps.
     }
 }

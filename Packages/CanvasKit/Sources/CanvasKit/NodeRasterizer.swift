@@ -73,8 +73,9 @@ final class BranchVisualLayer: CAShapeLayer {
 }
 
 /// When a node layer must re-raster: title, frame size, style, LOD
-/// mode, editing state or raster sharpness changed (pan and pure
-/// position moves never repaint — §11.4).
+/// mode, editing state, raster sharpness or **decoration state** (M3:
+/// task, note, link, tags) changed (pan and pure position moves never
+/// repaint — §11.4).
 struct NodeRasterKey: Equatable {
     let title: NodeTitle
     let size: CGSize
@@ -82,12 +83,14 @@ struct NodeRasterKey: Equatable {
     let lod: Bool
     let hidesTitle: Bool
     let rasterScale: CGFloat
+    let decorations: NodeDecorations?
 
     static func == (lhs: NodeRasterKey, rhs: NodeRasterKey) -> Bool {
         lhs.title == rhs.title
             && lhs.size == rhs.size
             && lhs.lod == rhs.lod
             && lhs.hidesTitle == rhs.hidesTitle
+            && lhs.decorations == rhs.decorations
             && abs(lhs.rasterScale - rhs.rasterScale) < 0.001
             && SceneDiffer.sameStyle(lhs.style, rhs.style)
     }
@@ -127,6 +130,7 @@ enum NodeRasterizer {
             NodeRenderer.draw(
                 style: node.style,
                 title: hidesTitle ? NodeTitle(text: "", runs: []) : node.title,
+                decorations: node.decorations,
                 measurer: measurer,
                 in: context,
                 frame: CGRect(origin: .zero, size: size))

@@ -136,6 +136,10 @@ public final class CanvasView: NSView {
     /// CanvasView+Drag.swift.
     var drag: DragState?
 
+    /// M3's decoration surface closures + highlight state; see
+    /// CanvasView+Decorations.swift.
+    let decorationActions = DecorationActions()
+
     /// Called when the system appearance changes, so the host can rebuild
     /// the scene for the new variant (dark mode is part of §14.1).
     public var onEffectiveAppearanceChange: (() -> Void)?
@@ -307,29 +311,6 @@ public final class CanvasView: NSView {
         needsDisplay = true
     }
 
-    // MARK: clipboard forwarding (F-EDT-9)
-
-    /// The map-level clipboard lives up the responder chain — the window
-    /// controller writes and reads the pasteboard. `NSResponder`'s own
-    /// implementations of these actions are no-ops that would swallow
-    /// the message, so the canvas explicitly forwards. While a node is
-    /// being edited the overlay `NSTextView` is first responder and
-    /// handles the standard selectors itself; the map never sees them,
-    /// so the editing session can never lose its keys to the clipboard.
-    /// (AppKit's `-copy:` & co. aren't exposed to Swift, hence plain
-    /// `@objc` declarations rather than overrides.)
-    @objc public func copy(_ sender: Any?) {
-        nextResponder?.tryToPerform(#selector(copy(_:)), with: sender)
-    }
-
-    @objc public func cut(_ sender: Any?) {
-        nextResponder?.tryToPerform(#selector(cut(_:)), with: sender)
-    }
-
-    @objc public func paste(_ sender: Any?) {
-        nextResponder?.tryToPerform(#selector(paste(_:)), with: sender)
-    }
-
     // MARK: events
 
     public override func scrollWheel(with event: NSEvent) {
@@ -430,6 +411,12 @@ public final class CanvasView: NSView {
                 create(camera.modelPoint(for: point))
                 return
             }
+        }
+        // M3: a decoration click (checkbox, ring, note/link badge)
+        // acts on its node instead of selecting + dragging.
+        if handleDecorationClick(at: point, with: event) {
+            needsDisplay = true
+            return
         }
         if let id = nodeID(at: point) {
             if event.modifierFlags.contains(.command) {

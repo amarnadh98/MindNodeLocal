@@ -126,7 +126,10 @@ extension MapCommand {
             guard model.nodes[id] != nil else {
                 throw ArborError.commandFailure("missing node \(id)")
             }
-            model.nodes[id]?.note = note
+            // An empty note is no note: the decoration reads nil as
+            // "nothing to show" (F-CNT-1's ≡ icon).
+            let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+            model.nodes[id]?.note = (trimmed?.isEmpty ?? true) ? nil : note
 
         case .moveNode(let id, let parentID, let index):
             guard let node = model.nodes[id] else {
@@ -290,12 +293,85 @@ extension MapCommand {
             guard model.nodes[id] != nil else {
                 throw ArborError.commandFailure("missing node \(id)")
             }
-            model.nodes[id]?.link = link
+            // A whitespace-only link is no link (F-CNT-4): trim, and an
+            // empty result clears the stored value.
+            let trimmed = link?.trimmingCharacters(in: .whitespacesAndNewlines)
+            model.nodes[id]?.link = (trimmed?.isEmpty ?? true) ? nil : trimmed
+
         case .setAIPolicy(let policy):
             model.ai = policy
 
         case .setTitle(let title):
             model.title = title
+
+        case .setTask(let ids, let isTask):
+            // All-or-nothing: every id must exist before any task moves.
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                if isTask {
+                    if model.nodes[id]?.task == nil {
+                        model.nodes[id]?.task = NodeTask()
+                    }
+                } else {
+                    model.nodes[id]?.task = nil
+                }
+            }
+
+        case .setTaskDone(let ids, let done):
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                // A completion request on a non-task is a no-op, not a
+                // failure: grouped commands (complete-all) target only
+                // leaf tasks, but multi-selects can mix both kinds.
+                guard var task = model.nodes[id]?.task else { continue }
+                task.done = done
+                model.nodes[id]?.task = task
+            }
+
+        case .setTaskDetails(let id, let due, let priority, let `repeat`):
+            guard var task = model.nodes[id]?.task else {
+                throw ArborError.commandFailure("node \(id) is not a task")
+            }
+            task.due = due
+            task.priority = priority
+            task.`repeat` = `repeat`
+            model.nodes[id]?.task = task
+
+        case .setTaskValue(let id, let task):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.task = task
+
+        case .setTags(let tags):
+            model.tags = tags
+
+        case .toggleTag(let ids, let tagID, let assigned):
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                var tags = model.nodes[id]?.tags ?? []
+                if assigned {
+                    if !tags.contains(tagID) {
+                        tags.append(tagID)
+                        model.nodes[id]?.tags = tags
+                    }
+                } else if let slot = tags.firstIndex(of: tagID) {
+                    tags.remove(at: slot)
+                    model.nodes[id]?.tags = tags.isEmpty ? nil : tags
+                }
+            }
+
+        case .setNodeTags(let id, let tags):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.tags = tags
         }
     }
 

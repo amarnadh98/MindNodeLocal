@@ -72,8 +72,8 @@ public enum SceneRenderer {
             context.saveGState()
             context.setAlpha(alpha)
             NodeRenderer.draw(
-                style: node.style, title: title, measurer: measurer,
-                in: context, frame: node.frame)
+                style: node.style, title: title, decorations: node.decorations,
+                measurer: measurer, in: context, frame: node.frame)
             context.restoreGState()
         }
 

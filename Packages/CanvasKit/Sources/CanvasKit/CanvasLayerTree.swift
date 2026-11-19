@@ -25,6 +25,10 @@ public struct ApplyContext {
     public var selectionColor: CGColor = CGColor(gray: 0, alpha: 1)
     public var editingNodeID: String?
     public var diff: SceneDiff? = nil
+    /// F-TAG-2 / F-TSK-5 highlight mode: the ids that stay at full
+    /// opacity; every other node layer dims to 25%. `nil` = no
+    /// highlight (view state, never a model mutation).
+    public var highlightedIDs: Set<String>? = nil
 
     public init(scene: CanvasScene, grid: SpatialGrid, camera: Camera, viewport: CGSize) {
         self.scene = scene
@@ -95,6 +99,9 @@ public final class CanvasLayerTree {
     /// `configureLayer`/`configureBranchLayer`; applied and animated by
     /// CanvasLayerTree+Reveal.swift.
     var revealOverlay: RevealOverlay?
+    /// F-TAG-2/F-TSK-5: ids kept at full opacity while highlight mode
+    /// dims every other layer to 25% (nil = no highlight).
+    var highlightedIDs: Set<String>?
 
     var nodeLayers: [String: NodeVisualLayer] = [:]
     var branchLayers: [BranchKey: BranchVisualLayer] = [:]
@@ -211,6 +218,7 @@ public final class CanvasLayerTree {
         grid = context.grid
         root.backgroundColor = context.scene.canvasColor
         editingID = context.editingNodeID
+        highlightedIDs = context.highlightedIDs
         // CA culls sublayers of a zero-bounds layer: the content layer
         // must cover the viewport even though its own content is empty.
         content.frame = CGRect(origin: .zero, size: viewport)
@@ -429,6 +437,9 @@ public final class CanvasLayerTree {
     ) {
         let frame = node.frame
         layer.bounds = CGRect(origin: .zero, size: frame.size)
+        // F-TAG-2/F-TSK-5: outside the highlight set, the layer dims to
+        // 25% (the base opacity CA animations settle back onto).
+        layer.opacity = highlightedIDs.map { $0.contains(node.id) ? 1 : 0.25 } ?? 1
         // The camera per layer: the node's model origin pinned at its
         // screen point, scaled by the zoom. Pan and zoom change these
         // placements without ever re-rastering (§11.4).
@@ -437,7 +448,6 @@ public final class CanvasLayerTree {
         switch move {
         case .appear(let fromAnchor, _):
             layer.position = camera.screenPoint(for: frame.origin)
-            layer.opacity = 1
             if !reduceMotion {
                 for (index, animation) in RelayoutAnimator.appearAnimations(
                     camera: camera, frame: frame, fromAnchor: fromAnchor
@@ -480,7 +490,8 @@ public final class CanvasLayerTree {
         let rasterScale = Self.clampedRasterScale(backingScale: backingScale, camera: camera)
         let key = NodeRasterKey(
             title: node.title, size: node.frame.size, style: node.style,
-            lod: lod, hidesTitle: node.id == editingID, rasterScale: rasterScale)
+            lod: lod, hidesTitle: node.id == editingID, rasterScale: rasterScale,
+            decorations: node.decorations)
         guard layer.rasterKey != key else { return }
         layer.rasterKey = key
         // §11.4: re-rasterize at contentsScale = backingScale × zoom
@@ -500,4 +511,6 @@ public final class CanvasLayerTree {
     func nodeLayerContents(_ id: String) -> Any? { nodeLayers[id]?.contents }
     func nodeLayerContentsScale(_ id: String) -> CGFloat { nodeLayers[id]?.contentsScale ?? 0 }
     func nodeRasterKey(_ id: String) -> NodeRasterKey? { nodeLayers[id]?.rasterKey }
+    /// The layer's base opacity — what highlight mode (F-TAG-2) set.
+    func nodeLayerOpacity(_ id: String) -> Float { nodeLayers[id]?.opacity ?? 0 }
 }

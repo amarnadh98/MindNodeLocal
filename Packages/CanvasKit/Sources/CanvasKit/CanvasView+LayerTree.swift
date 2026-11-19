@@ -66,10 +66,37 @@ extension CanvasView {
         context.selectionColor = selectionColor
         context.editingNodeID = nodeTextEditor.editingNodeID
         context.diff = precomputedDiff
+        context.highlightedIDs = highlightedIDs()
         layerTree.apply(context)
         // F-FOC: rings follow the new frames and dimming re-applies
         // (freshly realized layers start at full opacity).
         overlays.sceneDidApply(self)
+    }
+
+    /// The ids kept at full opacity in highlight mode (F-TAG-2/F-TSK-5);
+    /// nil when no mode is active.
+    func highlightedIDs() -> Set<String>? {
+        switch highlight {
+        case .tags(let tagIDs):
+            guard let model = dragModel else { return nil }
+            let wanted = tagIDs
+            var matches: Set<String> = []
+            for (id, node) in model.nodes {
+                if let tags = node.tags, tags.contains(where: { wanted.contains($0) }) {
+                    matches.insert(id)
+                }
+            }
+            return matches
+        case .tasks:
+            guard let model = dragModel else { return nil }
+            var matches: Set<String> = []
+            for (id, node) in model.nodes where node.task != nil {
+                matches.insert(id)
+            }
+            return matches
+        case nil:
+            return nil
+        }
     }
 
     /// Selection rings follow every selection mutation (they live in
