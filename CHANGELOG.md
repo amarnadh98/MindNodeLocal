@@ -10,6 +10,7 @@
 - `Config.xcconfig` + `AppIdentity` centralize app identity (SPEC §11.9).
 
 ### Fixed (M1)
+- CI: the 5k-node layout budget check fails at 20 ms on shared runners (10 ms stays enforced locally), ending flaky failures at ~10.4 ms on CI hardware.
 - Relayout animations no longer crash: the pooled `NodeVisualLayer`/`BranchVisualLayer` now implement `init(layer:)`, which Core Animation calls to build presentation layers for every running animation (caught by golden scenario 1 on CI).
 
 ### Added (M1, in progress)
