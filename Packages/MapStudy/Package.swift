@@ -19,6 +19,7 @@ let package = Package(
         .testTarget(
             name: "MapStudyTests",
             dependencies: ["MapStudy"],
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

@@ -743,7 +743,7 @@ My Map.arbor/
       "study": {
         "card": "auto|on|off",
         "fsrs": { "due": "ISO8601", "stability": 3.1, "difficulty": 5.2, "reps": 4, "lapses": 0,
-                  "state": "review", "lastReview": "ISO8601" }
+                  "state": "review", "lastReview": "ISO8601", "learningSteps": 0 }
       },
       "math": false,
       "numbering": "none|decimal|alpha|roman",
