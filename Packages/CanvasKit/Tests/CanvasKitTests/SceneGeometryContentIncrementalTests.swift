@@ -126,6 +126,45 @@ struct SceneGeometryContentIncrementalTests {
         #expect(total == 1)
     }
 
+    /// Structural edits under tasks: deleting, moving or restoring a task
+    /// subtree changes the rings of every ancestor — far beyond the
+    /// command's own dirty set. The update diffs the progress index so
+    /// the rings above stay exact.
+    @Test func structuralEditsUnderTasksKeepAncestorRingsExact() throws {
+        let measurer = TextMeasurer()
+        var model = contentModel()
+        model.nodes["leafA"]?.task = NodeTask(done: true)
+        model.nodes["leafB"]?.task = NodeTask()
+        let cache = SceneBuildCache(variant: .light)
+        _ = SceneGeometry.build(model: model, cache: cache, variant: .light, measurer: measurer)
+
+        func round(_ command: MapCommand, _ comment: String) throws {
+            let inverse = try command.inverse(in: model)
+            for step in [command, inverse] {
+                var edited = model
+                try step.apply(to: &edited)
+                let full = SceneGeometry.build(model: edited, variant: .light, measurer: measurer)
+                if let dirty = SceneGeometry.dirtyIDs(for: step, in: edited) {
+                    let incremental = SceneGeometry.update(
+                        model: edited, cache: cache, variant: .light, measurer: measurer,
+                        dirty: dirty)
+                    assertScenesEqual(incremental, full, comment)
+                } else {
+                    _ = SceneGeometry.build(
+                        model: edited, cache: cache, variant: .light, measurer: measurer)
+                }
+                model = edited
+            }
+        }
+
+        // Deleting the done leaf drops `root`'s ring from 1/2 to 0/1 —
+        // `root` is not in the delete's own dirty set — and the undo
+        // restores it.
+        try round(.deleteSubtrees(ids: ["leafA"]), "delete task leaf")
+        // Moving a task leaf up to the root changes both rings.
+        try round(.moveNode(id: "leafB", parent: "root", index: 0), "move task leaf")
+    }
+
     /// The ancestor chain rule: a task toggle on a leaf must dirty the
     /// leaf **and** every ancestor (each ring is a leading decoration,
     /// so each ring node's own size changed).
