@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var libraryCoordinator: LibraryCoordinator?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // SPEC §12 / ADR-0021: before anything can construct the
+        // updater, register automatic checks OFF for first launch.
+        AppUpdater.registerPrivacyDefaults()
         NSApp.mainMenu = buildMenu()
         libraryCoordinator = LibraryCoordinator()
     }
@@ -486,6 +489,10 @@ extension AppDelegate {
         appMenu.addItem(
             withTitle: "About \(appName)", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: "")
+        // SPEC §13 in-app updates (ADR-0021): the wiring lives in
+        // AppDelegate+Updater so this type stays under
+        // swiftlint's type_body_length.
+        addUpdaterItems(to: appMenu)
         appMenu.addItem(.separator())
         let services = NSMenuItem()
         services.title = "Services"

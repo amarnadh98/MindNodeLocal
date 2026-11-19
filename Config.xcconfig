@@ -8,6 +8,11 @@ DOCUMENT_EXTENSION = arbor
 THEME_UTI = com.arbor.theme
 THEME_EXTENSION = arbortheme
 URL_SCHEME = x-arbor
+// Sparkle EdDSA public key (ADR-0021): run Sparkle's generate_keys and paste
+// the printed SUPublicEDKey base64 string here before shipping a release.
+// The private key stays in the owner's keychain / CI secret
+// SPARKLE_EDDSA_PRIVATE_KEY — never in this repo.
+SPARKLE_PUBLIC_ED_KEY =
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 MACOSX_DEPLOYMENT_TARGET = 26.0
