@@ -261,6 +261,16 @@ final class MapDocument: NSDocument {
         }
     }
 
+    // MARK: printing (F-INT-9)
+
+    /// File ▸ Print… (⌘P, the macOS standard — the Quick Open conflict
+    /// was settled in ADR-0013: Quick Open ⇧⌘O, Command Palette ⇧⌘P).
+    /// Presents the Print panel with the Arbor options accessory; the
+    /// job itself is composed and printed in `MapDocument+Print.swift`.
+    override func printDocument(_ sender: Any?) {
+        presentPrintPanel()
+    }
+
     /// A store change rebuilds the visible scene — incrementally when the
     /// change set is small (SPEC §11.3), a full rebuild otherwise. The
     /// change count is left to NSDocument's undo-manager integration (each

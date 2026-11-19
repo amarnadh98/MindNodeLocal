@@ -40,6 +40,7 @@ jobs:
         run: |
           swift format lint --strict --configuration .swift-format -r Packages
           swift format lint --strict --configuration .swift-format -r App
+          swift format lint --strict --configuration .swift-format -r Extensions
       - name: Install SwiftLint
         run: brew install swiftlint
       - name: SwiftLint

@@ -7,6 +7,7 @@ import MapIO
 import PDFKit
 import SceneExport
 import SwiftUI
+import SystemIntegration
 import Testing
 
 @testable import Arbor
@@ -193,7 +194,7 @@ struct ExportImportTests {
         let thumbnailData = try Data(contentsOf: thumbnailURL)
         let source = try #require(CGImageSourceCreateWithData(thumbnailData as CFData, nil))
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        #expect(max(image.width, image.height) == DocumentQuickLook.thumbnailLongEdgePixels)
+        #expect(max(image.width, image.height) == PackagePreviews.storedThumbnailLongEdgePixels)
 
         // The preview is the whole-map vector PDF.
         let preview = try #require(PDFDocument(url: previewURL))
@@ -220,7 +221,7 @@ struct ExportImportTests {
 
         let start = CFAbsoluteTimeGetCurrent()
         let previewStart = CFAbsoluteTimeGetCurrent()
-        let payloads = try DocumentQuickLook.renderPayloads(
+        let payloads = try ArborPreviewRenderer.renderPayloads(
             model: document.model, variant: .light)
         let previewSeconds = CFAbsoluteTimeGetCurrent() - previewStart
         try document.write(to: url, ofType: AppIdentity.documentUTI)

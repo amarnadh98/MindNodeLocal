@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "CanvasKit", targets: ["CanvasKit"]),
         .library(name: "SceneExport", targets: ["SceneExport"]),
+        .library(name: "SystemIntegration", targets: ["SystemIntegration"]),
     ],
     dependencies: [
         .package(path: "../MapCore"),
@@ -45,6 +46,25 @@ let package = Package(
             name: "SceneExportTests",
             dependencies: ["SceneExport"],
             resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // The shared, pure logic behind the system integration slice
+        // (M5): the Quick Look thumbnail/preview choice (stored payload
+        // vs. re-render), Spotlight attribute extraction, and the print
+        // pagination math. The app's save path, the extension targets
+        // and the hosted tests all call this one target (ADR-0014).
+        .target(
+            name: "SystemIntegration",
+            dependencies: [
+                .target(name: "SceneExport"),
+                .product(name: "MapCore", package: "MapCore"),
+                .product(name: "MapRender", package: "MapRender"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "SystemIntegrationTests",
+            dependencies: ["SystemIntegration"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

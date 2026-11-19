@@ -80,6 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Save As…", #selector(NSDocument.saveAs(_:)), "S"),
                     item("Revert to Saved", #selector(NSDocument.revertToSaved(_:)), ""),
                     .separator(),
+                    // F-INT-9: Print keeps the macOS-standard ⌘P (the
+                    // Quick Open conflict was settled in ADR-0013 —
+                    // Quick Open ⇧⌘O, Command Palette ⇧⌘P — so Page
+                    // Setup carries no shortcut).
+                    item("Print…", #selector(NSDocument.printDocument(_:)), "p"),
+                    item("Page Setup…", #selector(NSDocument.runPageLayout(_:)), ""),
+                    .separator(),
                     item("Close", #selector(NSWindow.performClose(_:)), "w"),
                 ]))
         mainMenu.addItem(

@@ -40,6 +40,18 @@ targets:
       - package: CanvasKit
         product: SceneExport
       - package: MapIO
+      - package: CanvasKit
+        product: SystemIntegration
+      # F-INT-2/3 (M5): the system extension targets, embedded in the
+      # app bundle's PlugIns and discovered through pluginkit once the
+      # build is properly signed (ad-hoc builds may not register —
+      # docs/io/system-integration.md documents what to expect).
+      - target: QuickLookThumbnail
+        embed: true
+      - target: QuickLookPreview
+        embed: true
+      - target: SpotlightImporter
+        embed: true
     info:
       path: App/Resources/Info.plist
       properties:
@@ -102,6 +114,10 @@ targets:
             UTTypeDescription: Arbor Map
             UTTypeConformsTo:
               - com.apple.package
+              # A package whose contents are a document: lets Quick
+              # Look and Spotlight treat it as previewable/indexable
+              # content rather than an opaque bundle (F-INT-2/3).
+              - public.composite-content
             UTTypeTagSpecification:
               public.filename-extension:
                 - arbor
@@ -173,6 +189,8 @@ targets:
       - package: CanvasKit
       - package: CanvasKit
         product: SceneExport
+      - package: CanvasKit
+        product: SystemIntegration
       - package: MapIO
     settings:
       base:
@@ -180,6 +198,98 @@ targets:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Arbor.app/Contents/MacOS/Arbor
         BUNDLE_LOADER: $(TEST_HOST)
         GENERATE_INFOPLIST_FILE: YES
+  # F-INT-3 (M5): the Quick Look thumbnail extension. Links only
+  # `SystemIntegration` (+ its MapCore/MapRender/SceneExport graph) —
+  # headless, never the app's canvas code (ADR-0014).
+  QuickLookThumbnail:
+    type: app-extension
+    platform: macOS
+    settings:
+      base:
+        PRODUCT_NAME: QuickLookThumbnail
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.QuickLookThumbnail
+    sources:
+      - Extensions/QuickLookThumbnail
+    dependencies:
+      - package: CanvasKit
+        product: SystemIntegration
+      - package: MapCore
+      - package: MapRender
+    info:
+      path: Extensions/QuickLookThumbnail/Info.plist
+      properties:
+        CFBundleDisplayName: Arbor Thumbnail Extension
+        CFBundleName: ArborThumbnailExtension
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ThumbnailProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - com.arbor.map
+  # F-INT-3 (M5): the Quick Look preview extension (view-based
+  # QLPreviewingController showing the package's Preview.pdf).
+  QuickLookPreview:
+    type: app-extension
+    platform: macOS
+    settings:
+      base:
+        PRODUCT_NAME: QuickLookPreview
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.QuickLookPreview
+    sources:
+      - Extensions/QuickLookPreview
+    dependencies:
+      - package: CanvasKit
+        product: SystemIntegration
+      - package: MapCore
+      - package: MapRender
+    info:
+      path: Extensions/QuickLookPreview/Info.plist
+      properties:
+        CFBundleDisplayName: Arbor Preview Extension
+        CFBundleName: ArborPreviewExtension
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - com.arbor.map
+  # F-INT-2 (M5): the Spotlight importer. Attributes are extracted by
+  # the pure `SpotlightMetadata` (SystemIntegration) over a headless
+  # `ArborPackage.read` (MapCore).
+  SpotlightImporter:
+    type: app-extension
+    platform: macOS
+    settings:
+      base:
+        PRODUCT_NAME: SpotlightImporter
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.SpotlightImporter
+    sources:
+      - Extensions/SpotlightImporter
+    dependencies:
+      - package: CanvasKit
+        product: SystemIntegration
+      - package: MapCore
+    info:
+      path: Extensions/SpotlightImporter/Info.plist
+      properties:
+        CFBundleDisplayName: Arbor Spotlight Importer
+        CFBundleName: ArborSpotlightImporter
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Arbor Map
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.arbor.map
+            LSTypeIsPackage: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.spotlight-importer
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SpotlightImporter
 schemes:
   Arbor:
     build:
