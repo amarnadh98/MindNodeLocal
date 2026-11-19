@@ -1,0 +1,86 @@
+[
+  {
+    "id": "sheet-1",
+    "class": "sheet",
+    "title": "Sheet 1",
+    "rootTopic": {
+      "id": "topic-root",
+      "class": "topic",
+      "title": "产品 Vision 🚀",
+      "structureClass": "org.xmind.ui.map.clockwise",
+      "notes": {"plain": {"content": "Root note 论文"}},
+      "labels": ["alpha"],
+      "markers": [{"markerId": "task-start"}],
+      "children": {
+        "attached": [
+          {
+            "id": "topic-a",
+            "class": "topic",
+            "title": "Research",
+            "children": {
+              "attached": [
+                {
+                  "id": "topic-a1",
+                  "class": "topic",
+                  "title": "中文节点",
+                  "labels": ["高优先"]
+                },
+                {
+                  "id": "topic-a2",
+                  "class": "topic",
+                  "title": "Done task",
+                  "markers": [{"markerId": "task-done"}]
+                }
+              ]
+            },
+            "boundaries": [
+              {
+                "id": "bnd-1",
+                "class": "boundary",
+                "title": "Group 研究",
+                "range": {"begin": 0, "end": 1}
+              }
+            ],
+            "summaries": [
+              {
+                "id": "sum-1",
+                "class": "summary",
+                "title": "Summary 论文",
+                "range": {"begin": 0, "end": 1}
+              }
+            ]
+          },
+          {
+            "id": "topic-b",
+            "class": "topic",
+            "title": "Ship",
+            "structureClass": "org.xmind.ui.logic.right"
+          }
+        ],
+        "detached": [
+          {
+            "id": "topic-float",
+            "class": "topic",
+            "title": "Floating idea"
+          }
+        ],
+        "callout": [
+          {
+            "id": "topic-callout",
+            "class": "topic",
+            "title": "Callout ignored"
+          }
+        ]
+      }
+    },
+    "relationships": [
+      {
+        "id": "rel-1",
+        "class": "relationship",
+        "end1Id": "topic-root",
+        "end2Id": "topic-b",
+        "title": "blocks"
+      }
+    ]
+  }
+]

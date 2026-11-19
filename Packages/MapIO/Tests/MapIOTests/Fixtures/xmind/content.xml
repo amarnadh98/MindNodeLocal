@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" version="2.0">
+  <sheet id="sheet1">
+    <title>Sheet 1</title>
+    <topic id="t-root" structure-class="org.xmind.ui.map.clockwise">
+      <title>产品 Vision 🚀</title>
+      <children>
+        <topics type="attached">
+          <topic id="t-a">
+            <title>Research 论文</title>
+            <labels>
+              <label name="alpha"/>
+            </labels>
+            <children>
+              <topics type="attached">
+                <topic id="t-a1">
+                  <title>中文节点</title>
+                </topic>
+                <topic id="t-a2">
+                  <title>Done</title>
+                  <marker-refs>
+                    <marker-ref marker-id="task-done"/>
+                  </marker-refs>
+                </topic>
+              </topics>
+            </children>
+          </topic>
+          <topic id="t-b">
+            <title>Ship</title>
+            <notes>
+              <plain>Ship note</plain>
+            </notes>
+          </topic>
+        </topics>
+      </children>
+    </topic>
+    <relationships>
+      <relationship id="r1" end1="t-root" end2="t-b">
+        <title>blocks</title>
+      </relationship>
+    </relationships>
+  </sheet>
+</xmap-content>

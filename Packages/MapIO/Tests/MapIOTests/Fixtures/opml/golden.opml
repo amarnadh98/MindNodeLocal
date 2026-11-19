@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Roadmap 研究</title>
+  </head>
+  <body>
+    <outline text="产品 Vision 🚀" _note="Line one&#10;Line two" arbor:tags="alpha" arbor:structure="mindmap.balanced">
+      <outline text="Bold move" arbor:task-done="true"/>
+      <outline text="Ship docs" _note="Needs a home&#10;and a date" arbor:task-done="false" arbor:task-due="2026-12-01" arbor:task-priority="1" arbor:tags="高优先,alpha" arbor:folded="true">
+        <outline text="中文节点 🈶"/>
+        <outline text="Second child"/>
+      </outline>
+    </outline>
+    <outline text="Research 📚">
+      <outline text="Paper link"/>
+    </outline>
+  </body>
+</opml>
