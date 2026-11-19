@@ -36,6 +36,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// persists (F-CAN-8); injectable so tests don't wait a real second.
     var viewStateSaveDelay: Duration = .seconds(1)
 
+    // MARK: F-FOC wiring (find, focus, zen, quick open)
+    // The coordinator owns all F-FOC state; the hooks below are the
+    // only touch points in this shared file. See
+    // App/Sources/FocusFind/.
+    let focusFind = FocusFindCoordinator()
+
     private var viewStateSaveTask: Task<Void, Never>?
 
     /// F-CAN-6: the minimap overlay, anchored bottom-right of the canvas
@@ -86,11 +92,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // F-CAN-6: the minimap re-strokes its viewport rect; the
             // toolbar's zoom % follows.
             self?.syncMinimapCamera()
+            // F-FOC: find rings re-pin at the new camera and dimming
+            // re-applies to whatever the new viewport realized.
+            self?.focusFind.cameraDidChange()
         }
         canvas.onSelectionChange = { [weak self] ids in
             self?.canvasSelectionDidChange(ids)
             // Toolbar/menu validation follows the selection.
             self?.documentToolbar?.validateVisibleItems()
+            // F-FOC: navigation inside focus moves the focus.
+            self?.focusFind.selectionDidChange()
         }
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
@@ -105,6 +116,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         canvas.onDrop = { [weak self] command, selection in
             self?.performDragDrop(command, selection: selection)
         }
+        // F-FOC wiring: the coordinator reaches back through this weak
+        // reference (see FocusFindCoordinator).
+        focusFind.controller = self
         setupAccessibility()
         // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
         installChrome()
@@ -212,7 +226,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// per-document scene cache for the incremental path.
     func updateScene(preserveCamera: Bool) {
         guard let mapDocument = document as? MapDocument else { return }
-        let model = mapDocument.store.model
+        // F-FOC (find): the rendering model may temporarily unfold the
+        // current match's folded ancestors — a view-level value copy,
+        // never the document's model (FocusFindCoordinator).
+        let model = focusFind.renderingModel(base: mapDocument.store.model)
         let previousCamera = canvas.camera
         let variant = currentVariant()
         let cache: SceneBuildCache
@@ -304,6 +321,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
         canvas.pruneSelection()
         outlineController.reloadPreservingSelection()
+        // F-FOC: refresh the find matches and the dimming against the
+        // post-change model.
+        focusFind.sceneDidChange()
         window?.title = document?.displayName ?? window?.title ?? ""
     }
 
@@ -860,6 +880,12 @@ extension DocumentWindowController {
             // ⎋ commits; ⎋ again (this action, reached when nothing is
             // editing) deselects (F-EDT-1).
             canvas.commitEditing(next: .none)
+            return
+        }
+        // F-FOC: ⎋ first serves the open overlays — the quick-open
+        // palette, then the find bar, then Zen, then Focus mode; only
+        // when none of them is active does it deselect.
+        if focusFind.handleEscape() {
             return
         }
         canvas.setSelection([])

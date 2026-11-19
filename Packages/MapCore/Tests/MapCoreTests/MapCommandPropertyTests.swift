@@ -117,6 +117,7 @@ struct CommandPropertyTests {
             .deleteSubtrees(ids: [nodeID]),
             .deleteNodePromotingChildren(id: nodeID),
             .editText(id: nodeID, title: NodeTitle(text: "renamed \(generator.next())")),
+            .setNote(id: nodeID, note: generator.next() % 2 == 0 ? "note \(generator.next())" : nil),
             .reorderSibling(id: nodeID, delta: Int(generator.next() % 5) - 2),
             .promote(id: nodeID),
             .setSide(id: nodeID, side: generator.next() % 2 == 0 ? .left : .right),

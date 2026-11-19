@@ -21,6 +21,11 @@ public final class CanvasView: NSView {
     /// CanvasView+Accessibility.swift.
     public let accessibility = CanvasAccessibility()
 
+    /// F-FOC overlay state (find rings, focus/zen dimming); see
+    /// CanvasOverlays.swift. State lives on the object so the hooks in
+    /// this view stay one-liners.
+    public let overlays = CanvasOverlays()
+
     public var scene: CanvasScene? {
         didSet {
             // Spatial-grid sync first (the apply below culls through it):

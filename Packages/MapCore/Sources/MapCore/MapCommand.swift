@@ -55,6 +55,10 @@ public indirect enum MapCommand: Sendable, Equatable {
     case deleteNodePromotingChildren(id: String)
     /// Replaces the title of `id` (F-EDT-7).
     case editText(id: String, title: NodeTitle)
+    /// Replaces the Markdown note of `id` (F-CNT-1; find & replace,
+    /// F-FOC-3, reaches notes through this command so it is one
+    /// undoable step like every other mutation).
+    case setNote(id: String, note: String?)
     /// Moves `id`'s subtree to `parent` at `index`; `nil` parent makes it a
     /// root (F-EDT-5). Moving a node into its own subtree throws.
     case moveNode(id: String, parent: String?, index: Int)
@@ -105,6 +109,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .addChild, .addSibling, .insertParent, .addRoot: "Add Node"
         case .deleteSubtrees, .deleteNodePromotingChildren: "Delete Node"
         case .editText: "Edit Text"
+        case .setNote: "Edit Note"
         case .moveNode, .reorderSibling, .promote, .demote, .detach: "Move Node"
         case .insertSubtrees: "Duplicate Node"
         case .group(let name, _): name

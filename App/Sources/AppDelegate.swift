@@ -59,7 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func buildMenu() -> NSMenu {
+    /// Internal (not private) so hosted tests can install the menu: the
+    /// test host never finishes launching, so
+    /// `applicationDidFinishLaunching` has not run when the palette's
+    /// menu walk needs it. In a real launch the menu is set there.
+    func buildMenu() -> NSMenu {
         let mainMenu = NSMenu()
         mainMenu.addItem(appMenuItem())
         mainMenu.addItem(
@@ -99,6 +103,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "Paste with Style",
                         #selector(NSText.paste(_:)),
                         "v", modifiers: [.command, .option, .shift]),
+                    .separator(),
+                    // F-FOC-3 (SPEC §6.1 Find): the standard find bar
+                    // with replace, next/previous (wrap-around) and
+                    // use-selection-for-find. The actions live on the
+                    // window controller (DocumentWindowController+FocusFind).
+                    findSubmenu(),
                     .separator(),
                     // Edit title (F-EDT-2): ⏎/⌘⏎ are the Add-Sibling keys
                     // in the menu; F2 is unambiguous.
@@ -282,6 +292,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Minimap", #selector(DocumentWindowController.toggleMinimapAction(_:)),
                         "m", modifiers: [.command, .option]),
+                    // F-FOC (SPEC §6.1 View + Find): Focus dims and
+                    // fits the selected branch; Zen clears the stage;
+                    // Quick Open / the command palette fuzzy-jump. Quick
+                    // Open is ⇧⌘O (Xcode's "Open Quickly"): ⌘P stays the
+                    // macOS-standard Print (F-INT-9, ADR-0013).
+                    item(
+                        "Focus Mode", #selector(DocumentWindowController.focusModeAction(_:)),
+                        "F", modifiers: [.command, .shift]),
+                    item(
+                        "Zen Mode", #selector(DocumentWindowController.zenModeAction(_:)),
+                        "f", modifiers: [.command, .control]),
+                    .separator(),
+                    item(
+                        "Quick Open", #selector(DocumentWindowController.quickOpenAction(_:)),
+                        "O", modifiers: [.command, .shift]),
+                    item(
+                        "Command Palette", #selector(DocumentWindowController.commandPaletteAction(_:)),
+                        "P", modifiers: [.command, .shift]),
                 ]))
         mainMenu.addItem(
             menu(
@@ -294,6 +322,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ]))
         mainMenu.addItem(helpMenuItem())
         return mainMenu
+    }
+
+    /// Edit ▸ Find (F-FOC-3, SPEC §6.1): NSTextFinder-style items whose
+    /// actions live on the document window controller and validate
+    /// against the find session (DocumentWindowController+FocusFind).
+    private func findSubmenu() -> NSMenuItem {
+        let submenu = NSMenu(title: "Find")
+        submenu.addItem(
+            item("Find…", #selector(DocumentWindowController.findAction(_:)), "f"))
+        submenu.addItem(
+            item(
+                "Find and Replace…", #selector(DocumentWindowController.findReplaceAction(_:)),
+                "f", modifiers: [.command, .option]))
+        submenu.addItem(
+            item("Find Next", #selector(DocumentWindowController.findNextAction(_:)), "g"))
+        submenu.addItem(
+            item(
+                "Find Previous", #selector(DocumentWindowController.findPreviousAction(_:)),
+                "G", modifiers: [.command, .shift]))
+        submenu.addItem(
+            item(
+                "Use Selection for Find",
+                #selector(DocumentWindowController.useSelectionForFindAction(_:)), "e"))
+        let menuItem = NSMenuItem()
+        menuItem.title = "Find"
+        menuItem.submenu = submenu
+        return menuItem
     }
 
     private func appMenuItem() -> NSMenuItem {
