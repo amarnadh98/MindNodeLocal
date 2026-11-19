@@ -14,9 +14,14 @@ import MapRender
 /// with key equivalents (§14.1: reachable from menus); the canvas handles
 /// the keys itself when it is first responder.
 public final class CanvasView: NSView {
+    /// Accessibility hooks + the row element cache (SPEC §11.6); see
+    /// CanvasView+Accessibility.swift.
+    public let accessibility = CanvasAccessibility()
+
     public var scene: CanvasScene? {
         didSet {
             rebuildGrid()
+            accessibility.needsRebuild = true
             // The editing node's frame may have moved (or vanished) in
             // the rebuilt scene; the overlay follows or tears down.
             nodeTextEditor.reconcileWithScene()
@@ -42,7 +47,9 @@ public final class CanvasView: NSView {
     /// host can persist view state (F-CAN-8, ADR-0005).
     public var onCameraChange: (() -> Void)?
 
-    public private(set) var selection: Set<String> = []
+    public private(set) var selection: Set<String> = [] {
+        didSet { accessibilitySelectionDidChange(from: oldValue) }
+    }
 
     /// The inline editing overlay (SPEC §11.4); owns the TextKit 2 text
     /// view and the session state.
@@ -64,7 +71,9 @@ public final class CanvasView: NSView {
     /// drop targets (F-EDT-5) and spatial navigation resolves sibling
     /// order and roots (F-CAN-4). Maintained by the host alongside
     /// `scene`; the view reads it and never mutates it.
-    public var dragModel: MapModel?
+    public var dragModel: MapModel? {
+        didSet { accessibility.needsRebuild = true }
+    }
 
     /// Called with the one command a finished node drag produced (nil
     /// when the drop resolved to nothing). The host performs it through

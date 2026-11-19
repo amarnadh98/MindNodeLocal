@@ -73,6 +73,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         canvas.onDrop = { [weak self] command, selection in
             self?.performDragDrop(command, selection: selection)
         }
+        setupAccessibility()
     }
 
     required init?(coder: NSCoder) {
