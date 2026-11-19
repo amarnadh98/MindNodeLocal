@@ -232,6 +232,9 @@ public struct FSRSState: Codable, Sendable, Hashable {
     public var lapses: Int
     public var state: FSRSStateKind
     public var lastReview: Date?
+    /// Index into the scheduler's learning/relearning step list (SPEC §10).
+    /// Added in `formatVersion` 2 (M7); optional, so v1 files decode unchanged (nil = step 0).
+    public var learningSteps: Int?
 
     public init(
         due: Date,
@@ -242,7 +245,8 @@ public struct FSRSState: Codable, Sendable, Hashable {
         reps: Int = 0,
         lapses: Int = 0,
         state: FSRSStateKind = .new,
-        lastReview: Date? = nil
+        lastReview: Date? = nil,
+        learningSteps: Int? = nil
     ) {
         self.due = due
         self.stability = stability
@@ -253,6 +257,7 @@ public struct FSRSState: Codable, Sendable, Hashable {
         self.lapses = lapses
         self.state = state
         self.lastReview = lastReview
+        self.learningSteps = learningSteps
     }
 }
 
