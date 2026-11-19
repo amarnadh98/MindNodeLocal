@@ -163,6 +163,9 @@ public final class NodeTextEditor {
         // VoiceOver follows the editing text field (SPEC §11.6).
         canvas.announceEditingFocus(to: view)
         canvas.needsDisplay = true
+        // The node's raster hides its title from now (the overlay draws
+        // the live text — SPEC §11.4).
+        canvas.editingTargetDidChange()
     }
 
     private func configure(_ view: EditingTextView) {
@@ -213,6 +216,8 @@ public final class NodeTextEditor {
         placeholder = nil
         baseFont = nil
         baseColor = nil
+        // The node's raster shows its title again (SPEC §11.4).
+        canvas?.editingTargetDidChange()
         if let view, let canvas {
             // Clear the session before the resign notifications fire, so
             // the text view's own textDidEndEditing can't commit twice.

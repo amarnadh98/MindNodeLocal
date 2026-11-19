@@ -52,6 +52,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: MapLayout release tests (enforces the SPEC §11.8 10 ms budget)
         run: swift test -c release --package-path Packages/MapLayout
+      - name: CanvasKit release timings (printed only; budgets are enforced on local M1-class runs)
+        run: swift test -c release --package-path Packages/CanvasKit
 
   xcode:
     runs-on: xcode-27
