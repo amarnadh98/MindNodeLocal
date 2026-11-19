@@ -53,13 +53,32 @@ extension SceneGeometry {
             return anchorDirtyIDs(anchors)
         case .group(_, let commands):
             return groupDirtyIDs(commands, in: model)
-        case .setTheme:
+        case .setTheme, .setThemeSelection, .setThemeOverrides:
             // Every node's font and padding may change: full rebuild.
             return nil
-        case .setAppearance:
-            // The variant the whole scene resolves in may flip: full
-            // rebuild (F-STY-6).
+        case .setStructure:
+            // A structure override re-lays-out the whole root tree (the
+            // canvas resolves it per root); the cheap conservative
+            // answer is the full-rebuild fallback.
             return nil
+        case .setAppearance:
+            // The appearance flip re-resolves every style and the
+            // variant-tagged size cache is host-owned: full rebuild.
+            return nil
+        case .setStyle(let ids, let patch):
+            // Only font/padding/width fields can move a frame
+            // (NodeStylePatch.affectsMeasuredSize, ADR-0027); colors,
+            // borders, shapes and branch styling repaint only.
+            return patch.affectsMeasuredSize ? Set(ids) : []
+        case .resetStyle(let ids, let keys):
+            // The post-command model can't tell which fields left (the
+            // dirty set is derived after apply), so a reset touching any
+            // size-affecting key — or a wholesale clear — re-measures the
+            // node; over-marking is safe and cheap.
+            if keys == nil || !Set(keys ?? []).isDisjoint(with: NodeStylePatch.sizeAffectingKeys) {
+                return Set(ids)
+            }
+            return []
         case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches,
             .setPresentations, .setAIPolicy, .setTitle,
             // F-REL-1/2/3: the fine-grained relation edits are post-layout

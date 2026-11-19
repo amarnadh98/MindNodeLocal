@@ -115,6 +115,11 @@ public final class CanvasLayerTree {
     /// The connection ids the apply marked selected — carried through
     /// camera updates so relation re-rasters keep their halos.
     var selectedConnections: Set<String> = []
+    /// F-LAY-14: the folded-count pills of the visible folded nodes
+    /// (model-space frames for hit-testing, layers for drawing — the
+    /// same realize/recycle contract the rings use).
+    var foldedPillLayers: [String: FoldedPillLayer] = [:]
+    var foldedPillFrames: [String: CGRect] = [:]
     /// Fading-out layers of removed nodes/branches, recycled when their
     /// 160 ms window closes (or on the next apply at the latest).
     var dyingNodes: [String: NodeVisualLayer] = [:]
@@ -255,6 +260,7 @@ public final class CanvasLayerTree {
         realizeVisible(
             camera: camera, viewport: viewport, backingScale: backingScale,
             plan: plan, reduceMotion: context.reduceMotion)
+        syncFoldedPills(camera: camera, backingScale: backingScale)
         updateSelection(context.selection, color: context.selectionColor, camera: camera)
         mastery.update(masteryMarks, scene: context.scene, camera: camera)
         scheduleSettleIfNeeded(camera: camera, backingScale: backingScale)
@@ -276,6 +282,7 @@ public final class CanvasLayerTree {
         realizeVisible(
             camera: camera, viewport: viewport, backingScale: backingScale,
             plan: nil, reduceMotion: true)
+        syncFoldedPills(camera: camera, backingScale: backingScale)
         for ring in selectionRings.values {
             ring.transform = Self.modelSpaceTransform(for: camera)
             ring.lineWidth = 2.5 / camera.scale
@@ -377,6 +384,11 @@ public final class CanvasLayerTree {
             ring.removeFromSuperlayer()
             selectionRings.removeValue(forKey: id)
         }
+        for pill in foldedPillLayers.values {
+            pill.removeFromSuperlayer()
+        }
+        foldedPillLayers.removeAll()
+        foldedPillFrames.removeAll()
         mastery.clear()
         scene = nil
     }

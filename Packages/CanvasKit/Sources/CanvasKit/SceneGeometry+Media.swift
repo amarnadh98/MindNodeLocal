@@ -42,7 +42,18 @@ extension SceneGeometry {
         { id in
             guard let node: Node = inputs.model.nodes[id] else { return nil }
             let depth = inputs.ancestry[id]?.depth ?? 0
-            let style = inputs.caches.style(level: depth, level1Index: 0)
+            // F-STY-2/F-STY-3: a node with overrides measures with them
+            // (font, padding, width floors change the frame); nil-patch
+            // nodes (the incremental walk's overwhelming majority)
+            // resolve the memoized level style directly. The palette
+            // index is irrelevant to measurement, so the base style
+            // resolves at index 0.
+            let baseStyle = inputs.caches.style(level: depth, level1Index: 0)
+            let style =
+                node.style == nil
+                ? baseStyle
+                : inputs.caches.theme.applyingOverrides(
+                    node.style, to: baseStyle, variant: inputs.variant)
             let title = id == inputs.editingTitle?.id ? inputs.editingTitle?.title : node.title
             // One decoration value per node: recorded for the scene and
             // consumed by the measurement below (never computed twice).
@@ -53,7 +64,8 @@ extension SceneGeometry {
             inputs.cache.decorations[id] = nodeDecorations
             let key = SceneBuildCache.SizeKey(
                 id: id, title: title ?? node.title, themeID: inputs.caches.theme.id, level: depth,
-                variant: inputs.variant, width: node.width, decorations: nodeDecorations)
+                variant: inputs.variant, style: SceneBuildCache.StyleFingerprint(node.style),
+                width: node.width, decorations: nodeDecorations)
             let textSize: CGSize
             if let cached = inputs.cache.sizes[key] {
                 textSize = cached
