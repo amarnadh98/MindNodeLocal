@@ -1,0 +1,4 @@
+# shellcheck(1) project configuration.
+# Follow `source` statements so the release scripts' shared helper
+# (scripts/release/common.sh) is checked together with each script.
+external-sources=true

@@ -1,0 +1,136 @@
+name: Release
+
+# SPEC §13 release pipeline (M9). Push a v*.*.* tag to run it:
+#   1. Test                    (below)
+#   2. Archive                 (build-app.sh)
+#   3. Sign                    (Developer ID if secrets present, else ad-hoc)
+#   4. Notarize + staple       (Developer ID only)
+#   5. DMG + Applications alias (make-dmg.sh, create-dmg)
+#   6. Sparkle generate_appcast (appcast.sh, EdDSA key from secrets)
+#   7. GitHub Release          (gh release create)
+#   8. Publish appcast.xml    (publish-appcast.sh → GitHub Pages)
+#
+# The reusable logic lives in scripts/release/*.sh. Same macOS runner
+# label as ci.yml.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign, DMG, appcast and release
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      HAS_DEVELOPER_ID: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
+      HAS_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install release tools
+        run: brew install xcodegen create-dmg
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # SPEC §13 step 1: test.
+      - name: Test
+        run: xcodebuild -scheme Arbor -destination 'platform=macOS' test
+
+      # SPEC §13 step 3's "Developer ID if secrets are present": put the
+      # certificate where the archive/export step can sign with it.
+      - name: Import Developer ID certificate
+        if: env.HAS_DEVELOPER_ID == 'true'
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: scripts/release/import-certificate.sh
+
+      # SPEC §13 step 2: archive (the mode picks the signing path).
+      - name: Archive
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [ "$HAS_DEVELOPER_ID" = "true" ]; then
+            scripts/release/build-app.sh --developer-id dist
+          else
+            scripts/release/build-app.sh --adhoc dist
+          fi
+
+      # SPEC §13 step 3: ad-hoc signing fallback (Developer ID exports
+      # are already signed; those only get verified).
+      - name: Sign
+        run: |
+          if [ "$HAS_DEVELOPER_ID" = "true" ]; then
+            scripts/release/sign-app.sh --verify-only dist/Arbor.app
+          else
+            scripts/release/sign-app.sh --adhoc dist/Arbor.app
+          fi
+
+      # SPEC §13 step 4: notarize and staple (Developer ID only).
+      - name: Notarize and staple
+        if: env.HAS_DEVELOPER_ID == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: scripts/release/notarize-app.sh dist/Arbor.app
+
+      # SPEC §13 step 5: DMG with an Applications alias.
+      - name: Build DMG
+        id: dmg
+        run: |
+          DMG_PATH="$(scripts/release/make-dmg.sh dist/Arbor.app dist)"
+          echo "path=$DMG_PATH" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$DMG_PATH")" >> "$GITHUB_OUTPUT"
+
+      # SPEC §13 step 6: Sparkle generate_appcast (EdDSA key in CI
+      # secrets). Skipped until the key secret exists — the app then
+      # also skips update-signature verification (placeholder
+      # SUPublicEDKey, ADR-0021).
+      - name: Generate appcast
+        id: appcast
+        if: env.HAS_EDDSA_KEY == 'true'
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          APPCAST_PATH="$(scripts/release/appcast.sh \
+            "${{ steps.dmg.outputs.path }}" dist \
+            --download-url-prefix \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}")"
+          echo "path=$APPCAST_PATH" >> "$GITHUB_OUTPUT"
+
+      # SPEC §13 step 7: upload the DMG to the GitHub Release.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            dist/Arbor.app/Contents/Info.plist)"
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" \
+              "${{ steps.dmg.outputs.path }}" --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+              "${{ steps.dmg.outputs.path }}" \
+              --title "$VERSION" --generate-notes
+          fi
+
+      # SPEC §13 step 8: publish appcast.xml to GitHub Pages (requires
+      # the repo's Pages setting: "Deploy from a branch: gh-pages/(root)",
+      # see docs/release-checklist.md).
+      - name: Publish appcast to GitHub Pages
+        if: env.HAS_EDDSA_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/release/publish-appcast.sh "${{ steps.appcast.outputs.path }}"
