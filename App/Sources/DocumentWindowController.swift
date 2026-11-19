@@ -316,7 +316,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         let model = mapDocument.store.model
         let command: MapCommand
         switch origin {
-        case .perform(let performed), .undo(let performed), .redo(let performed):
+        case .perform(let performed), .undo(let performed), .redo(let performed),
+            .nonUndoable(let performed):
             command = performed
         }
         let dirty = SceneGeometry.dirtyIDs(for: command, in: model)

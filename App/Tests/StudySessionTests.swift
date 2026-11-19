@@ -45,7 +45,7 @@ struct GoldenScenarioThreeTests {
                     parent: deck.deckID, index: position,
                     node: Node(id: cardID, title: NodeTitle(text: "Term \(position + 1)"), note: "definition")))
         }
-        controller.modelDidChange()
+        controller.updateScene(preserveCamera: true)
 
         // F-STD-1: the branch becomes a deck through the menu action.
         controller.canvas.setSelection([deck.deckID])
@@ -323,7 +323,7 @@ struct MasteryOverlayHostedTests {
 
         // An edited document: the toggle leaves the change count alone.
         try document.store.perform(.setFolded(id: document.model.roots[0], folded: false))
-        controller.modelDidChange()
+        controller.updateScene(preserveCamera: true)
         GoldenScenarioThreeTests.settle()
         controller.toggleMasteryOverlayAction(nil)
         #expect(!controller.masteryOverlayEnabled)
