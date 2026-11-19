@@ -10,6 +10,7 @@
 - `Config.xcconfig` + `AppIdentity` centralize app identity (SPEC §11.9).
 
 ### Added (M1, in progress)
+- Canvas (slice 4a): `SceneGeometry` turns a `MapModel` into a renderable `CanvasScene` (measured nodes via the shared `TextMeasurer`, laid out by `TreeLayout` per root with multi-root stacking, Paper-theme style resolution by level and branch index, §7.4 tapered branch connectors, folded subtrees skipped); `SpatialGrid` — the 512 pt uniform-grid index behind hit-testing and culling; `SceneRenderer` — one drawing path (branches, nodes, selection rings) for canvas and future export/Quick Look; `CanvasView` — a flipped, layer-backed NSView with camera pan/pinch-zoom (⌘+/−/⌘0/⌘9, zoom-to-fit), click and ⌘-click selection, rubber-band multi-select. The document window now shows the actual map, fitted to the viewport.
 - MapRender (slice 3): `TextMeasurer` — the single CoreText-based source of truth for node text sizes (SPEC §9), with run attributes (bold/italic/code/underline/color), 1.25 line height, auto-width-then-wrap measurement and a size cache; `NodeRenderer` — the one CGContext renderer for all shapes (rounded rect, pill, rectangle, circle, square, diamond, hexagon, octagon, cloud, underline, none) with fills, borders, shadows and optically centered titles; `BranchPath` — curved/tapered/straight/elbow connectors per SPEC §7.4 (tapered as a 16-sample offset polygon with round caps); Paper theme resolution — light/dark level styles, palette-indexed branch colors, tapered widths.
 - MapCore command layer (SPEC §11.1/§11.3): `MapCommand` with `apply`/`inverse` for the M1 editing operations — add child/sibling/parent/root, delete subtree / delete-with-promotion, edit text, move/reorder/promote/demote/detach, duplicate, insert-subtrees, plus `group` for compound steps and `continuesEdit` for undo coalescing. Property tests: apply∘inverse identity, undo∘redo identity, fuzzed sequences fully restored, invariants preserved after every apply.
 - MapRepairer (review follow-up on PR #1): conservative structural repair per SPEC §8.2 — validate, repair what can be repaired, log, and still open. Wired into document loading; repairs mark the document dirty so they persist on the next save.
@@ -26,6 +27,22 @@
 - Layout: removed the unsound contour trim — a later sibling whose subtree is centered on tall descendants has a negative `minY` and reaches back into trimmed columns, overlapping nodes. Added a permanent seeded stress test (300 random trees × all structures) that would have caught it.
 - Repair: unreachable cycles are now broken (lowest-ID member promoted to a root, then resync) instead of being left unreachable; repair order is deterministic (creation time, then ID) so the same broken file always repairs identically; duplicate `children` entries are detected, reported, and de-duplicated.
 - CI: new `perf` job runs MapLayout tests in release, enforcing the SPEC §11.8 10 ms budget.
+
+### Fixed (re-review on PR #5)
+- Opened documents showed an empty canvas: the scene build had moved to `windowDidLoad`, which never fires for programmatically-constructed window controllers. The first build now runs in `showWindow(_:)` (document wired, window at its real size), with the initial zoom-to-fit.
+- Root cause found along the way: assigning `windowController.document` before `addWindowController(_:)` makes AppKit's insertion a no-op, leaving the document with zero window controllers — the assignment is removed (with a comment) and `addWindowController` owns it.
+- New hosted app test opens a `.arbor` package, shows the window, and asserts the canvas scene, the initial fit, and >500 drawn pixels.
+- View menu: hidden alternate Zoom In item with the `=` key equivalent, so ⌘= works even when a text field has focus.
+
+### Fixed (review on PR #5)
+- Canvas actually renders: dropped the custom `CALayer` assignment (a layer-hosting view's delegate-less layer never draws); the view now draws into its standard backing layer.
+- Multi-root stacking by the tree's full extent — balanced subtrees extend above the root, so stacking by the root's own `minY` overlapped trees (regression-tested with a wide-root scenario).
+- Natural-scroll pan direction fixed (camera origin subtracts the delta, like `NSClipView`); mouse-wheel deltas scaled by a line height.
+- `.auto` appearance follows the view's effective appearance and re-renders on system appearance change; the document's explicit light/dark override still wins.
+- Zoom: F-CAN-2 step list (25–400%) with `=` matched as ⌘+, ⌘* fit and ⌥⌘0 zoom-to-selection added, all exposed as View menu items (first-responder actions), so they work before the canvas is clicked.
+- Renderer culls nodes and branches to the visible rect (draw cost now follows the viewport); the measurer is injectable.
+- Branch taper is continuous root-to-leaf (w(level) → w(level+1)) instead of restarting at each node.
+- ADR-0004 records the positional branch-palette decision and the plan to make the index persistent before reorder/insert land.
 
 ### Fixed (review on PR #1)
 - Document creation/opening via `NSDocumentController`: `NSDocumentClass` is now declared in `CFBundleDocumentTypes`, and `MapDocument` no longer overrides `NSDocument.init(contentsOf:ofType:)`, so opened documents keep their `fileURL`, `fileType` and modification date. Tests now go through `NSDocumentController` instead of constructing the document directly.

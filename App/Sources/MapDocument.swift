@@ -1,5 +1,6 @@
 import AppKit
 import MapCore
+import MapRender
 import os
 
 @MainActor
