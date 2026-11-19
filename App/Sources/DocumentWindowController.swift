@@ -8,6 +8,21 @@ import MapRender
 final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     let canvas = CanvasView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
+    /// M4 (F-OUT): the outline pane — a second view on the same store.
+    /// All outline logic lives in App/Sources/Outline/; the integration
+    /// hooks are in DocumentWindowController+Outline.swift.
+    let outlineController = OutlineViewController()
+    /// M4 (F-OUT-1 ⌘3): the side-by-side container.
+    let documentSplitView = NSSplitView()
+    /// M4: which of ⌘1/⌘2/⌘3 is active (persisted via CanvasViewState).
+    /// Internal setter: the mode logic lives in
+    /// DocumentWindowController+Outline.swift.
+    var activeViewMode: ViewMode = .map
+    /// M4: outline ↔ canvas selection sync loop guard.
+    var isSyncingSelection = false
+    /// M4: the outline pane's width across ⌘3 sessions.
+    var lastOutlinePaneWidth: CGFloat = 300
+
     /// The pasteboard the clipboard actions exchange (F-EDT-9).
     /// Injectable so hosted tests use a private `NSPasteboard(name:)`
     /// instead of the user's clipboard.
@@ -61,6 +76,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // Programmatic windows don't get the nib-loading path's implicit
         // delegate assignment.
         window.delegate = self
+        installOutlineIntegration()
 
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
@@ -71,8 +87,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // toolbar's zoom % follows.
             self?.syncMinimapCamera()
         }
-        canvas.onSelectionChange = { [weak self] _ in
-            self?.scheduleViewStateSave()
+        canvas.onSelectionChange = { [weak self] ids in
+            self?.canvasSelectionDidChange(ids)
             // Toolbar/menu validation follows the selection.
             self?.documentToolbar?.validateVisibleItems()
         }
@@ -126,6 +142,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         if canvas.scene == nil {
             updateScene(preserveCamera: false)
         }
+        // M4: the outline pane builds its rows before it can be shown
+        // (⌘2/⌘3 or a restored active view).
+        outlineController.reloadPreservingSelection()
         super.showWindow(sender)
         // F-CAN-8: a stored view state restores the camera and the
         // (sanitized) selection INSTEAD of zoom-to-fit; only a document
@@ -284,6 +303,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             updateScene(preserveCamera: true)
         }
         canvas.pruneSelection()
+        outlineController.reloadPreservingSelection()
         window?.title = document?.displayName ?? window?.title ?? ""
     }
 
@@ -309,7 +329,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         viewStateSaveTask?.cancel()
         guard let mapDocument = document as? MapDocument else { return }
         let state = CanvasViewState(
-            camera: canvas.camera, selection: canvas.selection.sorted(), activeView: .map)
+            camera: canvas.camera, selection: canvas.selection.sorted(), activeView: activeViewMode)
         try? viewStateStore.save(state, docID: mapDocument.model.docID)
     }
 
@@ -332,6 +352,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         let state = stored.sanitized(for: scene)
         canvas.camera = state.camera
         canvas.setSelection(Set(state.selection))
+        // M4 (F-OUT-1): the restored view mode (⌘1/⌘2/⌘3) comes back
+        // with the camera; the default for a fresh sidecar is ⌘1.
+        if state.activeView != activeViewMode {
+            applyViewMode(state.activeView)
+        }
         return true
     }
 

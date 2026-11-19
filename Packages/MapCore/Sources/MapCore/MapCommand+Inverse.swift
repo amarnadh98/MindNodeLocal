@@ -190,6 +190,10 @@ extension MapCommand {
                     anchors: [InsertionAnchor(id: id, parent: parentID, index: slot)]))
         } else {
             let rootIndex = model.roots.firstIndex(of: id) ?? model.roots.count
+            // A deleted root can still carry a pinned `side` (however
+            // stale for a root); `addRoot`'s payload normalization would
+            // drop it and undo would not be exact. `insertSubtrees`
+            // restores the snapshot verbatim.
             restoreCommands.append(
                 .insertSubtrees(
                     mapping: [id: restore],
