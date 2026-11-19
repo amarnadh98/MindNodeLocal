@@ -46,6 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Copy", #selector(NSText.copy(_:)), "c"),
                     item("Paste", #selector(NSText.paste(_:)), "v"),
                     .separator(),
+                    // Edit title (F-EDT-2): ⏎/⌘⏎ are the Add-Sibling keys
+                    // in the menu; F2 is unambiguous.
+                    item(
+                        "Edit Title",
+                        #selector(DocumentWindowController.editTitleAction(_:)),
+                        "\u{f705}", modifiers: []),
+                    .separator(),
                     // Create (F-EDT-1) and edit (F-EDT-4/9) keys per SPEC §6.1.
                     item(
                         "Add Child",
@@ -105,6 +112,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "Deselect",
                         #selector(DocumentWindowController.deselectAction(_:)),
                         "\u{1b}", modifiers: []),
+                ]))
+        mainMenu.addItem(
+            menu(
+                "Format",
+                [
+                    // F-EDT-7: rich-text titles. The actions live on the
+                    // editing overlay's text view (CanvasKit), reached
+                    // through the responder chain while a node edits.
+                    item("Bold", NSSelectorFromString("toggleBoldAction:"), "b"),
+                    item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
+                    item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
                 ]))
         mainMenu.addItem(
             menu(

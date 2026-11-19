@@ -14,6 +14,9 @@ public struct SceneNode {
     public let title: NodeTitle
     public let level: Int
     public let level1Index: Int
+    /// The node's width mode/value, so the editing overlay can wrap at the
+    /// width the measurer used (F-EDT-8).
+    public var width: NodeWidth? = nil
 }
 
 /// One branch connector: parent outgoing anchor to child incoming anchor.
@@ -59,7 +62,8 @@ public enum SceneGeometry {
         model: MapModel,
         variant: ThemeVariant,
         measurer: TextMeasurer,
-        spacing: LayoutSpacing = .default
+        spacing: LayoutSpacing = .default,
+        editingTitle: (id: String, title: NodeTitle)? = nil
     ) -> CanvasScene {
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
@@ -69,45 +73,50 @@ public enum SceneGeometry {
             guard model.nodes[rootID] != nil else { continue }
             let structure = rootStructure(model, rootID: rootID)
             let layoutRoot = layoutTree(
-                model: model, rootID: rootID, measurer: measurer, variant: variant)
+                model: model, rootID: rootID, measurer: measurer, variant: variant,
+                editingTitle: editingTitle)
             guard let layoutRoot else { continue }
 
-            var frames = TreeLayout.layout(
+            let frames = TreeLayout.layout(
                 root: layoutRoot, structure: structure, spacing: spacing)
-            applyManualOffsets(model: model, rootID: rootID, to: &frames)
+            // Flexible positioning (F-LAY-11): a node's manual offset moves
+            // it and its descendants after auto layout (also how a
+            // floating root lands where it was created, F-CAN-5).
+            let offsets = accumulatedOffsets(model: model, rootID: rootID)
             let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
             let offsetY = cursorY - treeMinY
             let rootLevel1Index = levelOneIndices(model: model, rootID: rootID)
 
+            var bottom = (frames[rootID]?.maxY ?? 0)
             for (id, frame) in frames {
                 guard let node = model.nodes[id] else { continue }
                 let info = ancestryInfo(model: model, id: id, rootID: rootID)
-                let translated = frame.offsetBy(dx: 0, dy: offsetY)
+                let offset = offsets[id] ?? .zero
+                let translated = frame.offsetBy(dx: offset.x, dy: offsetY + offset.y)
                 let level1Index =
                     info.depth == 0
                     ? 0
                     : rootLevel1Index[info.level1AncestorID] ?? 0
+                let title = id == editingTitle?.id ? editingTitle?.title : node.title
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
                     style: PaperTheme.resolvedStyle(
                         level: info.depth, level1Index: level1Index, variant: variant),
-                    title: node.title,
+                    title: title ?? node.title,
                     level: info.depth,
-                    level1Index: level1Index)
+                    level1Index: level1Index,
+                    width: node.width)
+                if translated.maxY > bottom {
+                    bottom = translated.maxY
+                }
             }
 
             branches.append(
                 contentsOf: connectors(
                     model: model, rootID: rootID, nodes: &nodes, variant: variant))
 
-            if let rootFrame = frames[rootID] {
-                var bottom = rootFrame.maxY
-                for frame in frames.values where frame.maxY > bottom {
-                    bottom = frame.maxY
-                }
-                cursorY = bottom + offsetY + rootStackGap
-            }
+            cursorY = bottom + rootStackGap
         }
 
         return CanvasScene(
@@ -129,34 +138,15 @@ public enum SceneGeometry {
         return structure
     }
 
-    /// Applies manual offsets after the auto layout (F-LAY-11): a
-    /// node's offset moves it and its whole subtree, and a descendant's
-    /// own offset accumulates on top. Invisible (folded-away) frames
-    /// don't exist yet, so they take their offsets when they appear.
-    static func applyManualOffsets(model: MapModel, rootID: String, to frames: inout LayoutResult) {
-        func walk(_ id: String, accumulated: CGSize) {
-            guard let node = model.nodes[id], var frame = frames[id] else { return }
-            var offset = accumulated
-            if let manual = node.offset {
-                offset.width += manual.x
-                offset.height += manual.y
-            }
-            if offset.width != 0 || offset.height != 0 {
-                frame.origin.x += offset.width
-                frame.origin.y += offset.height
-                frames[id] = frame
-            }
-            for childID in node.children {
-                walk(childID, accumulated: offset)
-            }
-        }
-        walk(rootID, accumulated: CGSize(width: 0, height: 0))
-    }
-
     /// Builds the layout tree for one root: measured node sizes, folded
-    /// subtrees pruned.
+    /// subtrees pruned. The editing node measures its live draft title so
+    /// the node grows while typing (F-EDT-8).
     static func layoutTree(
-        model: MapModel, rootID: String, measurer: TextMeasurer, variant: ThemeVariant
+        model: MapModel,
+        rootID: String,
+        measurer: TextMeasurer,
+        variant: ThemeVariant,
+        editingTitle: (id: String, title: NodeTitle)? = nil
     ) -> LayoutNode? {
         func measuredSize(for node: Node, depth: Int) -> CGSize {
             let style: ResolvedNodeStyle = PaperTheme.resolvedStyle(
@@ -167,8 +157,9 @@ public enum SceneGeometry {
             } else {
                 maxWidth = style.maxWidth
             }
+            let title = node.id == editingTitle?.id ? editingTitle?.title : node.title
             let textSize: CGSize = measurer.nodeTitleSize(
-                node.title, font: style.font, maxWidth: maxWidth)
+                title ?? node.title, font: style.font, maxWidth: maxWidth)
             let width: CGFloat = textSize.width + style.paddingWidth * 2
             let height: CGFloat = textSize.height + style.paddingHeight * 2
             return CGSize(width: width, height: height)
@@ -188,6 +179,26 @@ public enum SceneGeometry {
             return LayoutNode(id: id, size: size, side: side(of: node), children: children)
         }
         return buildNode(rootID, depth: 0)
+    }
+
+    /// A node's manual offset, plus the accumulated offsets of its
+    /// ancestors — the translation applied after auto layout (SPEC §9:
+    /// "offset is added after auto layout; descendants move with it").
+    static func accumulatedOffsets(model: MapModel, rootID: String) -> [String: CGPoint] {
+        var result: [String: CGPoint] = [:]
+
+        func walk(_ id: String, inherited: CGPoint) {
+            var own = inherited
+            if let offset = model.nodes[id]?.offset {
+                own = CGPoint(x: own.x + offset.x, y: own.y + offset.y)
+            }
+            result[id] = own
+            for childID in model.nodes[id]?.children ?? [] {
+                walk(childID, inherited: own)
+            }
+        }
+        walk(rootID, inherited: .zero)
+        return result
     }
 
     private static func side(of node: Node) -> LayoutSide? {

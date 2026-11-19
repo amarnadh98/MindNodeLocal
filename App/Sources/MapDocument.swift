@@ -86,6 +86,72 @@ final class MapDocument: NSDocument {
 
     override static var writableTypes: [String] { [AppIdentity.documentUTI] }
 
+    // MARK: auto-naming (F-EDT-14)
+
+    /// Untitled documents take their display name from the root's text:
+    /// first line, path-illegal characters replaced, falling back to
+    /// "Untitled" (NSDocument's own default). An explicit document title
+    /// (SPEC §8.2) wins. Once renamed or saved, the stored name stands.
+    private var storedDisplayName: String?
+
+    override var displayName: String? {
+        get {
+            if let storedDisplayName { return storedDisplayName }
+            guard fileURL == nil else { return super.displayName }
+            return Self.derivedName(for: store.model) ?? super.displayName
+        }
+        set {
+            // A rename (title bar) or the first save assigns the name
+            // AppKit chose; remember it so the derived name yields.
+            storedDisplayName = newValue
+            for case let controller as DocumentWindowController in windowControllers {
+                controller.window?.title = newValue ?? ""
+            }
+        }
+    }
+
+    /// The save panel's default file name on the first save of an
+    /// untitled document is the auto-derived name (F-EDT-14).
+    override func prepareSavePanel(_ savePanel: NSSavePanel) -> Bool {
+        let accepted = super.prepareSavePanel(savePanel)
+        if fileURL == nil, let name = Self.derivedName(for: store.model) {
+            savePanel.nameFieldStringValue = name
+        }
+        return accepted
+    }
+
+    /// The name an untitled document shows and saves under, or nil when
+    /// the root has no usable text (then NSDocument's "Untitled" stands).
+    static func derivedName(for model: MapModel) -> String? {
+        if let explicit = model.title?.trimmingCharacters(in: .whitespacesAndNewlines), !explicit.isEmpty {
+            return sanitizedDocumentName(from: explicit)
+        }
+        guard let rootID = model.roots.first, let root = model.nodes[rootID] else { return nil }
+        return sanitizedDocumentName(from: root.title.text)
+    }
+
+    /// Filename-safe form of the root text: first line only, path
+    /// separators and colons become "-", control characters dropped,
+    /// ends stripped of dots and whitespace, capped at 80 characters.
+    static func sanitizedDocumentName(from raw: String) -> String? {
+        let firstLine =
+            raw.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline).first.map(
+                String.init) ?? ""
+        var name = ""
+        for scalar in firstLine.unicodeScalars {
+            guard !CharacterSet.controlCharacters.contains(scalar) else { continue }
+            if "/:\\".unicodeScalars.contains(scalar) {
+                name.unicodeScalars.append("-")
+                continue
+            }
+            name.unicodeScalars.append(scalar)
+        }
+        name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        name = name.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        guard !name.isEmpty else { return nil }
+        return String(name.prefix(80))
+    }
+
     override func makeWindowControllers() {
         let controller = DocumentWindowController(document: self)
         addWindowController(controller)

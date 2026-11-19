@@ -10,12 +10,15 @@ import MapRender
 public enum SceneRenderer {
     /// Draws the scene into a flipped context. Nodes and branches outside
     /// the visible model-space rect are skipped, so draw cost follows the
-    /// viewport, not the map size.
+    /// viewport, not the map size. While a node is being edited its title
+    /// is suppressed (the editing overlay draws the live text instead —
+    /// SPEC §11.4); the node's shape stays visible as an anchor.
     public static func draw(
         scene: CanvasScene,
         camera: Camera,
         selection: Set<String> = [],
         selectionColor: CGColor,
+        editingNodeID: String? = nil,
         measurer: TextMeasurer = SceneRenderer.sharedMeasurer,
         in context: CGContext,
         viewport: CGSize
@@ -52,8 +55,9 @@ public enum SceneRenderer {
 
         for node in scene.nodes.values {
             guard visible.intersects(node.frame) else { continue }
+            let title = node.id == editingNodeID ? NodeTitle(text: "", runs: []) : node.title
             NodeRenderer.draw(
-                style: node.style, title: node.title, measurer: measurer,
+                style: node.style, title: title, measurer: measurer,
                 in: context, frame: node.frame)
         }
 

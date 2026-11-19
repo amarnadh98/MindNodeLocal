@@ -17,6 +17,9 @@ public final class CanvasView: NSView {
     public var scene: CanvasScene? {
         didSet {
             rebuildGrid()
+            // The editing node's frame may have moved (or vanished) in
+            // the rebuilt scene; the overlay follows or tears down.
+            nodeTextEditor.reconcileWithScene()
             needsDisplay = true
         }
     }
@@ -25,11 +28,22 @@ public final class CanvasView: NSView {
         didSet {
             guard camera != oldValue else { return }
             clampCameraScale()
+            // Pan/zoom move the editing node on screen; the overlay is
+            // re-positioned, never re-rendered (SPEC §11.4).
+            nodeTextEditor.syncPosition()
             needsDisplay = true
         }
     }
 
     public private(set) var selection: Set<String> = []
+
+    /// The inline editing overlay (SPEC §11.4); owns the TextKit 2 text
+    /// view and the session state.
+    public let nodeTextEditor = NodeTextEditor()
+
+    /// F-CAN-5: double-click on empty canvas → the host creates a
+    /// floating root at this model point and enters edit mode.
+    public var onCreateFloatingNode: ((CGPoint) -> Void)?
 
     /// True until the host has run the first `zoomToFit` against the
     /// window's real on-screen content size (windows open at the creation
@@ -70,6 +84,7 @@ public final class CanvasView: NSView {
         self.camera = Camera()
         super.init(frame: frameRect)
         wantsLayer = true
+        nodeTextEditor.canvas = self
     }
 
     @available(*, unavailable)
@@ -77,6 +92,7 @@ public final class CanvasView: NSView {
         self.camera = Camera()
         super.init(coder: coder)
         wantsLayer = true
+        nodeTextEditor.canvas = self
     }
 
     public override var isFlipped: Bool { true }
@@ -104,6 +120,7 @@ public final class CanvasView: NSView {
             camera: camera,
             selection: selection,
             selectionColor: selectionColor,
+            editingNodeID: nodeTextEditor.editingNodeID,
             in: context,
             viewport: bounds.size)
 
@@ -267,7 +284,9 @@ public final class CanvasView: NSView {
     public override func keyDown(with event: NSEvent) {
         let characters = event.charactersIgnoringModifiers ?? ""
         let hasCommand = event.modifierFlags.contains(.command)
-        switch (characters, hasCommand, event.modifierFlags.contains(.option)) {
+        let hasOption = event.modifierFlags.contains(.option)
+        let hasShift = event.modifierFlags.contains(.shift)
+        switch (characters, hasCommand, hasOption) {
         case ("+", true, false), ("=", true, false):
             zoomStep(.closer)
         case ("-", true, false):
@@ -278,13 +297,48 @@ public final class CanvasView: NSView {
             zoomToFit()
         case ("0", true, true):
             zoomToSelection()
+        case ("\r", _, false) where !hasShift:
+            // ⏎/⌘⏎ edit the selected node (F-EDT-2); ⇧⏎ (new root) and
+            // ⌥⏎ (sibling above) fall through to the host's menu actions.
+            beginEditingSelection()
+        case ("\u{f705}", false, false):
+            // F2 (Edit Title, §6.1).
+            beginEditingSelection()
         default:
-            super.keyDown(with: event)
+            if let prefill = replaceEditText(for: event) {
+                // Typing a printable character on a selected node replaces
+                // its text (F-EDT-2).
+                beginEditingSelection(prefill: prefill)
+            } else {
+                super.keyDown(with: event)
+            }
         }
     }
 
     public override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        // Any click while editing first commits the session, so the click
+        // lands on the committed model (F-EDT-1: ⎋-equivalent behavior).
+        if nodeTextEditor.editingNodeID != nil {
+            nodeTextEditor.commit(next: .none)
+        }
+        // Double-click: a node edits its title (F-EDT-2); empty canvas
+        // creates a floating root at the point (F-CAN-5) instead of
+        // rubber-banding.
+        if event.clickCount == 2 {
+            if let id = nodeID(at: point) {
+                selection = [id]
+                onSelectionChange?(selection)
+                beginEditing(nodeID: id)
+                rubberBandStart = nil
+                needsDisplay = true
+                return
+            }
+            if let create = onCreateFloatingNode {
+                create(camera.modelPoint(for: point))
+                return
+            }
+        }
         if let id = nodeID(at: point) {
             if event.modifierFlags.contains(.command) {
                 if selection.contains(id) {
