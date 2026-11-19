@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import Foundation
 import MapStudy
 import QuartzCore
@@ -12,7 +13,47 @@ import QuartzCore
 ///
 /// The overlay is stored on the tree, so layers realized later by
 /// culling pick their state up on realization.
+///
+/// F-STD-5's refinement (M7): a placeholder node's raster renders
+/// through a Core Image gaussian blur (macOS's public per-layer
+/// `filters`), so its shape and outline read while its text does not —
+/// "blurred placeholders with their outlines visible". The blur is an
+/// effect on the existing contents; the raster key never changes.
 extension CanvasLayerTree {
+    /// The placeholder blur radius (F-STD-5): enough to make text
+    /// unreadable, little enough that the node's outline reads.
+    public static let placeholderBlurRadius: Double = 6
+
+    /// One gaussian-blur filter for one placeholder layer. Each filter
+    /// gets a unique CA name so Core Animation can track them
+    /// individually.
+    static func placeholderBlurFilter(id: String) -> CIFilter {
+        let blur = CIFilter(name: "CIGaussianBlur") ?? CIFilter()
+        blur.setValue(placeholderBlurRadius, forKey: kCIInputRadiusKey)
+        blur.name = "arbor.reveal.placeholder-blur.\(id)"
+        return blur
+    }
+
+    /// Applies one node's overlay state to its layer: opacity always,
+    /// the placeholder blur only while the state is `.placeholder`
+    /// (revealing clears the filter, never re-rastering).
+    func applyRevealState(to layer: CALayer, id: String, overlay: RevealOverlay) {
+        switch overlay.states[id] {
+        case .placeholder:
+            if layer.filters?.isEmpty ?? true {
+                layer.filters = [Self.placeholderBlurFilter(id: id)]
+            }
+        default:
+            // Visible, hidden, dimmed or unmanaged: no placeholder
+            // effect (only placeholders ever carry the filter).
+            if let first = layer.filters?.first as? CIFilter,
+                first.name.hasPrefix("arbor.reveal.placeholder-blur.")
+            {
+                layer.filters = nil
+            }
+        }
+    }
+
     /// Installs (or clears) the overlay and re-applies it to every
     /// realized layer instantly. Ids the overlay does not mention keep
     /// full opacity unless dimmed.
@@ -23,6 +64,7 @@ extension CanvasLayerTree {
         if let overlay {
             for (id, layer) in nodeLayers {
                 layer.opacity = Float(overlay.nodeOpacity(id))
+                applyRevealState(to: layer, id: id, overlay: overlay)
             }
             for (key, layer) in branchLayers {
                 layer.opacity = Float(overlay.branchOpacity(parentID: key.parentID, childID: key.childID))
@@ -30,6 +72,13 @@ extension CanvasLayerTree {
         } else {
             for layer in nodeLayers.values {
                 layer.opacity = 1
+                // Clearing the overlay ends recall: no placeholder may
+                // keep its blur after the mode exits.
+                if let first = layer.filters?.first as? CIFilter,
+                    first.name.hasPrefix("arbor.reveal.placeholder-blur.")
+                {
+                    layer.filters = nil
+                }
             }
             for layer in branchLayers.values {
                 layer.opacity = 1

@@ -8,7 +8,7 @@ where they live, and how to run them.
 |---|---|---|---|
 | 1 | Launch → New map → type root → ⇥ child → ⏎ siblings → drag a branch to reparent → ⌘S → quit → reopen: everything restored | **Automated (M1)** | `App/Tests/GoldenScenarioOneTests.swift` (hosted) |
 | 2 | Paste 40-line Markdown → map → Radial → theme → PDF export | Not yet — depends on paste (M1, partly covered by `ClipboardTests`), Radial (M2), themes (M2), export (M5) | — |
-| 3 | Select branch → Study Branch → 10 cards → mastery colors | **Automated (M7)** | `App/Tests/StudySessionTests.swift` (hosted) |
+| 3 | Select branch → Study Branch → 10 cards → mastery colors | **Automated (M7)** | `App/Tests/StudySessionTests.swift` (hosted); the branch can also be recalled on the canvas — `App/Tests/RecallModeTests.swift` (M7) |
 | 4 | Present → auto slides → arrow keys + clicker → presenter notes | **Automated as far as one display can go (M6)** | `App/Tests/PresentationTests.swift` (hosted) |
 | 5 | Global hotkey → Quick Entry → indented list → Create Map | Not yet — M4 (`F-QEN`) | — |
 
@@ -131,4 +131,32 @@ real app paths, hosted like scenario 1:
   (FSRS state + `study/reviews.jsonl`, including a truncated-tail read),
   Make Cloze through the editor's selected range, and the overlay's
   never-dirties contract.
+
+## Recall: how it is automated (M7)
+
+`RecallModeTests` (App/Tests/RecallModeTests.swift, hosted) covers
+F-STD-5's canvas self-testing through the real app paths — the
+⌥⌘R menu action, the session's own event entry point, and the
+document's non-undoable grading write:
+
+- **Placeholders**: the selected branch's descendants render
+  `.placeholder` in the layer tree's reveal overlay (the branch node
+  itself, the root and everything outside stay drawn), and the M7
+  placeholder blur (a per-layer `CIGaussianBlur`) is asserted
+  headlessly in CanvasKit's `RevealOverlayTests`, including the
+  culling realize path and the never-a-re-raster contract.
+- **Reveal**: → reveals ONE node in map order (never a subtree);
+  ⌥-click is driven through a real scene frame and reveals exactly
+  that subtree (`MapStudy.RecallMachineTests` covers the pure machine:
+  order, one-at-a-time, click, subtree, cycle safety, marking targets).
+- **Marks**: 1/2 grade the last revealed node's card Good/Again —
+  the review log and the node's FSRS state are asserted, with
+  ADR-0015's contract (the undo step after a grading is provably still
+  the last EDIT; grading keeps the mode alive, a real edit ends it).
+- **Never dirties**: entering and exiting recall leave the document's
+  change count and the undo stack untouched; a non-card node's mark is
+  session feedback only (no FSRS write, no dirtying).
+- **Edges**: a childless or folded-away branch has nothing to recall;
+  the menu item validates by selection and run state (checkmarked
+  while active); the shield's key translation is pinned.
 

@@ -52,8 +52,10 @@
 		833F7A09E4E1951491BAF30A /* PresenterDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 806689DA6563D3BDA2C30D2A /* PresenterDashboard.swift */; };
 		856E78DAEF9CDB41C13F248C /* MapLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 3F0A012FE8C6802965F3A70F /* MapLibrary */; };
 		87385042B26AC0884B4C0D44 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAC6BFCC857FA0158B42391 /* ExportCoordinator.swift */; };
+		8827056533211D1F237E94F6 /* DocumentWindowController+Recall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */; };
 		88793E886BACAA4C8920AE6E /* StudyDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75399A0C2934BB17F315640 /* StudyDashboardView.swift */; };
 		8879915EF65A25600F6AABF6 /* SceneExport in Frameworks */ = {isa = PBXBuildFile; productRef = 5BBEB38E79BC0FED7BFEB335 /* SceneExport */; };
+		8B3C418869473695F92200D4 /* RecallModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */; };
 		8BB84F03FB06F2D836DE8933 /* QuickOpenPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403FDA07486CE16C85F44C87 /* QuickOpenPanel.swift */; };
 		8CE6F8EB37F99F034F99F0B3 /* StudyDashboardController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B12C49BCA9FFB90960EB4 /* StudyDashboardController.swift */; };
 		96B11D99DA0409D0D479E844 /* DocumentWindowController+Toolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */; };
@@ -68,6 +70,7 @@
 		B8706D59CA96814D7E79F80A /* FocusFindCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */; };
 		BCE1A74E18AC59895789A289 /* CanvasKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2C2FAABF23A1E50C69E59904 /* CanvasKit */; };
 		BD7AE609AB2F8040FD6E7CD3 /* DocumentQuickLook.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD74A7E238F1A994718E4DF2 /* DocumentQuickLook.swift */; };
+		C4F64B256FF7DC218E32A48F /* RecallSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B22EDB00086A6408BA9CEB5 /* RecallSession.swift */; };
 		C986615B78CA694E4DAA98F8 /* DocumentWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */; };
 		CEB497AAF0AF89837E15E0BD /* SessionMinimapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A95DE3A8BF4B5595FE7852C /* SessionMinimapView.swift */; };
 		D1790FD36A1B6B934C01B694 /* MapCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2514B20D60A75A24AECF4DC7 /* MapCore */; };
@@ -110,6 +113,7 @@
 		0DC404C69786196CC5316EA3 /* CanvasAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasAccessibilityTests.swift; sourceTree = "<group>"; };
 		0E9B7C130CAE3A129DCC2F11 /* MapCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapCore; path = Packages/MapCore; sourceTree = SOURCE_ROOT; };
 		0EA2E24730DAC637172ADCC7 /* FindBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBarView.swift; sourceTree = "<group>"; };
+		15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallModeTests.swift; sourceTree = "<group>"; };
 		1A95DE3A8BF4B5595FE7852C /* SessionMinimapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMinimapView.swift; sourceTree = "<group>"; };
 		1FA0C610C59D37EB889D49E1 /* GenerationInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationInput.swift; sourceTree = "<group>"; };
 		23E3A21B1AB1C48E6DACFAFA /* OutlineRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineRowView.swift; sourceTree = "<group>"; };
@@ -127,6 +131,7 @@
 		4493C7C4AA6F6C2FBBB5BE2E /* DocumentImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImporter.swift; sourceTree = "<group>"; };
 		48AB29C79C038696D981150A /* MapRender */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapRender; path = Packages/MapRender; sourceTree = SOURCE_ROOT; };
 		4A35BFC7B3BAEE3F1CEEE63F /* FocusFindFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindFixtures.swift; sourceTree = "<group>"; };
+		4B22EDB00086A6408BA9CEB5 /* RecallSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallSession.swift; sourceTree = "<group>"; };
 		4F07E8EBA38F9A680ACE7D2F /* MapAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapAI; path = Packages/MapAI; sourceTree = SOURCE_ROOT; };
 		4F7778E4EA9A36895828CA61 /* OutlineDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineDataSource.swift; sourceTree = "<group>"; };
 		4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -155,6 +160,7 @@
 		93F2CED246AA6556C01EFA73 /* LibraryWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryWindowController.swift; sourceTree = "<group>"; };
 		9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Toolbar.swift"; sourceTree = "<group>"; };
 		9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditingTests.swift; sourceTree = "<group>"; };
+		A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Recall.swift"; sourceTree = "<group>"; };
 		BAD228F60FD2E82E4CDE6A93 /* StudySessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudySessionView.swift; sourceTree = "<group>"; };
 		BB4D4A57AC819F94BBED21FC /* MapLibrary */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapLibrary; path = Packages/MapLibrary; sourceTree = SOURCE_ROOT; };
 		BD74A7E238F1A994718E4DF2 /* DocumentQuickLook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentQuickLook.swift; sourceTree = "<group>"; };
@@ -174,7 +180,7 @@
 		F401197E85E463072F6963CE /* MapIO */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapIO; path = Packages/MapIO; sourceTree = SOURCE_ROOT; };
 		F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewController.swift; sourceTree = "<group>"; };
 		F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindCoordinator.swift; sourceTree = "<group>"; };
-		"TEMP_4D205E7F-EBB6-4378-BF61-6E2E061EBF7D" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_8347B183-9EB0-4E2F-98F8-14A66A13801D" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -297,7 +303,9 @@
 		97784976B015ECE84423540D /* Study */ = {
 			isa = PBXGroup;
 			children = (
+				A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */,
 				5E152710B3C3F191419559D3 /* DocumentWindowController+Study.swift */,
+				4B22EDB00086A6408BA9CEB5 /* RecallSession.swift */,
 				1A95DE3A8BF4B5595FE7852C /* SessionMinimapView.swift */,
 				3B8B12C49BCA9FFB90960EB4 /* StudyDashboardController.swift */,
 				C75399A0C2934BB17F315640 /* StudyDashboardView.swift */,
@@ -341,6 +349,7 @@
 				823BBFD2BD9A3E950CB48DAE /* MinimapToolbarTests.swift */,
 				C33B924535A56DE8F007D316 /* OutlineViewTests.swift */,
 				53F33823EACC1A3ED8D65CB8 /* PresentationTests.swift */,
+				15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */,
 				C01AF1A0F9ECD2B3C28700E4 /* StudySessionTests.swift */,
 				3C24FFCEDC9EBD59FFC5B577 /* ViewStateRestoreTests.swift */,
 			);
@@ -380,12 +389,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_AF279645-D7E2-43F3-8D29-2B100E09105D" /* t3-73567a80-5a224675e342fe7e */ = {
+		"TEMP_FEFA6193-5A88-4E66-81FD-3E040E43ED22" /* t3-d6218b74-4229158858298dec */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_4D205E7F-EBB6-4378-BF61-6E2E061EBF7D" /* Config.xcconfig */,
+				"TEMP_8347B183-9EB0-4E2F-98F8-14A66A13801D" /* Config.xcconfig */,
 			);
-			path = "t3-73567a80-5a224675e342fe7e";
+			path = "t3-d6218b74-4229158858298dec";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -513,6 +522,7 @@
 				4B9E4A21A59F590E9CB6FE38 /* MinimapToolbarTests.swift in Sources */,
 				B28CF76C31C912679B3E09CB /* OutlineViewTests.swift in Sources */,
 				E7BCB1EEEC5652400850C107 /* PresentationTests.swift in Sources */,
+				8B3C418869473695F92200D4 /* RecallModeTests.swift in Sources */,
 				D5106CD6F6DF0A8F37B02688 /* StudySessionTests.swift in Sources */,
 				0C83A5B8B764843DCDA9191A /* ViewStateRestoreTests.swift in Sources */,
 			);
@@ -535,6 +545,7 @@
 				24746A5E041AA7CF7FCEBC12 /* DocumentWindowController+FocusFind.swift in Sources */,
 				82A741B2B723A653B09FCBBE /* DocumentWindowController+Outline.swift in Sources */,
 				F8A854299DA70227916EB438 /* DocumentWindowController+Presentation.swift in Sources */,
+				8827056533211D1F237E94F6 /* DocumentWindowController+Recall.swift in Sources */,
 				FEC1FC09EA61F3BAEE881226 /* DocumentWindowController+Study.swift in Sources */,
 				96B11D99DA0409D0D479E844 /* DocumentWindowController+Toolbar.swift in Sources */,
 				C986615B78CA694E4DAA98F8 /* DocumentWindowController.swift in Sources */,
@@ -559,6 +570,7 @@
 				D6D9E474C80546174A06F4D6 /* PresentationCoordinator.swift in Sources */,
 				833F7A09E4E1951491BAF30A /* PresenterDashboard.swift in Sources */,
 				8BB84F03FB06F2D836DE8933 /* QuickOpenPanel.swift in Sources */,
+				C4F64B256FF7DC218E32A48F /* RecallSession.swift in Sources */,
 				CEB497AAF0AF89837E15E0BD /* SessionMinimapView.swift in Sources */,
 				E60CECBF0108704DB4E70DB2 /* SlidesSidebar.swift in Sources */,
 				8CE6F8EB37F99F034F99F0B3 /* StudyDashboardController.swift in Sources */,
@@ -631,7 +643,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_4D205E7F-EBB6-4378-BF61-6E2E061EBF7D" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_8347B183-9EB0-4E2F-98F8-14A66A13801D" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -713,7 +725,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_4D205E7F-EBB6-4378-BF61-6E2E061EBF7D" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_8347B183-9EB0-4E2F-98F8-14A66A13801D" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

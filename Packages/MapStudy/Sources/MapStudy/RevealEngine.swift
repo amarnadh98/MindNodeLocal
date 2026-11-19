@@ -145,6 +145,17 @@ public struct RevealEngine: Sendable, Equatable {
         return placeholders.contains(id) ? .placeholder : .hidden
     }
 
+    /// `id` and everything below it — the same hierarchy collection
+    /// `revealedIDs` applies to a step, exposed for callers that need a
+    /// subtree set directly (study recall's ⌥-click reveal, F-STD-5:
+    /// the subtree semantics stay defined in exactly one place).
+    public func subtree(of id: String) -> Set<String> {
+        var result = Set<String>()
+        var visited = Set<String>()
+        collect(id, into: &result, visited: &visited)
+        return result
+    }
+
     /// Includes `id` and everything below it. An id already visible
     /// still reveals its subtree (a base-visible focus node's children
     /// can be build steps of their own), and cycles in a corrupt

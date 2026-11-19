@@ -1,20 +1,23 @@
 import Charts
 import SwiftUI
 
-/// The study dashboard surface (F-STD-7): due today, a 30-day forecast
-/// (Swift Charts), retention stats, the streak, a heatmap calendar and
-/// the opt-in daily reminder. All values come precomputed in the
-/// `DashboardSnapshot` — this view renders, it never computes.
+/// The study dashboard surface (F-STD-7): due today, due per deck, a
+/// 30-day forecast (Swift Charts), retention stats, the streak, a
+/// heatmap calendar and the opt-in daily reminder with its time. All
+/// values come precomputed in the `DashboardSnapshot` — this view
+/// renders, it never computes.
 struct StudyDashboardView: View {
     let snapshot: DashboardSnapshot
 
     @State private var reminderOn =
         UserDefaults.standard.object(forKey: StudyPreferences.dailyReminderKey) as? Bool ?? false
+    @State private var reminderTime = StudyPreferences.reminderTime()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 statRow
+                decksSection
                 forecastSection
                 heatmapSection
                 reminderSection
@@ -51,6 +54,38 @@ struct StudyDashboardView: View {
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
+    }
+
+    // MARK: F-STD-7 "cards due today per deck": every Study-marked
+    // branch (F-STD-1) with its due and total card counts.
+    @ViewBuilder
+    private var decksSection: some View {
+        if !snapshot.decks.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Due by Deck")
+                    .font(.headline)
+                ForEach(snapshot.decks) { deck in
+                    HStack {
+                        Text(deck.name.isEmpty ? "Deck" : deck.name)
+                            .lineLimit(1)
+                        Spacer()
+                        if deck.due > 0 {
+                            Text("\(deck.due) of \(deck.total) due")
+                                .font(.callout)
+                                .foregroundStyle(Color.accentColor)
+                        } else {
+                            Text(deck.total == 0 ? "no cards" : "none due of \(deck.total)")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        }
     }
 
     private var forecastSection: some View {
@@ -96,11 +131,34 @@ struct StudyDashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Daily Reminder")
                     .font(.headline)
-                Text("A local notification at 9:00 each morning. Nothing is sent anywhere.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "A local notification each morning. Nothing is sent anywhere."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
+            DatePicker(
+                "",
+                selection: Binding(
+                    get: { reminderTime },
+                    set: { date in
+                        reminderTime = date
+                        UserDefaults.standard.set(date, forKey: StudyPreferences.dailyReminderTimeKey)
+                        // A time change while enabled reschedules the
+                        // pending request at the new hour (F-STD-7).
+                        if reminderOn {
+                            Task { @MainActor in
+                                reminderOn = await StudyReminder.setEnabled(true)
+                            }
+                        }
+                    }),
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .frame(width: 84)
+            .disabled(!reminderOn)
+            .accessibilityLabel("Reminder time")
             Toggle(
                 "",
                 isOn: Binding(

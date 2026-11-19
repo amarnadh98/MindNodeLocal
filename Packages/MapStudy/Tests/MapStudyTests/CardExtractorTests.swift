@@ -179,6 +179,20 @@ struct CardExtractorTests {
 
     // MARK: - Cloze (F-STD-2)
 
+    /// F-STD-2's "Reversed, optional" needs an answer side to invert:
+    /// an explicitly marked card with no back content stays basic-only.
+    @Test func reversedCardNeedsAnswerContent() {
+        let model = map(
+            [
+                node("root", title: "R", children: ["bare"], deck: true),
+                node("bare", parent: "root", title: "Bare", card: .on),
+            ],
+            roots: ["root"])
+        let cards = CardExtractor.extract(from: model)
+        #expect(cards.map(\.id).contains("bare"))
+        #expect(!cards.map(\.id).contains("bare#r"))
+    }
+
     @Test func clozeEdgeCases() {
         let model = map(
             [

@@ -272,4 +272,63 @@ struct StudyStatsTests {
         #expect(counts[0] == 1)  // 6 days ago
         #expect(counts.reduce(0, +) == 4)
     }
+
+    // MARK: deck breakdown (F-STD-7 "due per deck")
+
+    /// root → deckA(a1, a2, deckB(b1)), root → plain(p1).
+    /// deckB is nested inside deckA and owns b1; deckA keeps a1, a2.
+    private func deckModel() -> MapModel {
+        var model = MapModel.emptyDocument(docID: "decks")
+        func add(_ id: String, parent: String?, deck: Bool = false) {
+            var node = Node(id: id, title: NodeTitle(text: id))
+            node.parent = parent
+            if deck { node.study = NodeStudy(deck: true) }
+            model.nodes[id] = node
+            if let parent {
+                model.nodes[parent]?.children.append(id)
+            } else {
+                model.roots.append(id)
+            }
+        }
+        add("root", parent: nil)
+        add("deckA", parent: "root", deck: true)
+        add("a1", parent: "deckA")
+        add("a2", parent: "deckA")
+        add("deckB", parent: "deckA", deck: true)
+        add("b1", parent: "deckB")
+        add("plain", parent: "root")
+        add("p1", parent: "plain")
+        return model
+    }
+
+    @Test func deckBreakdownAttributesCardsToTheNearestDeckInMapOrder() {
+        let model = deckModel()
+        // Cards under plain (no deck anywhere above) are nobody's.
+        let cards = [card("a1"), card("a2"), card("b1"), card("p1")]
+        let states: [String: FSRSCard] = [
+            "a1": state(.review, due: now),
+            "a2": state(.review, due: now.addingTimeInterval(86_400)),
+            "b1": state(.new, due: now),
+        ]
+        let breakdown = StudyStats.deckBreakdown(model: model, cards: cards, states: states, now: now)
+        #expect(breakdown.map(\.id) == ["deckA", "deckB"])
+        let outer = breakdown[0]
+        #expect(outer.name == "deckA")
+        #expect(outer.due == 1)
+        #expect(outer.total == 2)
+        // The nested deck owns its subtree's cards exclusively.
+        let nested = breakdown[1]
+        #expect(nested.name == "deckB")
+        #expect(nested.due == 0)
+        #expect(nested.total == 1)
+    }
+
+    @Test func deckBreakdownListsCardlessDecks() {
+        var model = deckModel()
+        // deckB keeps its subtree membership but loses its only card.
+        model.nodes["deckB"]?.children.removeAll { $0 == "b1" }
+        let breakdown = StudyStats.deckBreakdown(model: model, cards: [], states: [:], now: now)
+        #expect(breakdown.map(\.id) == ["deckA", "deckB"])
+        #expect(breakdown.allSatisfy { $0.due == 0 && $0.total == 0 })
+    }
 }

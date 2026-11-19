@@ -82,6 +82,20 @@ enum StudyPreferences {
     static let reviewsPerDayKey = "StudyReviewsPerDay"
     /// The reminder opt-in (F-STD-7): off until the user asks.
     static let dailyReminderKey = "StudyDailyReminderEnabled"
+    /// The reminder's time of day (F-STD-7 "toggle + time"), stored as
+    /// a Date whose hour/minute are all that matter. Default 9:00.
+    static let dailyReminderTimeKey = "StudyDailyReminderTime"
+
+    /// The persisted reminder time, defaulting to 9:00 today.
+    static func reminderTime(defaults: UserDefaults = .standard) -> Date {
+        if let stored = defaults.object(forKey: dailyReminderTimeKey) as? Date {
+            return stored
+        }
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = 9
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? Date()
+    }
 
     /// New cards per day: a UserDefaults override wins, else the
     /// document's `studySettings.newPerDay`, else 20 (F-STD-4 default).

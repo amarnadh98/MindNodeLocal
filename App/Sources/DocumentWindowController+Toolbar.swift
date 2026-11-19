@@ -342,6 +342,10 @@ extension DocumentWindowController {
             // F-STD: the study menu's own validation (checkmark states,
             // editing-sensitive enabling) lives with the actions.
             return validateStudyMenuItem(menuItem)
+        case #selector(recallAction(_:)):
+            // F-STD-5: recall's own validation (active-state checkmark,
+            // needs a branch with descendants).
+            return validateRecallMenuItem(menuItem)
         default:
             return validateFocusFindMenuItem(menuItem) ?? true
         }
