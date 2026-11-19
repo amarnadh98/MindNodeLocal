@@ -93,4 +93,48 @@ struct MapDocumentTests {
         #expect(opened.model.nodes[rootID]?.tags?.isEmpty == true)
         #expect(opened.model.nodes[rootID]?.title.text == "Root")
     }
+
+    /// NSDocument posts its undo-group change counts on a later run-loop
+    /// turn; spin briefly so `isDocumentEdited` reflects them.
+    private func settle() {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    /// An untitled document whose store groups are the top-level undo
+    /// groups. In the app each key event closes the undo manager's
+    /// by-event group; a test runs inside one long run-loop pass, where
+    /// that outer group would never close.
+    private func makeEditableDocument() throws -> MapDocument {
+        let document = try #require(
+            try NSDocumentController.shared.makeUntitledDocument(ofType: AppIdentity.documentUTI)
+                as? MapDocument)
+        document.undoManager?.groupsByEvent = false
+        return document
+    }
+
+    @Test func undoingBackToTheSavedStateClearsTheEditedFlag() throws {
+        let document = try makeEditableDocument()
+        try document.store.perform(.addRoot(index: nil, node: Node(id: UUID().uuidString)))
+        settle()
+        #expect(document.isDocumentEdited)
+
+        document.undoManager?.undo()
+        settle()
+        #expect(!document.isDocumentEdited)
+    }
+
+    @Test func typingAfterASaveDirtiesTheDocumentAgain() throws {
+        let document = try makeEditableDocument()
+        let id = UUID().uuidString
+        try document.store.perform(.addRoot(index: nil, node: Node(id: id)))
+        try document.store.perform(.editText(id: id, title: NodeTitle(text: "A")))
+        settle()
+        _ = try document.fileWrapper(ofType: AppIdentity.documentUTI)
+        document.updateChangeCount(.changeCleared)
+        #expect(!document.isDocumentEdited)
+
+        try document.store.perform(.editText(id: id, title: NodeTitle(text: "AB")))
+        settle()
+        #expect(document.isDocumentEdited)
+    }
 }

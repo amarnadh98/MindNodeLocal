@@ -353,3 +353,30 @@ extension CanvasView {
         zoomToSelection()
     }
 }
+
+/// Selection maintenance for the editing loop (F-CAN-4: the selection
+/// stays valid after every model change).
+extension CanvasView {
+    /// Sets the selection, dropping ids that no longer exist in the
+    /// scene (deleted nodes, descendants of newly folded nodes).
+    public func setSelection(_ ids: Set<String>) {
+        selection = ids.filter { scene?.nodes[$0] != nil }
+        needsDisplay = true
+        onSelectionChange?(selection)
+    }
+
+    /// Drops selection ids that fell out of the scene in a rebuild.
+    public func pruneSelection() {
+        let valid = selection.filter { scene?.nodes[$0] != nil }
+        guard valid != selection else { return }
+        selection = valid
+        needsDisplay = true
+        onSelectionChange?(selection)
+    }
+
+    /// True when `id` renders left of its root — its incoming branch
+    /// heads left — so promote/demote mirror there (F-EDT-6).
+    public func isOnLeftSide(_ id: String) -> Bool {
+        scene?.branches.contains { $0.childID == id && $0.direction == .left } ?? false
+    }
+}
