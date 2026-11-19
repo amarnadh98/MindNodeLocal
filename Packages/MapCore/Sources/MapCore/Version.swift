@@ -3,6 +3,10 @@ import Foundation
 /// Arbor on-disk document format version (SPEC §8). Version 2 added
 /// `Node.paletteIndex` (the persistent branch palette index, ADR-0009);
 /// `Migrations.v1ToV2` back-fills it positionally for existing files.
+/// Version 3 added the optional `MapModel.ai` policy object (the
+/// per-document "Never send to cloud AI" flag, SPEC §12/F-AI-1) and
+/// `Node.note` editing (`setNote`); both are optional, so
+/// `Migrations.v2ToV3` only stamps the version.
 public enum ArborFormat {
-    public static let formatVersion = 2
+    public static let formatVersion = 3
 }

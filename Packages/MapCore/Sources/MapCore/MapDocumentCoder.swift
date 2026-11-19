@@ -73,18 +73,25 @@ public struct PackageMeta: Codable, Sendable, Hashable {
     public var created: Date
     public var modified: Date
     public var docID: String
+    /// Who last mutated the document (F-AI-5): `nil` for pre-AI files,
+    /// `.user` for every user edit, `.ai` after an AI mutation. A
+    /// journal-only field — the save stamps the author of the most
+    /// recent change, it is not a per-change history.
+    public var lastModifiedBy: AuthorKind?
 
     public init(
         formatVersion: Int = ArborFormat.formatVersion,
         appVersion: String = "0.1.0",
         created: Date = Date(),
         modified: Date = Date(),
-        docID: String
+        docID: String,
+        lastModifiedBy: AuthorKind? = nil
     ) {
         self.formatVersion = formatVersion
         self.appVersion = appVersion
         self.created = created
         self.modified = modified
         self.docID = docID
+        self.lastModifiedBy = lastModifiedBy
     }
 }

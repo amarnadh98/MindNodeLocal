@@ -22,6 +22,8 @@ packages:
     path: Packages/MapIO
   MapLibrary:
     path: Packages/MapLibrary
+  MapAI:
+    path: Packages/MapAI
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -48,6 +50,7 @@ targets:
       - package: MapStudy
       - package: MapIO
       - package: MapLibrary
+      - package: MapAI
     info:
       path: App/Resources/Info.plist
       properties:
@@ -164,6 +167,9 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
+        # SPEC §12: network client — only the AI providers the user
+        # configures (Settings ▸ AI) and user-initiated URL imports.
+        com.apple.security.network.client: true
   ArborTests:
     type: bundle.unit-test
     platform: macOS
@@ -184,6 +190,7 @@ targets:
       - package: MapStudy
       - package: MapIO
       - package: MapLibrary
+      - package: MapAI
     settings:
       base:
         PRODUCT_NAME: ArborTests

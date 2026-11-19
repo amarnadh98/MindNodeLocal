@@ -295,8 +295,10 @@ extension DocumentWindowController {
         }
     }
 
-    /// NSMenuItemValidation: the View ▸ Minimap checkmark and the zoom
-    /// menu's step marks; editing actions disable with no selection.
+    /// NSMenuItemValidation: the View ▸ Minimap checkmark, the zoom
+    /// menu's step marks, the AI menu's availability (F-AI-1) and the
+    /// per-document cloud flag's state (SPEC §12); editing actions
+    /// disable with no selection.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(toggleMinimapAction(_:)):
@@ -314,6 +316,17 @@ extension DocumentWindowController {
             return presentationCoordinatorBox?.isLiveEditPaused == true
         case #selector(toggleSlidesSidebarAction(_:)):
             menuItem.state = slidesSidebarBox?.isVisible == true ? .on : .off
+            return true
+        case #selector(aiExpandAction(_:)), #selector(generateMapAction(_:)),
+            #selector(aiSummarizeBranchAction(_:)), #selector(aiRewriteTitlesAction(_:)),
+            #selector(aiSuggestTitleAction(_:)):
+            // F-AI-1: with AI off entirely the items hide, not just
+            // disable — see AIController.menuAvailable and the AI
+            // menu's delegate in AppDelegate.
+            menuItem.isHidden = !ai.menuAvailable
+            return ai.menuAvailable
+        case #selector(aiToggleNeverSendToCloudAction(_:)):
+            menuItem.state = ai.neverSendToCloud ? .on : .off
             return true
         case #selector(deleteSubtreeAction(_:)), #selector(deleteNodeOnlyAction(_:)),
             #selector(addChildAction(_:)), #selector(addSiblingBelow(_:)),

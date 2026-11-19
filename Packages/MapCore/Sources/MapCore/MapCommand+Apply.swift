@@ -291,6 +291,11 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             model.nodes[id]?.link = link
+        case .setAIPolicy(let policy):
+            model.ai = policy
+
+        case .setTitle(let title):
+            model.title = title
         }
     }
 

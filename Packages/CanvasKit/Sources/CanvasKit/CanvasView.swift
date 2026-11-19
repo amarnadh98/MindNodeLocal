@@ -58,6 +58,14 @@ public final class CanvasView: NSView {
         scene = newScene
     }
 
+    /// F-AI-2 ghost suggestions: AI-proposed children rendered as a
+    /// dashed, 50%-opacity overlay — never model nodes until accepted.
+    /// The public surface lives in CanvasView+Ghosts.swift; the storage
+    /// + overlay here because the camera path must re-pin it.
+    var ghostStorage: GhostPresentation?
+
+    let ghostOverlay = GhostOverlay()
+
     public var camera: Camera {
         didSet {
             guard camera != oldValue else { return }
@@ -69,6 +77,7 @@ public final class CanvasView: NSView {
                 camera: camera, viewport: bounds.size, backingScale: backingScale)
             ensureTreeHosted()
             nodeTextEditor.syncPosition()
+            ghostOverlay.updateCamera(camera: camera)
             needsDisplay = true
             // F-CAN-8: the host debounces a view-state save per camera
             // move; the camera itself is not model state.
@@ -118,6 +127,10 @@ public final class CanvasView: NSView {
     /// its MapStore — one undo step — and keeps the selection on the
     /// given ids. The view never mutates the model.
     public var onDrop: ((MapCommand?, Set<String>) -> Void)?
+
+    /// F-AI-2: called when the user clicks a ghost suggestion — the
+    /// host accepts exactly that one suggestion (one undo step).
+    public var onGhostAccept: ((String) -> Void)?
 
     /// Drag state (F-EDT-5); the interaction logic lives in
     /// CanvasView+Drag.swift.
@@ -396,6 +409,13 @@ public final class CanvasView: NSView {
         // Double-click: a node edits its title (F-EDT-2); empty canvas
         // creates a floating root at the point (F-CAN-5) instead of
         // rubber-banding.
+        // F-AI-2: a click on a ghost suggestion accepts that one
+        // suggestion — before real-node hit-testing, so the click
+        // never selects the node underneath.
+        if let ghost = ghostID(at: point), let accept = onGhostAccept {
+            accept(ghost)
+            return
+        }
         if event.clickCount == 2 {
             if let id = nodeID(at: point) {
                 selection = [id]

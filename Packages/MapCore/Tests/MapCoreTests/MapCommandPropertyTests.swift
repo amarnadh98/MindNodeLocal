@@ -138,6 +138,12 @@ struct CommandPropertyTests {
                         id: nodeID,
                         index: generator.next() % 2 == 0 ? Int(generator.next() % 8) : nil)
                 ]),
+            .setAIPolicy(
+                policy: generator.next() % 2 == 0
+                    ? DocumentAIPolicy(neverSendToCloud: generator.next() % 2 == 0)
+                    : nil),
+            .setNote(id: nodeID, note: generator.next() % 2 == 0 ? "note \(generator.next())" : nil),
+            .setTitle(generator.next() % 2 == 0 ? "title \(generator.next())" : nil),
             (try? MapCommand.duplicate(id: nodeID, in: model)),
             // M6 (F-PRE-2/3): a wholesale presentation-list replace; the
             // inverse restores the pre-state list exactly.

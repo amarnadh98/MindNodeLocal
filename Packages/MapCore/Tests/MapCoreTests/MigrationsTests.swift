@@ -6,13 +6,35 @@ import Testing
 /// SPEC §8.4: a fixture-backed migration test for every version step
 /// ever shipped. v1 → v2 back-fills the persistent branch palette index
 /// positionally (ADR-0009) so pre-v2 files keep their on-screen colors.
+/// v2 → v3 only stamps the version: the v3 schema additions
+/// (`MapModel.ai`, `Node.note` editing) are optional.
 struct MigrationsTests {
     @Test func v1FixtureMigratesExactlyToTheV2Fixture() throws {
         let v1 = try decodeFixture("map-v1")
-        let migrated = try Migrations.migrate(v1, from: 1)
+        let migrated = Migrations.v1ToV2(v1)
         let v2 = try decodeFixture("map-v2")
         #expect(migrated == v2)
         #expect(migrated.formatVersion == 2)
+    }
+
+    @Test func v2FixtureMigratesExactlyToTheV3Fixture() throws {
+        let v2 = try decodeFixture("map-v2")
+        let migrated = try Migrations.migrate(v2, from: 2)
+        let v3 = try decodeFixture("map-v3")
+        #expect(migrated == v3)
+        #expect(migrated.formatVersion == 3)
+        // The optional AI policy stays unset: old files carry no
+        // restriction (SPEC §12).
+        #expect(migrated.ai == nil)
+    }
+
+    @Test func v1MigratesThroughEveryStepToCurrent() throws {
+        let v1 = try decodeFixture("map-v1")
+        let migrated = try Migrations.migrate(v1, from: 1)
+        #expect(migrated.formatVersion == ArborFormat.formatVersion)
+        // Compose the steps by hand: the result must be identical.
+        let composed = Migrations.v2ToV3(Migrations.v1ToV2(v1))
+        #expect(migrated == composed)
     }
 
     @Test func migrationIsIdempotent() throws {
@@ -48,6 +70,14 @@ struct MigrationsTests {
         #expect(throws: ArborError.self) {
             _ = try Migrations.migrate(model, from: 0)
         }
+    }
+
+    @Test func v3AIPolicyFixtureDecodesAndRoundTrips() throws {
+        let fixture = try decodeFixture("map-v3-ai-policy")
+        #expect(fixture.formatVersion == 3)
+        #expect(fixture.ai?.neverSendToCloud == true)
+        let roundTripped = try MapDocumentCoder.roundTrip(fixture)
+        #expect(roundTripped == fixture)
     }
 
     private func decodeFixture(_ name: String) throws -> MapModel {

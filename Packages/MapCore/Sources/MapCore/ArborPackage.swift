@@ -221,6 +221,8 @@ public enum Migrations {
         switch version {
         case 1:
             return v1ToV2(model)
+        case 2:
+            return v2ToV3(model)
         default:
             return model
         }
@@ -244,6 +246,16 @@ public enum Migrations {
             }
         }
         migrated.formatVersion = 2
+        return migrated
+    }
+
+    /// v2 → v3: `MapModel.ai` (the per-document AI policy, SPEC §12)
+    /// and `Node.note` editing are optional schema additions, so no
+    /// back-fill is needed — the step only stamps the version, keeping
+    /// every existing field byte-compatible.
+    static func v2ToV3(_ model: MapModel) -> MapModel {
+        var migrated = model
+        migrated.formatVersion = 3
         return migrated
     }
 }

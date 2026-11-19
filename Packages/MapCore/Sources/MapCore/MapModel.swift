@@ -251,6 +251,10 @@ public struct MapModel: Codable, Sendable, Hashable {
     public var studySettings: StudySettings?
     public var view: ViewState?
     public var filters: [SavedFilter]?
+    /// Per-document AI policy (SPEC §12, F-AI-1): optional so pre-v3
+    /// files decode unchanged (nil = no restriction). Mutations go
+    /// through `MapCommand.setAIPolicy`.
+    public var ai: DocumentAIPolicy?
 
     public init(
         formatVersion: Int = ArborFormat.formatVersion,
@@ -268,7 +272,8 @@ public struct MapModel: Codable, Sendable, Hashable {
         presentations: [Presentation]? = nil,
         studySettings: StudySettings? = nil,
         view: ViewState? = nil,
-        filters: [SavedFilter]? = nil
+        filters: [SavedFilter]? = nil,
+        ai: DocumentAIPolicy? = nil
     ) {
         self.formatVersion = formatVersion
         self.docID = docID
@@ -286,6 +291,7 @@ public struct MapModel: Codable, Sendable, Hashable {
         self.studySettings = studySettings
         self.view = view
         self.filters = filters
+        self.ai = ai
     }
 
     public static func emptyDocument(docID: String = UUID().uuidString) -> MapModel {
