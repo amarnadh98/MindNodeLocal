@@ -19,12 +19,17 @@ enum DocumentQuickLook {
     /// The thumbnail's long edge, per SPEC §5.16 F-INT-3.
     static let thumbnailLongEdgePixels = 512
 
-    /// Renders both preview payloads for `model`.
+    /// Renders both preview payloads for `model`. Theme resolution goes
+    /// through the catalog so user-themed documents preview in their
+    /// own colors (F-STY-5).
+    @MainActor
     static func renderPayloads(
         model: MapModel, variant: ThemeVariant,
         measurer: TextMeasurer = SceneRenderer.sharedMeasurer
     ) throws -> (thumbnail: Data, preview: Data) {
-        let scene = SceneGeometry.build(model: model, variant: variant, measurer: measurer)
+        let scene = SceneGeometry.build(
+            model: model, variant: variant, measurer: measurer,
+            theme: ThemeCatalog.shared.theme(for: model))
         var thumbnailOptions = ImageExportOptions(format: .png, targetLongEdgePixels: thumbnailLongEdgePixels)
         thumbnailOptions.margin = 12
         let thumbnail = try ImageExporter.export(scene: scene, model: model, options: thumbnailOptions)
@@ -41,6 +46,7 @@ enum DocumentQuickLook {
     /// Quick Look directory, replacing yesterday's entries. Failure is
     /// deliberately non-fatal: a save must never fail because a preview
     /// could not be drawn.
+    @MainActor
     static func attachPreviews(
         to root: FileWrapper, model: MapModel, variant: ThemeVariant,
         measurer: TextMeasurer = SceneRenderer.sharedMeasurer

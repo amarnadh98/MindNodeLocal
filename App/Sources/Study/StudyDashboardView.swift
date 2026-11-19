@@ -16,6 +16,7 @@ struct StudyDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                caughtUpBanner
                 statRow
                 decksSection
                 forecastSection
@@ -26,6 +27,34 @@ struct StudyDashboardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Study Dashboard")
+    }
+
+    /// F-ONB-3's Study empty state — celebratory, not an apology: a
+    /// clear day is the product working.
+    @ViewBuilder
+    private var caughtUpBanner: some View {
+        if snapshot.dueToday == 0 {
+            HStack(spacing: 12) {
+                Image(systemName: "party.popper")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.green)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("All caught up!")
+                        .font(.title3.weight(.semibold))
+                    Text("Nothing is due today. The forecast below shows what's coming.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "All caught up. Nothing is due today.")
+        }
     }
 
     private var statRow: some View {

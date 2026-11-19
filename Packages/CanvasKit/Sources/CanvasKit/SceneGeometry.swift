@@ -184,18 +184,24 @@ public enum SceneGeometry {
     public static let rootStackGap: CGFloat = 120
 
     /// Full rebuild, keeping no caches (tests, probes, one-shot callers).
+    /// `theme` overrides the model's theme selection — the theme editor's
+    /// live preview renders a draft theme no document stores yet, and the
+    /// app resolves user themes (`.arbortheme` files) through its catalog
+    /// before handing the value here.
     public static func build(
         model: MapModel,
         variant: ThemeVariant,
         measurer: TextMeasurer,
         spacing: LayoutSpacing = .default,
         showsTagPills: Bool = true,
-        editingTitle: (id: String, title: NodeTitle)? = nil
+        editingTitle: (id: String, title: NodeTitle)? = nil,
+        theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
             showsTagPills: showsTagPills, editingTitle: editingTitle,
-            cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil)
+            cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil,
+            theme: theme)
     }
 
     /// Full rebuild that also fills `cache`, so later small changes can
@@ -207,11 +213,13 @@ public enum SceneGeometry {
         measurer: TextMeasurer,
         spacing: LayoutSpacing = .default,
         showsTagPills: Bool = true,
-        editingTitle: (id: String, title: NodeTitle)? = nil
+        editingTitle: (id: String, title: NodeTitle)? = nil,
+        theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: nil)
+            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: nil,
+            theme: theme)
     }
 
     /// Incremental rebuild after a small change (SPEC §11.3): reuses the
@@ -232,16 +240,18 @@ public enum SceneGeometry {
         spacing: LayoutSpacing = .default,
         dirty: Set<String>,
         showsTagPills: Bool = true,
-        editingTitle: (id: String, title: NodeTitle)? = nil
+        editingTitle: (id: String, title: NodeTitle)? = nil,
+        theme: Theme? = nil
     ) -> CanvasScene {
         guard cache.variant == variant, cache.spacing == spacing else {
             return build(
                 model: model, variant: variant, measurer: measurer, spacing: spacing,
-                editingTitle: editingTitle)
+                showsTagPills: showsTagPills, editingTitle: editingTitle, theme: theme)
         }
         return buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: dirty)
+            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: dirty,
+            theme: theme)
     }
 
     // MARK: core build
@@ -254,11 +264,14 @@ public enum SceneGeometry {
         showsTagPills: Bool,
         editingTitle: (id: String, title: NodeTitle)?,
         cache: SceneBuildCache,
-        dirty: Set<String>?
+        dirty: Set<String>?,
+        theme explicitTheme: Theme? = nil
     ) -> CanvasScene {
         // F-STY-3/F-STY-4: styles resolve from the document's theme
         // selection (default Paper) at the current appearance variant.
-        let theme = BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
+        // F-STY-5: an explicit theme wins — the theme editor's draft and
+        // the app's user-theme catalog both resolve before this point.
+        let theme = explicitTheme ?? BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
         var cursorY: CGFloat = 0

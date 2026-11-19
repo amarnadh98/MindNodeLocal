@@ -40,7 +40,11 @@ final class MapDocument: NSDocument {
 
     override init() {
         let manager = UndoManager()
-        store = MapStore(model: MapModel.emptyDocument(), undoManager: manager)
+        var model = MapModel.emptyDocument()
+        // F-STY-6: new documents start in the Settings ▸ General
+        // default theme (Paper until the user picks otherwise).
+        model.theme = ThemeSelection(id: ThemeCatalog.defaultThemeID)
+        store = MapStore(model: model, undoManager: manager)
         super.init()
         // The store's manager must be the document's, so Edit ▸ Undo and
         // NSDocument's own change-count integration see the same stacks.

@@ -224,6 +224,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             }
             canvas.setSelection([rootID])
             canvas.beginEditing(nodeID: rootID, placeholder: "Central Idea")
+            // F-ONB-4: the keyboard-first tip rides the brand-new
+            // document's first frame.
+            showTipOnce(TipCenter.keyboardFirstTip)
         }
         // The camera may not have changed (a restored state that equals
         // the default never fired `onCameraChange`), so seed the minimap
@@ -301,7 +304,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
             showsTagPills: showsTagPills,
-            editingTitle: editingDraftTitle)
+            editingTitle: editingDraftTitle,
+            theme: ThemeCatalog.shared.theme(for: model))
         canvas.scene = scene
         // F-CAN-6: the minimap mirrors the rebuilt scene (its cached
         // image re-renders here, on scene change only).
@@ -334,7 +338,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             variant: currentVariant(),
             measurer: SceneRenderer.sharedMeasurer,
             dirty: [id],
-            editingTitle: editingDraftTitle)
+            editingTitle: editingDraftTitle,
+            theme: ThemeCatalog.shared.theme(for: model))
         canvas.scene = scene
         canvas.dragModel = model
     }
@@ -374,7 +379,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 variant: currentVariant(),
                 measurer: SceneRenderer.sharedMeasurer,
                 dirty: dirty,
-                editingTitle: editingDraftTitle)
+                editingTitle: editingDraftTitle,
+                theme: ThemeCatalog.shared.theme(for: model))
             canvas.scene = scene
             canvas.dragModel = model
         } else {
@@ -399,6 +405,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         window?.title = document?.displayName ?? window?.title ?? ""
         // M6 (F-PRE-2): authored slide changes rebuild the sidebar.
         refreshSlidesSidebar()
+        // F-ONB-4: a map crossing the fold-tip threshold gets (at most)
+        // the session's one tip.
+        showMapGrewTipIfNeeded(nodeCount: model.nodes.count)
     }
 
     // MARK: view state (F-CAN-8, ADR-0005)
@@ -664,7 +673,8 @@ extension DocumentWindowController {
         var probe = store.model
         try? MapCommand.addRoot(index: nil, node: node).apply(to: &probe)
         let probeScene = SceneGeometry.build(
-            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer)
+            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: probe))
         let autoFrame = probeScene.nodes[node.id]?.frame ?? .zero
         let offset = ModelOffset(
             x: modelPoint.x - autoFrame.midX,

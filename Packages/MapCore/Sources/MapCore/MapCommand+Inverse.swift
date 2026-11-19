@@ -215,6 +215,11 @@ extension MapCommand {
         case .setTheme:
             return .setTheme(id: model.theme?.id)
 
+        case .setAppearance:
+            // Exact snapshot: auto and a missing value are the same
+            // state, normalized so undo restores what the file stored.
+            return .setAppearance(mode: model.appearance ?? .auto)
+
         case .setPresentations:
             // Exact snapshot of the pre-state list (`nil` included).
             return .setPresentations(model.presentations)

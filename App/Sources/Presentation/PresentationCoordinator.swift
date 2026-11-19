@@ -80,7 +80,8 @@ final class PresentationCoordinator {
     static func resolveDeck(model: MapModel, variant: ThemeVariant) -> [ResolvedSlide] {
         let unfolded = PresentationGeometry.applyingFoldState([], to: model)
         let scene = SceneGeometry.build(
-            model: unfolded, variant: variant, measurer: SceneRenderer.sharedMeasurer)
+            model: unfolded, variant: variant, measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: model))
         if let authored = (model.presentations ?? []).first(where: { !$0.slides.isEmpty }) {
             return PresentationGeometry.resolve(presentation: authored, scene: scene)
         }
@@ -268,7 +269,8 @@ final class PresentationCoordinator {
         let derived = PresentationGeometry.applyingFoldState(slide.folded, to: store.model)
         let scene = SceneGeometry.build(
             model: derived, variant: windowController.currentVariant(),
-            measurer: SceneRenderer.sharedMeasurer)
+            measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: store.model))
         let camera = slide.camera(
             for: view.bounds.size, scene: scene, margin: Self.presentationCameraMargin)
         let engine = RevealEngine(
@@ -353,13 +355,15 @@ final class PresentationCoordinator {
         guard let slide, let camera else { return }
         let scene = SceneGeometry.build(
             model: PresentationGeometry.applyingFoldState(slide.folded, to: store.model),
-            variant: variant, measurer: SceneRenderer.sharedMeasurer)
+            variant: variant, measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: store.model))
         var nextScene: CanvasScene?
         var nextCamera: Camera?
         if let next {
             let scene2 = SceneGeometry.build(
                 model: PresentationGeometry.applyingFoldState(next.folded, to: store.model),
-                variant: variant, measurer: SceneRenderer.sharedMeasurer)
+                variant: variant, measurer: SceneRenderer.sharedMeasurer,
+                theme: ThemeCatalog.shared.theme(for: store.model))
             nextScene = scene2
             nextCamera = next.camera(
                 for: CGSize(width: 320, height: 180), scene: scene2, margin: Self.presentationCameraMargin)

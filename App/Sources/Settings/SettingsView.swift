@@ -1,4 +1,5 @@
 import AppKit
+import MapRender
 import SwiftUI
 
 /// The Settings window's tab catalog (SPEC §5.20 F-SET). Every tab in
@@ -67,6 +68,14 @@ struct SettingsView: View {
     /// Settings ▸ AI (F-AI-1): the AI slice's own pane, hosted as a tab.
     @StateObject private var aiModel = AISettingsModel()
     @State private var automaticUpdateChecks = AppUpdater.shared.automaticallyChecks
+    /// F-STY-6/5: the themes the pickers offer (built-ins + user
+    /// themes), re-read when the tab appears so an import shows up.
+    @State private var knownThemes: [MapRender.Theme] = []
+    /// F-STY-6: the default theme for new documents.
+    @State private var defaultThemeID = ThemeCatalog.defaultThemeID
+    /// F-STY-5: the theme chosen for the Themes tab's Export row.
+    @State private var exportThemeID = BuiltInThemes.defaultID
+    @State private var themesStatus = ""
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -78,12 +87,21 @@ struct SettingsView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .frame(minWidth: 620, minHeight: 460)
+        .onAppear { reloadThemes() }
         .onChange(of: smartTyping) { applyEditorTypingPreferences() }
         .onChange(of: spellCheck) { applyEditorTypingPreferences() }
         .onChange(of: showsMinimap) { applyMinimapPreference(showsMinimap) }
         .onChange(of: menuBarExtra) {
             QuickEntryCoordinator.shared.setMenuBarExtra(menuBarExtra)
         }
+    }
+
+    /// F-STY-5/6: the catalog re-reads its folder so an import or a
+    /// theme-editor save is reflected immediately.
+    private func reloadThemes() {
+        ThemeCatalog.shared.reload()
+        knownThemes = ThemeCatalog.shared.themes
+        defaultThemeID = ThemeCatalog.defaultThemeID
     }
 
     /// The AI tab hosts the AI slice's pane (its own grouped Form);
@@ -105,9 +123,7 @@ struct SettingsView: View {
         switch tab {
         case .general:
             wiredToggle("Restore windows", isOn: $restoreWindows)
-            unavailable(
-                "Default theme",
-                note: "Documents remember their theme; a new-document default ships with the themes slice.")
+            defaultThemeRow
             unavailable("Default structure", note: "Only the balanced map structure is built so far.")
             unavailable("New-document location", note: "New maps stay in the standard Documents flow.")
             unavailable("Open Library at launch", note: "Open it from Window ▸ Library (⇧⌘L).")
@@ -124,11 +140,7 @@ struct SettingsView: View {
             unavailable("Show status bar", note: "Not built yet.")
             unavailable("Reduced motion override", note: "Follows the system setting for now.")
         case .themes:
-            unavailable(
-                "Manage, import, export",
-                note:
-                    "Twelve built-in themes are available per document; theme import/export ships with the Library milestone."
-            )
+            themeManagementRows
         case .shortcuts:
             hotkeyRow
             wiredToggle("Quick Entry in menu bar", isOn: $menuBarExtra)
@@ -160,7 +172,7 @@ struct SettingsView: View {
             unavailable("Beta channel", note: "Only the stable appcast is published.")
         case .advanced:
             unavailable("Rebuild index", note: "Use Library ▸ Advanced ▸ Rebuild Index.")
-            unavailable("Reset tips", note: "No tips store exists yet.")
+            resetTipsRow
             unavailable("Export diagnostics", note: "Planned in a later milestone.")
             unavailable("File-format pretty-print", note: "map.json is always written pretty-printed.")
         }
@@ -203,6 +215,142 @@ struct SettingsView: View {
     /// A row whose toggle writes a real key the owning feature reads.
     private func wiredToggle(_ title: String, isOn binding: Binding<Bool>) -> some View {
         Toggle(title, isOn: binding)
+    }
+
+    // MARK: F-STY-6 default theme (General)
+
+    /// The default theme picker (F-STY-6): new documents start here
+    /// (MapDocument reads the same key when it builds a fresh model).
+    private var defaultThemeRow: some View {
+        Picker("Default theme", selection: $defaultThemeID) {
+            ForEach(knownThemes, id: \.id) { theme in
+                Text(theme.name).tag(theme.id)
+            }
+        }
+        .onChange(of: defaultThemeID) { _, newValue in
+            ThemeCatalog.defaultThemeID = newValue
+        }
+        .accessibilityLabel("Default theme for new documents")
+    }
+
+    // MARK: F-STY-5 manage / import / export (Themes)
+
+    /// The Themes tab: manage, import, export rows (SPEC §5.20).
+    private var themeManagementRows: some View {
+        Section("Themes") {
+            LabeledContent("Themes folder") {
+                Button("Open in Finder") { openThemesFolder() }
+            }
+            LabeledContent("Import theme…") {
+                Button("Choose File…") { importTheme() }
+            }
+            exportThemeRow
+            if !userThemes.isEmpty {
+                userThemeList
+            }
+            if !themesStatus.isEmpty {
+                Text(themesStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var exportThemeRow: some View {
+        LabeledContent("Export theme…") {
+            HStack {
+                Picker("", selection: $exportThemeID) {
+                    ForEach(knownThemes, id: \.id) { theme in
+                        Text(theme.name).tag(theme.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 200)
+                Button("Export…") { exportTheme() }
+            }
+        }
+    }
+
+    /// User themes with per-row default/delete (built-ins are
+    /// read-only app data).
+    private var userThemeList: some View {
+        Section("Your themes") {
+            ForEach(userThemes, id: \.id) { theme in
+                LabeledContent(theme.name) {
+                    HStack {
+                        Button("Make Default") {
+                            defaultThemeID = theme.id
+                            ThemeCatalog.defaultThemeID = theme.id
+                            themesStatus = "New maps start in \(theme.name)."
+                        }
+                        Button("Delete", role: .destructive) { deleteUserTheme(theme) }
+                    }
+                }
+            }
+        }
+    }
+
+    private var userThemes: [Theme] {
+        knownThemes.filter { theme in !BuiltInThemes.all.contains { $0.id == theme.id } }
+    }
+
+    private func openThemesFolder() {
+        try? FileManager.default.createDirectory(
+            at: ThemeCatalog.shared.directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(ThemeCatalog.shared.directory)
+    }
+
+    private func importTheme() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [ThemeCatalog.themeType]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let installed = try ThemeCatalog.shared.install(from: url)
+            reloadThemes()
+            themesStatus = "Installed \(installed.name)."
+        } catch {
+            themesStatus = "The theme file could not be read."
+        }
+    }
+
+    private func exportTheme() {
+        guard let theme = knownThemes.first(where: { $0.id == exportThemeID }) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [ThemeCatalog.themeType]
+        panel.nameFieldStringValue =
+            ThemeCatalog.sanitizedName(theme.name, fallback: theme.id)
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ThemeCatalog.shared.export(theme, to: url)
+            themesStatus = "Exported \(theme.name)."
+        } catch {
+            themesStatus = "The theme could not be exported."
+        }
+    }
+
+    private func deleteUserTheme(_ theme: Theme) {
+        try? ThemeCatalog.shared.deleteUserTheme(id: theme.id)
+        reloadThemes()
+        if defaultThemeID == theme.id {
+            defaultThemeID = BuiltInThemes.defaultID
+            ThemeCatalog.defaultThemeID = BuiltInThemes.defaultID
+        }
+    }
+
+    // MARK: F-ONB-4 reset tips (Advanced)
+
+    /// Settings ▸ Advanced ▸ Reset tips: every "Got it" goes, so
+    /// contextual tips may show again from the next session.
+    private var resetTipsRow: some View {
+        LabeledContent("Reset tips") {
+            Button("Reset") {
+                TipCenter.resetAllDismissed()
+                themesStatus = ""
+            }
+        }
     }
 
     /// A row whose feature is not built: shown, disabled, honest.

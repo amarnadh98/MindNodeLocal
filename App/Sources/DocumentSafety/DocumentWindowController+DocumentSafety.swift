@@ -79,6 +79,9 @@ extension DocumentWindowController {
             #selector(unfoldOneLevelAction(_:)), #selector(showLevelsAction(_:)),
             #selector(makeStudyDeckAction(_:)), #selector(setCardPolicyAction(_:)),
             #selector(makeClozeAction(_:)),
+            // F-STY-5/6: the theme editor's Apply performs a command,
+            // and the appearance override writes the model.
+            #selector(editThemeAction(_:)), #selector(setAppearanceAction(_:)),
             #selector(NSText.cut(_:)), #selector(NSText.paste(_:)):
             return false
         default:

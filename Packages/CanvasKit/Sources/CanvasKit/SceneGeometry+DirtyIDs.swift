@@ -54,6 +54,10 @@ extension SceneGeometry {
         case .setTheme:
             // Every node's font and padding may change: full rebuild.
             return nil
+        case .setAppearance:
+            // The variant the whole scene resolves in may flip: full
+            // rebuild (F-STY-6).
+            return nil
         case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches,
             .setPresentations, .setAIPolicy, .setTitle,
             // F-REL-1/2/3: the fine-grained relation edits are post-layout
