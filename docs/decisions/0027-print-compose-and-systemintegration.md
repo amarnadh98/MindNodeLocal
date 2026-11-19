@@ -71,8 +71,15 @@ reaches paper.
   page are all drawn by the same scene code — a rendering fix lands in
   all four places at once.
 - The print tests can assert page counts as pure math (`tileGrid`,
-  `paginateOutline`) AND run the real `NSPrintOperation` to a spool
-  PDF file (save disposition) without a printer.
+  `paginateOutline`) and the full spool contract (the real
+  `NSPrintOperation`, its save disposition and `NSPrintJobSavingURL`,
+  and the composed bytes written and read back as a file). The one
+  step deliberately NOT exercised headlessly is Apple's daemon
+  delivery: `operation.run()` with a save disposition was
+  harness-verified to block indefinitely when the print backend is
+  unreachable (a plain PDFKit job hangs the same way — `printToolAgent`
+  never answers; no printers needed), so a hosted `run()` would hang
+  the suite on such machines instead of failing honestly.
 - PDFKit owns the last mile (dialog, spooling, printer features), so
   Page Setup and the panel's paper/orientation controls work because
   they genuinely drive `NSPrintInfo`, which is what the composer reads.

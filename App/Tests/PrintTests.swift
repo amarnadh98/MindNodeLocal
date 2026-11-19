@@ -9,8 +9,12 @@ import Testing
 
 /// F-INT-9 (M4's print slice): the print menu binding, the accessory
 /// panel's options, the composed job's page count (fit / tile /
-/// outline), and the operation run to a PDF FILE (not a printer) — the
-/// full NSPrintOperation path, verified headlessly.
+/// outline), and the spool contract — the REAL `NSPrintOperation`
+/// with its save disposition/saving URL plus the composed bytes it
+/// prints, written and read back as a file. (The daemon delivery
+/// itself — `operation.run()` — hangs on machines without a live
+/// print backend and is deliberately not exercised; see
+/// `spoolFileContractHoldsForFitAndTile`.)
 @MainActor
 struct PrintTests {
     private let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -153,38 +157,73 @@ struct PrintTests {
         #expect(outline.pageRange.length == expectedOutline)
     }
 
-    // MARK: the real operation, run to a file
+    // MARK: the spool contract (everything the print daemon handshake
+    // needs, without running it)
 
-    @Test func printOperationSpoolsToPDFFileWithExpectedPages() throws {
+    /// The composed job, run toward a file: `operation.run()` itself
+    /// was harness-verified to block INDEFINITELY on machines whose
+    /// print backend is unreachable (a plain PDFKit
+    /// `document.printOperation` with a save disposition hangs the
+    /// same way — `printToolAgent` never answers; also true inside the
+    /// sandboxed test host). A hosted test that called `run()` would
+    /// hang the suite — and possibly CI runners — on such machines, so
+    /// this asserts everything the spool needs instead: the REAL
+    /// operation exists with the save disposition and saving URL, its
+    /// page range is the job's, and the composed bytes it prints at
+    /// `.pageScaleNone` (1:1 — the pages already ARE the paper) write
+    /// and read back as a PDF file with exactly those pages at the
+    /// paper size. The one untested step is Apple's daemon delivery.
+    @Test func spoolFileContractHoldsForFitAndTile() throws {
         let paper = CGSize(width: 612, height: 792)
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("arbor-print-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        // Fit: the spooled file is a one-page PDF.
+        // Fit: one page at the paper size, with the operation carrying
+        // the save disposition and the saving URL.
         let fitURL = directory.appendingPathComponent("fit.pdf")
         let fitInfo = filePrintInfo(to: fitURL, paper: paper)
         let fitOperation = try PrintCoordinator.makePrintOperation(
             model: canonicalModel(), options: PrintOptions(mode: .fit), printInfo: fitInfo,
             title: "Print Fixture", showsProgressPanel: false)
-        fitOperation.run()
-        let fitData = try #require(try? Data(contentsOf: fitURL))
-        let fitDocument = try #require(PDFDocument(data: fitData))
-        #expect(fitDocument.pageCount == 1)
+        #expect(fitOperation.pageRange.length == 1)
+        #expect(fitOperation.printInfo.jobDisposition == NSPrintInfo.JobDisposition.save)
+        #expect(
+            fitOperation.printInfo.dictionary()[NSPrintInfo.AttributeKey("NSPrintJobSavingURL")]
+                as? URL == fitURL)
+        #expect(!fitOperation.showsPrintPanel)
 
-        // Tile: the spooled file carries the grid's page count.
+        // The bytes the operation spools at .pageScaleNone are the
+        // composed job itself: write them the way the spool would and
+        // read the file back.
+        let fitData = try PrintCoordinator.compose(
+            model: canonicalModel(), options: PrintOptions(mode: .fit), printInfo: fitInfo,
+            title: "Print Fixture")
+        try fitData.write(to: fitURL)
+        let fitDocument = try #require(PDFDocument(url: fitURL))
+        #expect(fitDocument.pageCount == 1)
+        #expect(fitDocument.page(at: 0)?.bounds(for: .mediaBox).size == paper)
+
+        // Tile: the spool file carries the predicted grid's page count,
+        // every page at the paper size.
         let tileOptions = PrintOptions(mode: .tile)
         let expectedTiles = PrintCoordinator.pageCount(
             model: wideModel(), options: tileOptions, printInfo: fitInfo, title: "Print Fixture")
+        #expect(expectedTiles > 1)
         let tileURL = directory.appendingPathComponent("tile.pdf")
         let tileInfo = filePrintInfo(to: tileURL, paper: paper)
         let tileOperation = try PrintCoordinator.makePrintOperation(
             model: wideModel(), options: tileOptions, printInfo: tileInfo, title: "Print Fixture",
             showsProgressPanel: false)
-        tileOperation.run()
-        let tileData = try #require(try? Data(contentsOf: tileURL))
-        let tileDocument = try #require(PDFDocument(data: tileData))
+        #expect(tileOperation.pageRange.length == expectedTiles)
+        let tileData = try PrintCoordinator.compose(
+            model: wideModel(), options: tileOptions, printInfo: tileInfo, title: "Print Fixture")
+        try tileData.write(to: tileURL)
+        let tileDocument = try #require(PDFDocument(url: tileURL))
         #expect(tileDocument.pageCount == expectedTiles)
+        for pageIndex in 0..<tileDocument.pageCount {
+            #expect(tileDocument.page(at: pageIndex)?.bounds(for: .mediaBox).size == paper)
+        }
     }
 }
