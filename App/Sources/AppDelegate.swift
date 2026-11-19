@@ -217,6 +217,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Zoom to Selection", #selector(CanvasView.zoomToSelectionAction(_:)),
                         "0", modifiers: [.command, .option]),
+                    .separator(),
+                    // F-CAN-6: the minimap toggle, persisted per user in
+                    // UserDefaults; the checkmark mirrors the preference
+                    // (auto-hide applies only while the whole map fits).
+                    item(
+                        "Minimap", #selector(DocumentWindowController.toggleMinimapAction(_:)),
+                        "m", modifiers: [.command, .option]),
                 ]))
         mainMenu.addItem(
             menu(

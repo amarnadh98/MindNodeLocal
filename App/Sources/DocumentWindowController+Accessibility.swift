@@ -26,7 +26,7 @@ extension DocumentWindowController {
         hooks.onAddSibling = { [weak self] id in
             guard let self else { return }
             self.canvas.setSelection([id])
-            self.addSiblingBelow()
+            self.addSiblingBelow(nil)
         }
         hooks.onToggleFold = { [weak self] id in
             guard let self else { return }

@@ -23,6 +23,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private var viewStateSaveTask: Task<Void, Never>?
 
+    /// F-CAN-6: the minimap overlay, anchored bottom-right of the canvas
+    /// and installed by `installChrome()` (DocumentWindowController+Toolbar).
+    var minimap: MinimapView?
+
+    /// The document toolbar (§4.1), kept so selection changes can
+    /// re-validate its items.
+    var documentToolbar: NSToolbar?
+
+    /// The zoom % pull-down's button, synced on camera moves.
+    var zoomPopupButton: NSButton?
+
     /// The pasteboard flavours written by copy/cut (F-EDT-9): the
     /// internal lossless payload plus the three interop texts.
     private static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
@@ -56,9 +67,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
         canvas.onCameraChange = { [weak self] in
             self?.scheduleViewStateSave()
+            // F-CAN-6: the minimap re-strokes its viewport rect; the
+            // toolbar's zoom % follows.
+            self?.syncMinimapCamera()
         }
         canvas.onSelectionChange = { [weak self] _ in
             self?.scheduleViewStateSave()
+            // Toolbar/menu validation follows the selection.
+            self?.documentToolbar?.validateVisibleItems()
         }
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
@@ -74,6 +90,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             self?.performDragDrop(command, selection: selection)
         }
         setupAccessibility()
+        // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
+        installChrome()
     }
 
     required init?(coder: NSCoder) {
@@ -119,6 +137,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             canvas.setSelection([rootID])
             canvas.beginEditing(nodeID: rootID, placeholder: "Central Idea")
         }
+        // The camera may not have changed (a restored state that equals
+        // the default never fired `onCameraChange`), so seed the minimap
+        // and the zoom % once, then validate the toolbar.
+        syncMinimapCamera()
+        documentToolbar?.validateVisibleItems()
     }
 
     /// F-CAN-3: an untitled, still-empty document gets its placeholder
@@ -165,6 +188,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             measurer: SceneRenderer.sharedMeasurer,
             editingTitle: editingDraftTitle)
         canvas.scene = scene
+        // F-CAN-6: the minimap mirrors the rebuilt scene (its cached
+        // image re-renders here, on scene change only).
+        minimap?.scene = scene
         // The scene's source model, for drag-target resolution (F-EDT-5).
         canvas.dragModel = model
         if preserveCamera {
@@ -502,8 +528,8 @@ extension DocumentWindowController {
 
     /// Always creates a sibling below the selection, without ⏎'s
     /// enter-edit rule — for callers with no keyboard context, such as
-    /// VoiceOver's Add Sibling action.
-    func addSiblingBelow() {
+    /// VoiceOver's Add Sibling action and the toolbar button.
+    @objc func addSiblingBelow(_ sender: Any?) {
         addCommand { .addSibling(anchor: $0, before: false, node: $1) }
     }
 
