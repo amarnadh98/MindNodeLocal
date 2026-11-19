@@ -62,6 +62,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// DocumentWindowController+Presentation.swift.
     var presentationCoordinatorBox: PresentationCoordinator?
     var slidesSidebarBox: SlidesSidebarController?
+    /// The frontmost study session of this window (kept so hosted tests
+    /// and VoiceOver scripts can reach it; a new session replaces it).
+    var activeStudySession: StudySessionController?
 
     /// The pasteboard flavours written by copy/cut (F-EDT-9): the
     /// internal lossless payload plus the three interop texts.
@@ -313,7 +316,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         let model = mapDocument.store.model
         let command: MapCommand
         switch origin {
-        case .perform(let performed), .undo(let performed), .redo(let performed):
+        case .perform(let performed), .undo(let performed), .redo(let performed),
+            .nonUndoable(let performed):
             command = performed
         }
         let dirty = SceneGeometry.dirtyIDs(for: command, in: model)
@@ -337,6 +341,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-FOC: refresh the find matches and the dimming against the
         // post-change model.
         focusFind.sceneDidChange()
+        // F-STD-6: a live mastery overlay recolors after every change
+        // (a grading moves a card's retrievability bucket).
+        applyMasteryOverlay()
         window?.title = document?.displayName ?? window?.title ?? ""
         // M6 (F-PRE-2): authored slide changes rebuild the sidebar.
         refreshSlidesSidebar()

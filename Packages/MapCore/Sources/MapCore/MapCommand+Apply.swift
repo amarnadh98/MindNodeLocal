@@ -281,6 +281,11 @@ extension MapCommand {
             // builds the whole new list and groups the command under an
             // action name ("Add Slide", …), one undo step per action.
             model.presentations = presentations
+        case .setStudy(_, let id, let study):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.study = study
         }
     }
 

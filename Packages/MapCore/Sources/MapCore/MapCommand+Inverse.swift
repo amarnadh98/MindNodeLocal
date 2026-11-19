@@ -163,6 +163,11 @@ extension MapCommand {
         case .setPresentations:
             // Exact snapshot of the pre-state list (`nil` included).
             return .setPresentations(model.presentations)
+        case .setStudy(let name, let id, _):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setStudy(name: name, id: id, study: model.nodes[id]?.study)
         }
     }
 

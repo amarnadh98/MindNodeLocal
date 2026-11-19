@@ -269,11 +269,30 @@ public enum CardPolicy: String, Codable, Sendable {
 
 public struct NodeStudy: Codable, Sendable, Hashable {
     public var card: CardPolicy
+    /// The FSRS state of the node's **basic** card (`nodeID`, SPEC §10):
+    /// the field `map.json` has always had under `study.fsrs`.
     public var fsrs: FSRSState?
+    /// FSRS state of the node's non-basic cards, keyed by card key
+    /// (SPEC §10: "card state is stored on the node, keyed by card
+    /// subtype"): `"r"` reversed, `"cN"` each cloze index, `"s:<summaryID>"`
+    /// a summary card owned by this node. Optional, so files written
+    /// before the field decode with an empty map (ADR-0015).
+    public var fsrsByCard: [String: FSRSState]?
+    /// True on a branch node marked as a study deck (F-STD-1, ADR-0015):
+    /// nodes inside a deck follow the auto card rule. `nil` reads as
+    /// not-a-deck.
+    public var deck: Bool?
 
-    public init(card: CardPolicy = .auto, fsrs: FSRSState? = nil) {
+    public init(
+        card: CardPolicy = .auto,
+        fsrs: FSRSState? = nil,
+        fsrsByCard: [String: FSRSState]? = nil,
+        deck: Bool? = nil
+    ) {
         self.card = card
         self.fsrs = fsrs
+        self.fsrsByCard = fsrsByCard
+        self.deck = deck
     }
 }
 

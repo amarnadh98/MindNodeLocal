@@ -35,24 +35,54 @@ public struct Card: Sendable, Equatable, Hashable {
 /// - `on`: a basic card even for a bare leaf; the explicit marking also opts the
 ///   node into a reversed card (F-STD-2 "Reversed, optional") when the node has
 ///   answer content, so ids `nodeID` and `nodeID#r` travel together.
-/// - `auto` (or unset): a basic card iff the node has children or a note —
-///   "a node becomes a card if it has children or a note; leaf nodes without a
-///   note are not cards by default" (F-STD-1).
+/// - `auto` (or unset): the F-STD-1 rule — a basic card iff the node is
+///   **inside a branch marked Study** (`study.deck`, the "Make Study
+///   Deck" flag on an ancestor or the node itself) and it has children
+///   or a note; "leaf nodes without a note are not cards by default".
 ///
 /// Cloze markup in a title or note is explicit intent, so cloze cards are
-/// derived whenever the node is not `off`, regardless of the auto rule; one
-/// card per distinct deletion index, emitted in ascending index order.
-/// Summary cards come from `summaries`: the sibling range is the prompt, the
-/// summary node's title the answer; the summary node can opt out with `off`.
+/// derived whenever the node is not `off`, regardless of decks or the auto
+/// rule; one card per distinct deletion index, emitted in ascending index
+/// order. Summary cards follow the deck of the range's parent (the summary
+/// node can opt out with `off`).
+///
+/// Three scopes, all outline-ordered:
+/// - `extract(from:)` — the document's cards: auto respects deck marks.
+///   This is what "Study Due", the dashboard and the mastery overlay see.
+/// - `extractAll(from:)` — a whole-document session ("Study Document"):
+///   the document itself is the deck, every eligible node is a card.
+/// - `extract(from:subtreeRoot:)` — a branch session ("Study Branch"):
+///   the selected branch is an implicit deck for that session.
 ///
 /// Cards are emitted in map (outline) order: roots in creation order, then
 /// depth-first in `children` order; a node's own cards come before its
 /// children's, and a summary card follows the last sibling of its range.
 public enum CardExtractor {
+    /// The document's cards (F-STD-1): explicit policies win anywhere;
+    /// auto cards exist only inside deck branches.
     public static func extract(from map: MapModel) -> [Card] {
+        extract(from: map, roots: map.roots, implicitDeck: false)
+    }
+
+    /// Every eligible card in the map, decks notwithstanding — the
+    /// "Study Document" session scope (F-STD-4).
+    public static func extractAll(from map: MapModel) -> [Card] {
+        extract(from: map, roots: map.roots, implicitDeck: true)
+    }
+
+    /// The cards of one branch's subtree — the "Study Branch" session
+    /// scope (F-STD-4): the branch is an implicit deck for the session,
+    /// so its eligible nodes are cards even without a deck mark. A
+    /// missing subtree root yields no cards.
+    public static func extract(from map: MapModel, subtreeRoot: String) -> [Card] {
+        guard map.nodes[subtreeRoot] != nil else { return [] }
+        return extract(from: map, roots: [subtreeRoot], implicitDeck: true)
+    }
+
+    private static func extract(from map: MapModel, roots: [String], implicitDeck: Bool) -> [Card] {
         let context = ExtractionContext(map: map)
-        for root in map.roots {
-            context.visit(root, breadcrumb: [])
+        for root in roots {
+            context.visit(root, breadcrumb: [], inDeck: implicitDeck)
         }
         return context.cards
     }
@@ -73,17 +103,20 @@ public enum CardExtractor {
             }
         }
 
-        func visit(_ nodeID: String, breadcrumb: [String]) {
+        func visit(_ nodeID: String, breadcrumb: [String], inDeck: Bool) {
             guard let node = map.nodes[nodeID] else { return }
-            cards.append(contentsOf: nodeCards(node, breadcrumb: breadcrumb))
+            // The deck node is inside its own branch (F-STD-1: a branch is
+            // "a node plus its subtree").
+            let selfInDeck = inDeck || (node.study?.deck ?? false)
+            cards.append(contentsOf: nodeCards(node, breadcrumb: breadcrumb, inDeck: selfInDeck))
             var childBreadcrumb = breadcrumb
             childBreadcrumb.append(node.title.text)
             for child in node.children {
-                visit(child, breadcrumb: childBreadcrumb)
+                visit(child, breadcrumb: childBreadcrumb, inDeck: selfInDeck)
             }
             for summary in summariesByLastChild[nodeID] ?? [] where pendingSummaries.contains(summary.id) {
                 pendingSummaries.remove(summary.id)
-                if let card = summaryCard(summary) {
+                if let card = summaryCard(summary, inDeck: selfInDeck) {
                     cards.append(card)
                 }
             }
@@ -91,7 +124,7 @@ public enum CardExtractor {
 
         // MARK: Per-node cards
 
-        private func nodeCards(_ node: Node, breadcrumb: [String]) -> [Card] {
+        private func nodeCards(_ node: Node, breadcrumb: [String], inDeck: Bool) -> [Card] {
             let policy = node.study?.card ?? .auto
             guard policy != .off else { return [] }
 
@@ -104,7 +137,7 @@ public enum CardExtractor {
             let isBasic: Bool
             switch policy {
             case .on: isBasic = true
-            case .auto: isBasic = !node.children.isEmpty || !note.isEmpty
+            case .auto: isBasic = inDeck && (!node.children.isEmpty || !note.isEmpty)
             case .off: isBasic = false
             }
             if isBasic {
@@ -139,7 +172,7 @@ public enum CardExtractor {
 
         // MARK: Summaries
 
-        private func summaryCard(_ summary: Summary) -> Card? {
+        private func summaryCard(_ summary: Summary, inDeck: Bool) -> Card? {
             guard summary.range.count >= 2,
                 let first = summary.range.first,
                 let last = summary.range.last,
@@ -148,7 +181,10 @@ public enum CardExtractor {
                 let parent = map.nodes[summary.parent],
                 let firstIndex = parent.children.firstIndex(of: first),
                 let lastIndex = parent.children.firstIndex(of: last),
-                firstIndex <= lastIndex
+                firstIndex <= lastIndex,
+                // Summary cards follow the range parent's deck like any
+                // other auto card (F-STD-1).
+                inDeck || summaryNode.study?.card == .on
             else { return nil }
             let prompt = parent.children[firstIndex...lastIndex]
                 .compactMap { map.nodes[$0]?.title.text }

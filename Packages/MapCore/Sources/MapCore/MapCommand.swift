@@ -108,6 +108,14 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// undo step — and the inverse restores the pre-action list
     /// exactly, `nil` included.
     case setPresentations(_ presentations: [Presentation]?)
+    /// Replaces one node's whole study section (F-STD-1/3/6: the deck
+    /// flag, the card policy, the per-card FSRS states). The host builds
+    /// the next `NodeStudy` from the current one (toggling the deck,
+    /// marking a card, writing a grade — ADR-0015); the inverse snapshots
+    /// the pre-state whole, so the restore is exact. `study: nil` removes
+    /// the section. `name` is the undo-menu action name ("Make Study
+    /// Deck", "Mark Card", "Grade Card").
+    case setStudy(name: String, id: String, study: NodeStudy?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -127,6 +135,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .recolorBranches: "Recolor Branches"
         case .setTheme: "Set Theme"
         case .setPresentations: "Edit Slides"
+        case .setStudy(let name, _, _): name
         }
     }
 
@@ -160,7 +169,10 @@ public indirect enum MapCommand: Sendable, Equatable {
             snapshot.created = now
             snapshot.modified = now
             if var study = snapshot.study {
+                // A duplicate is a new node, not a clone of the study
+                // history: the whole scheduling state goes (ADR-0015).
                 study.fsrs = nil
+                study.fsrsByCard = nil
                 snapshot.study = study
             }
             snapshot.children = model.nodes[nodeID]!.children.map { copy($0, parent: newID) }
