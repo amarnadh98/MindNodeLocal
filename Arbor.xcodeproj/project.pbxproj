@@ -8,14 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		017B42C3E5BE9FF888002972 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CDE8F1E860DC1E87190C113 /* ExportSheet.swift */; };
+		04DEAE5589854027D1B17E66 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D27C8948AC7140AB70796AF8 /* Sparkle */; };
 		0930B3BEA72C8881720F7C16 /* GenerationInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA0C610C59D37EB889D49E1 /* GenerationInput.swift */; };
 		0ABBAAEAE36B685D722209B1 /* MapDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763A388A39D618FE613DD3B1 /* MapDocument.swift */; };
 		0C83A5B8B764843DCDA9191A /* ViewStateRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C24FFCEDC9EBD59FFC5B577 /* ViewStateRestoreTests.swift */; };
 		0F5FCA2BEC29F5A80CFA075C /* LibraryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31244D860A69AC962A112BDB /* LibraryCoordinator.swift */; };
 		11EB7B8E68D6C0E42F6B3B59 /* CanvasKit in Frameworks */ = {isa = PBXBuildFile; productRef = C4AC95ED195E72A49F8863CA /* CanvasKit */; };
 		12D2E37A94B838FE567F9CA3 /* MapAI in Frameworks */ = {isa = PBXBuildFile; productRef = C31FA0B7121054655F097F72 /* MapAI */; };
+		131091CD41E226E04A93D261 /* UpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E9FF55B4AE3F99741F825B /* UpdaterTests.swift */; };
 		1F762A25C56D0F1BADCE8582 /* InlineEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */; };
 		214993110FC0F832EBCAB52E /* AIFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0F9BFC02649692080AE24A /* AIFeatureTests.swift */; };
+		22A087CBF9DC29D1EF454FB3 /* AppDelegate+Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5164CC0990929E94BEC9ACC /* AppDelegate+Updater.swift */; };
 		24746A5E041AA7CF7FCEBC12 /* DocumentWindowController+FocusFind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C6EFFC840C452A382C5FB6 /* DocumentWindowController+FocusFind.swift */; };
 		2910866D0BD3BB018A4C63DB /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = 82578E0D053CC6E252ED5CF3 /* MapLayout */; };
 		2A7D45C9FA1E4F92AAF67C9D /* DocumentWindowController+AIActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1F22F8EE1DFBE0EA1D98EE /* DocumentWindowController+AIActions.swift */; };
@@ -59,6 +62,7 @@
 		8B3C418869473695F92200D4 /* RecallModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */; };
 		8BB84F03FB06F2D836DE8933 /* QuickOpenPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403FDA07486CE16C85F44C87 /* QuickOpenPanel.swift */; };
 		8CE6F8EB37F99F034F99F0B3 /* StudyDashboardController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B12C49BCA9FFB90960EB4 /* StudyDashboardController.swift */; };
+		93A62E72F0067EBAD74F0EE1 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA69620A7B415338C8853415 /* AppUpdater.swift */; };
 		96B11D99DA0409D0D479E844 /* DocumentWindowController+Toolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */; };
 		9755CFB2BC6B767DD649E562 /* LibrarySidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF0D7B0862AD8821D396BA0B /* LibrarySidebar.swift */; };
 		A0F7857E433590DC9DDF2207 /* LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9D5C3ABF0BDC73FE635DC7 /* LibraryTests.swift */; };
@@ -162,6 +166,8 @@
 		9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Toolbar.swift"; sourceTree = "<group>"; };
 		9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditingTests.swift; sourceTree = "<group>"; };
 		A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Recall.swift"; sourceTree = "<group>"; };
+		B5164CC0990929E94BEC9ACC /* AppDelegate+Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Updater.swift"; sourceTree = "<group>"; };
+		BA69620A7B415338C8853415 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		BAD228F60FD2E82E4CDE6A93 /* StudySessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudySessionView.swift; sourceTree = "<group>"; };
 		BB4D4A57AC819F94BBED21FC /* MapLibrary */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapLibrary; path = Packages/MapLibrary; sourceTree = SOURCE_ROOT; };
 		BD74A7E238F1A994718E4DF2 /* DocumentQuickLook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentQuickLook.swift; sourceTree = "<group>"; };
@@ -169,6 +175,7 @@
 		BFDB01A25A1B67800B8A302E /* AppBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBookmarkStore.swift; sourceTree = "<group>"; };
 		C01AF1A0F9ECD2B3C28700E4 /* StudySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudySessionTests.swift; sourceTree = "<group>"; };
 		C33B924535A56DE8F007D316 /* OutlineViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewTests.swift; sourceTree = "<group>"; };
+		C5E9FF55B4AE3F99741F825B /* UpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterTests.swift; sourceTree = "<group>"; };
 		C75399A0C2934BB17F315640 /* StudyDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyDashboardView.swift; sourceTree = "<group>"; };
 		C8D0FDF585D9150461A53CAA /* PresentationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationCoordinator.swift; sourceTree = "<group>"; };
 		CA463BCF16A91FEF44EE1FCC /* MapLayout */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapLayout; path = Packages/MapLayout; sourceTree = SOURCE_ROOT; };
@@ -182,7 +189,7 @@
 		F401197E85E463072F6963CE /* MapIO */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapIO; path = Packages/MapIO; sourceTree = SOURCE_ROOT; };
 		F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewController.swift; sourceTree = "<group>"; };
 		F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindCoordinator.swift; sourceTree = "<group>"; };
-		"TEMP_76E97328-6E4C-49D0-A6F3-1C6414581647" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_64D316FC-6F8C-419F-ABC7-BFA9C5D9471E" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -215,6 +222,7 @@
 				70A4EBBBD20A51A044D10D49 /* MapIO in Frameworks */,
 				F163E201B6651C63D56574E1 /* MapLibrary in Frameworks */,
 				E1797C60E34B32BCD97C567B /* MapAI in Frameworks */,
+				04DEAE5589854027D1B17E66 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -231,7 +239,9 @@
 				68FF2BA288C549876464B3A3 /* Presentation */,
 				97784976B015ECE84423540D /* Study */,
 				4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */,
+				B5164CC0990929E94BEC9ACC /* AppDelegate+Updater.swift */,
 				2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */,
+				BA69620A7B415338C8853415 /* AppUpdater.swift */,
 				4493C7C4AA6F6C2FBBB5BE2E /* DocumentImporter.swift */,
 				BD74A7E238F1A994718E4DF2 /* DocumentQuickLook.swift */,
 				5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */,
@@ -354,6 +364,7 @@
 				53F33823EACC1A3ED8D65CB8 /* PresentationTests.swift */,
 				15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */,
 				C01AF1A0F9ECD2B3C28700E4 /* StudySessionTests.swift */,
+				C5E9FF55B4AE3F99741F825B /* UpdaterTests.swift */,
 				3C24FFCEDC9EBD59FFC5B577 /* ViewStateRestoreTests.swift */,
 			);
 			path = Tests;
@@ -392,12 +403,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_64FEC551-614E-44ED-B56E-2EAF2B24056C" /* t3-d6218b74-4229158858298dec */ = {
+		"TEMP_38867B5E-6C1E-402C-AF36-B8502EAEFA68" /* t3-23566e40-9f5f696e76417d47 */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_76E97328-6E4C-49D0-A6F3-1C6414581647" /* Config.xcconfig */,
+				"TEMP_64D316FC-6F8C-419F-ABC7-BFA9C5D9471E" /* Config.xcconfig */,
 			);
-			path = "t3-d6218b74-4229158858298dec";
+			path = "t3-23566e40-9f5f696e76417d47";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -453,6 +464,7 @@
 				FB586DA8E035266B306B34F4 /* MapIO */,
 				5CA89D5239C338056A02144A /* MapLibrary */,
 				03072AC7EEE269DD8C026DD1 /* MapAI */,
+				D27C8948AC7140AB70796AF8 /* Sparkle */,
 			);
 			productName = Arbor;
 			productReference = CBAC62CC4DC9451138C0087B /* Arbor.app */;
@@ -485,6 +497,7 @@
 			mainGroup = D456DBA015945693DC8C5A27;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				1AFFC8287AFA44E4D473638A /* XCRemoteSwiftPackageReference "Sparkle" */,
 				0B2DB006B66C456B468269E5 /* XCLocalSwiftPackageReference "Packages/CanvasKit" */,
 				72F7CFCFC3CB82401FA8BE32 /* XCLocalSwiftPackageReference "Packages/MapAI" */,
 				160334E0FEF41679A143780A /* XCLocalSwiftPackageReference "Packages/MapCore" */,
@@ -527,6 +540,7 @@
 				E7BCB1EEEC5652400850C107 /* PresentationTests.swift in Sources */,
 				8B3C418869473695F92200D4 /* RecallModeTests.swift in Sources */,
 				D5106CD6F6DF0A8F37B02688 /* StudySessionTests.swift in Sources */,
+				131091CD41E226E04A93D261 /* UpdaterTests.swift in Sources */,
 				0C83A5B8B764843DCDA9191A /* ViewStateRestoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -539,8 +553,10 @@
 				435ADE0545CD50536420B5F2 /* AIController.swift in Sources */,
 				6343DE9B64F7C291DE959A99 /* AISettingsWindowController.swift in Sources */,
 				44A19D0E90B0A4EB49F16E2D /* AppBookmarkStore.swift in Sources */,
+				22A087CBF9DC29D1EF454FB3 /* AppDelegate+Updater.swift in Sources */,
 				40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */,
 				F39B1DC08A3DF5433F14D703 /* AppIdentity.swift in Sources */,
+				93A62E72F0067EBAD74F0EE1 /* AppUpdater.swift in Sources */,
 				B6B3AC2ACC07AF9C2B50E2C0 /* ConceptIndexView.swift in Sources */,
 				D9980930E919F3BE3159A190 /* DocumentImporter.swift in Sources */,
 				BD7AE609AB2F8040FD6E7CD3 /* DocumentQuickLook.swift in Sources */,
@@ -647,7 +663,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_76E97328-6E4C-49D0-A6F3-1C6414581647" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_64D316FC-6F8C-419F-ABC7-BFA9C5D9471E" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -729,7 +745,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_76E97328-6E4C-49D0-A6F3-1C6414581647" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_64D316FC-6F8C-419F-ABC7-BFA9C5D9471E" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -852,6 +868,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		1AFFC8287AFA44E4D473638A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		01CA8FFE8C301398BB72F7C3 /* MapStudy */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -916,6 +943,11 @@
 		C4AC95ED195E72A49F8863CA /* CanvasKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CanvasKit;
+		};
+		D27C8948AC7140AB70796AF8 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1AFFC8287AFA44E4D473638A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		F54E21355F96F5AD144FD37A /* MapLayout */ = {
 			isa = XCSwiftPackageProductDependency;
