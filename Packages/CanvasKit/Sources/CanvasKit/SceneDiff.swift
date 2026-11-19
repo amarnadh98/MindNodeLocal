@@ -121,14 +121,17 @@ public enum SceneDiffer {
             && sameColor(lhs.fillColor, rhs.fillColor)
             && sameColor(lhs.borderColor, rhs.borderColor)
             && lhs.borderWidth == rhs.borderWidth
+            && lhs.borderDash == rhs.borderDash
             && lhs.cornerRadius == rhs.cornerRadius
             && lhs.paddingWidth == rhs.paddingWidth
             && lhs.paddingHeight == rhs.paddingHeight
             && sameColor(lhs.textColor, rhs.textColor)
             && lhs.font == rhs.font
+            && lhs.textAlignment == rhs.textAlignment
             && lhs.underlineWidth == rhs.underlineWidth
             && lhs.shadows.count == rhs.shadows.count
             && zip(lhs.shadows, rhs.shadows).allSatisfy { sameShadow($0, $1) }
+            && lhs.minWidth == rhs.minWidth
             && lhs.maxWidth == rhs.maxWidth
     }
 
@@ -155,9 +158,9 @@ public enum SceneDiffer {
 }
 
 extension SceneBranch: Equatable {
-    /// Geometry equality: anchors, direction, axis, widths and taper.
-    /// Color is deliberately excluded — a palette change repaints the
-    /// fill without being a morph (§11.4 path animation stays for
+    /// Geometry equality: anchors, direction, axis, widths and line
+    /// style. Color is deliberately excluded — a palette change repaints
+    /// the fill without being a morph (§11.4 path animation stays for
     /// geometry only, since `path` doesn't carry color).
     public static func == (lhs: SceneBranch, rhs: SceneBranch) -> Bool {
         lhs.parentID == rhs.parentID
@@ -168,7 +171,7 @@ extension SceneBranch: Equatable {
             && lhs.axis == rhs.axis
             && lhs.startWidth == rhs.startWidth
             && lhs.endWidth == rhs.endWidth
-            && lhs.tapered == rhs.tapered
+            && lhs.lineStyle == rhs.lineStyle
     }
 
     /// Full equality including the fill color.

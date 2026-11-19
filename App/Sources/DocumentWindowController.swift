@@ -8,6 +8,17 @@ import MapRender
 final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     let canvas = CanvasView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
+    /// The inspector pane (SPEC §4.1, F-STY-2/3/4/6): a trailing
+    /// inspector-style split item hosting SwiftUI, hidden by default
+    /// (visibility persisted in `DocumentPreferences`). Owns no model
+    /// state; every mutation is one `MapStore` command.
+    let inspector = InspectorPaneController()
+
+    /// F-STY-4 live theme preview: the theme grid's hovered tile pins
+    /// the scene's theme WITHOUT touching the model (view-only; hover
+    /// never dirties the document). `nil` = the stored selection.
+    var previewThemeID: String?
+
     /// The pasteboard the clipboard actions exchange (F-EDT-9).
     /// Injectable so hosted tests use a private `NSPasteboard(name:)`
     /// instead of the user's clipboard.
@@ -43,6 +54,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // must not set it first — assigning it here makes AppKit's insert
         // a no-op and the document ends up with zero window controllers.
         super.init(window: window)
+        // SPEC §4.1: the window content is a split view — the canvas,
+        // plus the trailing inspector pane (hidden by default). The pane
+        // needs this controller (its store and canvas), so the split
+        // view installs only after `super.init`.
+        inspector.host = self
+        inspector.install(canvas: canvas, in: window)
         // The window controller must be the window's delegate for two
         // reasons: `windowWillClose` flushes the view state (F-CAN-8),
         // and the delegate is the responder-chain hop that lets the
@@ -59,6 +76,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
         canvas.onSelectionChange = { [weak self] _ in
             self?.scheduleViewStateSave()
+            self?.inspector.refresh()
         }
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
@@ -96,6 +114,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         if canvas.scene == nil {
             updateScene(preserveCamera: false)
         }
+        // The inspector's first snapshot (selection and theme state);
+        // later refreshes ride selection changes and model changes.
+        inspector.refresh()
         super.showWindow(sender)
         // F-CAN-8: a stored view state restores the camera and the
         // (sanitized) selection INSTEAD of zoom-to-fit; only a document
@@ -157,7 +178,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// node grows while typing (F-EDT-8).
     func updateScene(preserveCamera: Bool) {
         guard let mapDocument = document as? MapDocument else { return }
-        let model = mapDocument.store.model
+        var model = mapDocument.store.model
+        // A live theme preview (F-STY-4 hover) overrides the stored
+        // selection for this build only — the model is untouched.
+        if let previewThemeID {
+            model.theme = ThemeSelection(id: previewThemeID)
+        }
         let previousCamera = canvas.camera
         let scene = SceneGeometry.build(
             model: model,
@@ -180,6 +206,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     func modelDidChange() {
         updateScene(preserveCamera: true)
         canvas.pruneSelection()
+        inspector.refresh()
         window?.title = document?.displayName ?? window?.title ?? ""
     }
 

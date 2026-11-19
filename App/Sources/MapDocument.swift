@@ -19,12 +19,25 @@ final class MapDocument: NSDocument {
 
     override init() {
         let manager = UndoManager()
-        store = MapStore(model: MapModel.emptyDocument(), undoManager: manager)
+        store = MapStore(model: Self.initialModel(), undoManager: manager)
         super.init()
         // The store's manager must be the document's, so Edit ▸ Undo and
         // NSDocument's own change-count integration see the same stacks.
         undoManager = manager
         meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: store.model.docID)
+    }
+
+    /// A brand-new document opens with the user's default theme
+    /// (F-STY-6, a `UserDefaults` preference; "paper" until they pick).
+    /// Untitled-empty seeding happens in the window controller, so the
+    /// document stays pristine until the first edit.
+    static func initialModel() -> MapModel {
+        var model = MapModel.emptyDocument()
+        let themeID = DocumentPreferences.defaultThemeID
+        if themeID != BuiltInThemes.defaultID {
+            model.theme = ThemeSelection(id: themeID)
+        }
+        return model
     }
 
     override func read(from fileWrapper: FileWrapper, ofType typeName: String) throws {

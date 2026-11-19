@@ -269,51 +269,50 @@ extension MapCommand {
 
         case .setTheme(let id):
             model.theme = id.map { ThemeSelection(id: $0, overrides: model.theme?.overrides) }
-        }
-    }
 
-    /// Strips every connection, boundary and summary that references a
-    /// removed node, so the model stays structurally valid after a delete.
-    /// The delete commands' inverses restore the pre-delete lists wholesale.
-    func purgeSecondaryReferences(to removed: Set<String>, in model: inout MapModel) {
-        guard !removed.isEmpty else { return }
-        let connections = (model.connections ?? []).filter { connection in
-            !removed.contains(connection.from) && !removed.contains(connection.to)
-        }
-        model.connections = connections.isEmpty ? nil : connections
+        case .setThemeSelection(let selection):
+            model.theme = selection
 
-        var boundaries: [Boundary] = []
-        for boundary in model.boundaries ?? [] {
-            let nodes = boundary.nodes.filter { !removed.contains($0) }
-            if nodes.isEmpty { continue }
-            if nodes.count == boundary.nodes.count {
-                boundaries.append(boundary)
-            } else {
-                boundaries.append(Boundary(id: boundary.id, nodes: nodes, title: boundary.title, style: boundary.style))
+        case .setThemeOverrides(let overrides):
+            if let current = model.theme {
+                model.theme = ThemeSelection(id: current.id, overrides: overrides)
+            } else if let overrides {
+                // No stored selection (a fresh document runs the default
+                // theme): the toggle still works by pinning the default
+                // theme with the patch.
+                model.theme = ThemeSelection(overrides: overrides)
             }
-        }
-        model.boundaries = boundaries.isEmpty ? nil : boundaries
 
-        let summaries = (model.summaries ?? []).filter { summary in
-            !removed.contains(summary.node) && !removed.contains(summary.parent)
-                && !summary.range.contains { removed.contains($0) }
-        }
-        model.summaries = summaries.isEmpty ? nil : summaries
-    }
-
-    /// Drops summaries whose range is no longer a run of the summary
-    /// parent's children (moves, promotions, demotions and detachments can
-    /// break them). The move commands' inverses restore the pre-move list.
-    func purgeStaleSummaries(in model: inout MapModel) {
-        let summaries = (model.summaries ?? []).filter { summary in
-            guard let parent = model.nodes[summary.parent] else { return false }
-            guard model.nodes[summary.node] != nil else { return false }
-            for rangeID in summary.range where !parent.children.contains(rangeID) {
-                return false
+        case .setStyle(let ids, let patch):
+            // All-or-nothing: every id must exist before any style moves.
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
             }
-            return true
+            for id in ids {
+                var merged = model.nodes[id]?.style ?? NodeStylePatch()
+                merged.merge(patch)
+                model.nodes[id]?.style = merged.isEmpty ? nil : merged
+            }
+
+        case .resetStyle(let ids, let keys):
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                guard var patch = model.nodes[id]?.style else { continue }
+                if let keys {
+                    for key in keys {
+                        patch.clear(key)
+                    }
+                } else {
+                    patch = NodeStylePatch()
+                }
+                model.nodes[id]?.style = patch.isEmpty ? nil : patch
+            }
+
+        case .setAppearance(let mode):
+            model.appearance = mode
         }
-        model.summaries = summaries.isEmpty ? nil : summaries
     }
 
     // swiftlint:enable cyclomatic_complexity function_body_length

@@ -168,6 +168,8 @@ public enum Migrations {
         switch version {
         case 1:
             return v1ToV2(model)
+        case 2:
+            return v2ToV3(model)
         default:
             return model
         }
@@ -191,6 +193,17 @@ public enum Migrations {
             }
         }
         migrated.formatVersion = 2
+        return migrated
+    }
+
+    /// v2 → v3: three optional fields join the schema —
+    /// `NodeStylePatch.fontWeight`, `NodeStylePatch.minWidth` and
+    /// `ThemePatch.rainbowBranches` — all defaulting to `nil` (the
+    /// pre-v3 behavior), so there is nothing to back-fill; the step
+    /// only stamps the version so the next save writes a v3 file.
+    static func v2ToV3(_ model: MapModel) -> MapModel {
+        var migrated = model
+        migrated.formatVersion = 3
         return migrated
     }
 }

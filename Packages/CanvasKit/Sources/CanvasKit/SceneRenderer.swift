@@ -41,16 +41,35 @@ public enum SceneRenderer {
                 dx: -max(branch.startWidth, branch.endWidth),
                 dy: -max(branch.startWidth, branch.endWidth))
             guard visible.intersects(bounds) else { continue }
-            let path =
-                branch.tapered
-                ? MapRender.BranchPath.tapered(
+            // §7.4 line styles after the child's branch override
+            // (ADR-0011), same switch as the layer tree's branch path.
+            let path: CGPath
+            switch branch.lineStyle {
+            case .tapered:
+                path = MapRender.BranchPath.tapered(
                     from: branch.from, to: branch.to,
                     startWidth: branch.startWidth, endWidth: branch.endWidth,
                     axis: branch.axis)
-                : MapRender.BranchPath.straight(from: branch.from, to: branch.to)
-            context.setFillColor(branch.color)
-            context.addPath(path)
-            context.fillPath()
+            case .curved:
+                path = MapRender.BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+            case .straight:
+                path = MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+            case .elbow:
+                path = MapRender.BranchPath.elbow(from: branch.from, to: branch.to, axis: branch.axis)
+            case .none:
+                continue
+            }
+            if branch.tapered {
+                context.setFillColor(branch.color)
+                context.addPath(path)
+                context.fillPath()
+            } else {
+                context.setStrokeColor(branch.color)
+                context.setLineWidth(max(branch.startWidth, branch.endWidth))
+                context.setLineCap(.round)
+                context.addPath(path)
+                context.strokePath()
+            }
         }
 
         for node in scene.nodes.values {

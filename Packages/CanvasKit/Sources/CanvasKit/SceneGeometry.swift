@@ -20,6 +20,8 @@ public struct SceneNode {
 }
 
 /// One branch connector: parent outgoing anchor to child incoming anchor.
+/// `lineStyle` is how the connector draws (§7.4); `tapered` is the
+/// fill-vs-stroke convenience that follows from it.
 public struct SceneBranch {
     public let parentID: String
     public let childID: String
@@ -30,7 +32,12 @@ public struct SceneBranch {
     public let startWidth: CGFloat
     public let endWidth: CGFloat
     public let color: CGColor
-    public let tapered: Bool
+    /// The effective line style after the child node's branch overrides
+    /// (F-STY-2 branch line style; ADR-0011: a node's branch overrides
+    /// act on the connector from its parent to it).
+    public let lineStyle: BranchLineStyle
+
+    public var tapered: Bool { lineStyle == .tapered }
 }
 
 /// A whole map prepared for rendering: laid out in model space (y grows
@@ -60,7 +67,7 @@ final class BuildCaches {
     }
 
     let theme: Theme
-    private let variant: ThemeVariant
+    let variant: ThemeVariant
     private var styles: [StyleKey: ResolvedNodeStyle] = [:]
     private var branchColors: [Int: CGColor] = [:]
 
@@ -150,7 +157,8 @@ public enum SceneGeometry {
                     id: id,
                     frame: translated,
                     style: caches.theme.applyingOverrides(
-                        node.style, to: caches.style(level: info.depth, level1Index: level1Index)),
+                        node.style, to: caches.style(level: info.depth, level1Index: level1Index),
+                        variant: caches.variant),
                     title: title ?? node.title,
                     level: info.depth,
                     level1Index: level1Index,
@@ -199,7 +207,14 @@ public enum SceneGeometry {
         editingTitle: (id: String, title: NodeTitle)? = nil
     ) -> LayoutNode? {
         func measuredSize(for node: Node, depth: Int) -> CGSize {
-            let style = caches.style(level: depth, level1Index: 0)
+            // F-STY-2/F-STY-3: a node with overrides measures with them
+            // (font, padding, width floors change the frame); nodes
+            // without pay only the nil-check on the fast path. The
+            // palette index is irrelevant to measurement (no
+            // measurement-consumed field is palette-keyed), so the cache
+            // key uses index 0.
+            let style = caches.theme.applyingOverrides(
+                node.style, to: caches.style(level: depth, level1Index: 0), variant: caches.variant)
             let maxWidth: CGFloat?
             if node.width?.mode == .fixed, let fixed = node.width?.value {
                 maxWidth = fixed
@@ -209,7 +224,8 @@ public enum SceneGeometry {
             let title = node.id == editingTitle?.id ? editingTitle?.title : node.title
             let textSize: CGSize = measurer.nodeTitleSize(
                 title ?? node.title, font: style.font, maxWidth: maxWidth)
-            let width: CGFloat = textSize.width + style.paddingWidth * 2
+            let width: CGFloat = max(
+                textSize.width + style.paddingWidth * 2, style.minWidth)
             let height: CGFloat = textSize.height + style.paddingHeight * 2
             return CGSize(width: width, height: height)
         }
@@ -272,12 +288,15 @@ public enum SceneGeometry {
     /// The palette index each of `rootID`'s children colors its branch
     /// with (ADR-0009): the stored persistent index, falling back to
     /// the child's position when none is stored; the theme's
-    /// rainbow-branches toggle (F-STY-8) collapses it to 0 when off.
+    /// rainbow-branches toggle (F-STY-8) collapses it to 0 when off —
+    /// the document's stored override of that toggle wins over the
+    /// theme's own value.
     static func levelOneIndices(model: MapModel, rootID: String, theme: Theme) -> [String: Int] {
+        let rainbow = model.theme?.overrides?.rainbowBranches ?? theme.rainbowBranches
         var indices: [String: Int] = [:]
         for (position, childID) in (model.nodes[rootID]?.children ?? []).enumerated() {
             let stored = model.nodes[childID]?.paletteIndex ?? position
-            indices[childID] = theme.effectivePaletteIndex(stored)
+            indices[childID] = rainbow ? stored : 0
         }
         return indices
     }
@@ -308,7 +327,8 @@ public enum SceneGeometry {
             guard let node = model.nodes[id] else { return }
             let children = node.folded ? [] : node.children
             let parentStyle = caches.theme.applyingOverrides(
-                node.style, to: caches.style(level: parentInfo.level, level1Index: parentInfo.index))
+                node.style, to: caches.style(level: parentInfo.level, level1Index: parentInfo.index),
+                variant: caches.variant)
             for childID in children {
                 guard let childScene = nodes[childID] else { continue }
                 let direction: BranchDirection
@@ -325,8 +345,21 @@ public enum SceneGeometry {
                 let childStyle = childScene.style
                 let to = NodeRenderer.incomingAnchor(
                     style: childStyle, frame: childScene.frame, direction: direction)
-                let widths = taperedWidths(
-                    theme: caches.theme, parentLevel: parentInfo.level, childLevel: childScene.level)
+                // ADR-0011: the child node's branch overrides color the
+                // connector from its parent to it (each node owns exactly
+                // one incoming branch; roots have none).
+                let childPatch = model.nodes[childID]?.style
+                let lineStyle =
+                    childPatch?.branchLineStyle.flatMap {
+                        BranchLineStyle(rawValue: $0.lowercased())
+                    }
+                    ?? caches.theme.branch.lineStyle
+                let color =
+                    childPatch?.branchColor.flatMap { ThemeHex.color($0) }
+                    ?? caches.branchColor(level1Index: childScene.level1Index)
+                let widths = overrideWidths(
+                    theme: caches.theme, patch: childPatch, lineStyle: lineStyle,
+                    parentLevel: parentInfo.level, childLevel: childScene.level)
                 result.append(
                     SceneBranch(
                         parentID: id,
@@ -337,22 +370,12 @@ public enum SceneGeometry {
                         axis: axis,
                         startWidth: widths.start,
                         endWidth: widths.end,
-                        color: caches.branchColor(level1Index: childScene.level1Index),
-                        tapered: caches.theme.branch.lineStyle == .tapered))
+                        color: color,
+                        lineStyle: lineStyle))
                 walk(childID, parentInfo: (level: parentInfo.level + 1, index: childScene.level1Index))
             }
         }
         walk(rootID, parentInfo: (level: 0, index: 0))
         return result
-    }
-
-    /// Continuous taper from the root to the leaves (§7.2): a branch's
-    /// start width is its parent node's width `w(level)`, and it tapers to
-    /// `w(level + 1)` — no thickness jump at intermediate nodes. The width
-    /// fall-off is theme data (Paper: 6 pt at the root down to 2 pt).
-    static func taperedWidths(
-        theme: Theme, parentLevel: Int, childLevel: Int
-    ) -> (start: CGFloat, end: CGFloat) {
-        (start: theme.branchWidth(level: parentLevel), end: theme.branchWidth(level: childLevel))
     }
 }

@@ -38,14 +38,139 @@ extension Theme {
         return max(CGFloat(branchStyle.endWidth), CGFloat(branchStyle.startWidth) - CGFloat(level))
     }
 
-    /// The F-STY-3 per-node override seam. The inspector's stored
-    /// `NodeStylePatch` folds in here — after the level style and the
-    /// branch color — in the inspector slice; until then resolution is
-    /// purely theme → level style → branch color and the patch has no
-    /// effect.
-    public func applyingOverrides(_ overrides: NodeStylePatch?, to style: ResolvedNodeStyle) -> ResolvedNodeStyle {
-        _ = overrides
-        return style
+    // One wide switch over the patch's fields, by design (mirrors the
+    // command dispatchers): field order is the doc-comment order.
+    // swiftlint:disable cyclomatic_complexity
+    /// The F-STY-3 per-node override seam: folds a node's stored
+    /// `NodeStylePatch` into an already theme-resolved style — after the
+    /// level style and the branch color — for every patch field that
+    /// addresses the node itself (shape, fill/none, border, corner
+    /// radius, padding, shadow, typography, text color/alignment,
+    /// min/max width). The branch fields (`branchColor`, `branchWidth`,
+    /// `branchTaper`, `branchLineStyle`) do **not** land here: they
+    /// override the one connector drawn from the node's *parent* to the
+    /// node (ADR-0011), which `SceneGeometry` resolves while building
+    /// branch connectors.
+    ///
+    /// Unknown values (bad hexes, unrecognized alignment/line-style
+    /// strings) are ignored one field at a time — an override can never
+    /// take the style invalid; the theme's value stands.
+    ///
+    /// Fast path: `nil` (the overwhelming majority of nodes) returns
+    /// immediately — the BuildCaches memoization never pays for nodes
+    /// without overrides.
+    public func applyingOverrides(
+        _ overrides: NodeStylePatch?, to style: ResolvedNodeStyle, variant: ThemeVariant
+    ) -> ResolvedNodeStyle {
+        guard let overrides, !overrides.isEmpty else { return style }
+        var resolved = style
+
+        if let shape = overrides.shape {
+            resolved.shape = shape
+        }
+        if let fill = overrides.fill {
+            switch fill.lowercased() {
+            case "none":
+                resolved.fillColor = nil
+            default:
+                resolved.fillColor = ThemeHex.color(fill) ?? resolved.fillColor
+            }
+        }
+        if let borderColor = overrides.borderColor {
+            resolved.borderColor = ThemeHex.color(borderColor) ?? resolved.borderColor
+        }
+        if let borderWidth = overrides.borderWidth {
+            resolved.borderWidth = CGFloat(borderWidth)
+        }
+        if let borderDash = overrides.borderDash {
+            resolved.borderDash = borderDash
+        }
+        if overrides.shape != nil {
+            // The border follows the shape's drawing mode (§7.2): an
+            // underline shape draws the border AS the underline, and
+            // leaving underline turns it back into a stroke.
+            if resolved.shape == .underline {
+                resolved.underlineWidth = max(resolved.underlineWidth, resolved.borderWidth)
+                resolved.borderWidth = 0
+            } else if resolved.underlineWidth > 0, resolved.borderWidth == 0 {
+                resolved.borderWidth = resolved.underlineWidth
+                resolved.underlineWidth = 0
+            }
+        }
+        if let cornerRadius = overrides.cornerRadius {
+            resolved.cornerRadius = CGFloat(cornerRadius)
+        }
+        if let padding = overrides.padding {
+            resolved.paddingWidth = CGFloat(padding)
+            resolved.paddingHeight = CGFloat(padding)
+        }
+        if let shadow = overrides.shadow {
+            resolved.shadows = Self.overrideShadowLayers(shadow, variant: variant)
+        }
+        if let fontName = overrides.fontName {
+            // An explicit family wins; the empty string returns to the
+            // theme's system family.
+            resolved.font = FontSpec(
+                size: resolved.font.size, weight: resolved.font.weight,
+                family: fontName.isEmpty ? nil : fontName,
+                italic: resolved.font.italic, monospace: resolved.font.monospace)
+        }
+        if let fontSize = overrides.fontSize {
+            resolved.font = FontSpec(
+                size: CGFloat(fontSize), weight: resolved.font.weight,
+                family: resolved.font.family,
+                italic: resolved.font.italic, monospace: resolved.font.monospace)
+        }
+        if let fontWeight = overrides.fontWeight {
+            resolved.font = FontSpec(
+                size: resolved.font.size, weight: CGFloat(fontWeight),
+                family: resolved.font.family,
+                italic: resolved.font.italic, monospace: resolved.font.monospace)
+        }
+        if let textColor = overrides.textColor {
+            resolved.textColor = ThemeHex.color(textColor) ?? resolved.textColor
+        }
+        if let alignment = overrides.alignment {
+            switch alignment.lowercased() {
+            case "left": resolved.textAlignment = .leading
+            case "right": resolved.textAlignment = .trailing
+            case "center": resolved.textAlignment = .center
+            default: break
+            }
+        }
+        if let minWidth = overrides.minWidth {
+            resolved.minWidth = CGFloat(minWidth)
+        }
+        if let maxWidth = overrides.maxWidth {
+            resolved.maxWidth = CGFloat(maxWidth)
+        }
+        return resolved
+    }
+
+    // swiftlint:enable cyclomatic_complexity
+
+    /// F-STY-2 shadow presets at the current appearance, mirroring §7.2's
+    /// reference definitions: raised is two layers in light / one
+    /// compressed layer in dark; soft is a single close layer.
+    private static func overrideShadowLayers(
+        _ shadow: ShadowStyle, variant: ThemeVariant
+    ) -> [ShadowLayer] {
+        let black = { (alpha: CGFloat) -> CGColor in
+            CGColor(gray: 0, alpha: alpha)
+        }
+        switch shadow {
+        case .none:
+            return []
+        case .soft:
+            return [ShadowLayer(offsetY: 2, blur: 6, color: black(variant == .light ? 0.10 : 0.30))]
+        case .raised:
+            return variant == .light
+                ? [
+                    ShadowLayer(offsetY: 1, blur: 3, color: black(0.08)),
+                    ShadowLayer(offsetY: 4, blur: 12, color: black(0.06)),
+                ]
+                : [ShadowLayer(offsetY: 4, blur: 12, color: black(0.40))]
+        }
     }
 
     /// Resolves the style for a node at `level` on the branch whose
@@ -120,7 +245,8 @@ extension Theme {
                     monospace: font.monospace),
                 underlineWidth: underlineWidth,
                 shadows: shadows,
-                maxWidth: CGFloat(levelStyle.maxWidth)))
+                maxWidth: CGFloat(levelStyle.maxWidth)),
+            variant: variant)
     }
 
     /// The palette color at `level1Index`, wrapped around the palette.

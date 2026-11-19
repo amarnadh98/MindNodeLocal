@@ -217,6 +217,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Zoom to Selection", #selector(CanvasView.zoomToSelectionAction(_:)),
                         "0", modifiers: [.command, .option]),
+                    .separator(),
+                    // SPEC §4.1: the inspector is hidden by default;
+                    // ⌥⌘I toggles it (visibility persisted).
+                    item(
+                        "Toggle Inspector", #selector(DocumentWindowController.toggleInspectorAction(_:)),
+                        "i", modifiers: [.command, .option]),
                 ]))
         mainMenu.addItem(
             menu(

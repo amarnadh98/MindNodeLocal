@@ -83,71 +83,10 @@ public enum NodeShape: String, Codable, Sendable, CaseIterable {
     case none
 }
 
-public enum ShadowStyle: String, Codable, Sendable {
+public enum ShadowStyle: String, Codable, Sendable, CaseIterable {
     case none
     case soft
     case raised
-}
-
-public struct NodeStylePatch: Codable, Sendable, Hashable {
-    public var shape: NodeShape?
-    public var fill: String?
-    public var borderColor: String?
-    public var borderWidth: Double?
-    public var borderDash: Bool?
-    public var cornerRadius: Double?
-    public var padding: Double?
-    public var shadow: ShadowStyle?
-    public var fontName: String?
-    public var fontSize: Double?
-    public var textColor: String?
-    public var alignment: String?
-    public var branchColor: String?
-    public var branchWidth: Double?
-    public var branchTaper: Double?
-    public var branchLineStyle: String?
-    public var maxWidth: Double?
-    public var imagePlacement: ImagePlacement?
-
-    public init(
-        shape: NodeShape? = nil,
-        fill: String? = nil,
-        borderColor: String? = nil,
-        borderWidth: Double? = nil,
-        borderDash: Bool? = nil,
-        cornerRadius: Double? = nil,
-        padding: Double? = nil,
-        shadow: ShadowStyle? = nil,
-        fontName: String? = nil,
-        fontSize: Double? = nil,
-        textColor: String? = nil,
-        alignment: String? = nil,
-        branchColor: String? = nil,
-        branchWidth: Double? = nil,
-        branchTaper: Double? = nil,
-        branchLineStyle: String? = nil,
-        maxWidth: Double? = nil,
-        imagePlacement: ImagePlacement? = nil
-    ) {
-        self.shape = shape
-        self.fill = fill
-        self.borderColor = borderColor
-        self.borderWidth = borderWidth
-        self.borderDash = borderDash
-        self.cornerRadius = cornerRadius
-        self.padding = padding
-        self.shadow = shadow
-        self.fontName = fontName
-        self.fontSize = fontSize
-        self.textColor = textColor
-        self.alignment = alignment
-        self.branchColor = branchColor
-        self.branchWidth = branchWidth
-        self.branchTaper = branchTaper
-        self.branchLineStyle = branchLineStyle
-        self.maxWidth = maxWidth
-        self.imagePlacement = imagePlacement
-    }
 }
 
 public enum ImagePlacement: String, Codable, Sendable {

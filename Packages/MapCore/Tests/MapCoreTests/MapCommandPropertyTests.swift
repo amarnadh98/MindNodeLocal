@@ -103,7 +103,20 @@ struct CommandPropertyTests {
     private func unconditionalCommands(
         nodeID: String, model: MapModel, generator: inout CommandGenerator
     ) -> [MapCommand] {
-        [
+        // Random draws happen into locals first: one giant array literal
+        // of interleaved `generator.next()` calls does not type-check in
+        // reasonable time.
+        let styleIDs = styleCommandIDs(nodeID, model: model, generator: &generator)
+        let styleKeys: [NodeStyleKey]? =
+            generator.next() % 4 == 0 ? nil : [generator.pick(from: NodeStyleKey.allCases) ?? .fill]
+        let themeID: String? = generator.next() % 2 == 0 ? "ocean" : nil
+        let rainbow: Bool = generator.next() % 2 == 0
+        let clearOverrides = generator.next() % 3 == 0
+        let appearance: AppearanceMode? =
+            generator.next() % 4 == 0 ? nil : (generator.next() % 2 == 0 ? .dark : .light)
+        let paletteIndex: Int? = generator.next() % 2 == 0 ? Int(generator.next() % 8) : nil
+
+        var commands: [MapCommand] = [
             .addChild(
                 parent: nodeID, index: nil,
                 node: Node(id: "g\(generator.next())", title: NodeTitle(text: "c"))),
@@ -122,15 +135,24 @@ struct CommandPropertyTests {
             .setSide(id: nodeID, side: generator.next() % 2 == 0 ? .left : .right),
             .setFolded(id: nodeID, folded: generator.next() % 2 == 0),
             .setOffset(id: nodeID, offset: ModelOffset(x: 10, y: -5)),
-            .setTheme(id: generator.next() % 2 == 0 ? "ocean" : nil),
-            .recolorBranches(
-                assignments: [
-                    PaletteIndexAssignment(
-                        id: nodeID,
-                        index: generator.next() % 2 == 0 ? Int(generator.next() % 8) : nil)
-                ]),
-            (try? MapCommand.duplicate(id: nodeID, in: model)),
-        ].compactMap { $0 }
+            .setTheme(id: themeID),
+            .setThemeSelection(
+                generator.next() % 3 == 0
+                    ? nil
+                    : ThemeSelection(
+                        id: generator.next() % 2 == 0 ? "ocean" : "paper",
+                        overrides: generator.next() % 2 == 0 ? ThemePatch(rainbowBranches: rainbow) : nil)),
+            .setThemeOverrides(
+                overrides: clearOverrides ? nil : ThemePatch(rainbowBranches: rainbow)),
+            .recolorBranches(assignments: [PaletteIndexAssignment(id: nodeID, index: paletteIndex)]),
+            .setStyle(ids: styleIDs, patch: stylePatch(&generator)),
+            .resetStyle(ids: styleIDs, keys: styleKeys),
+            .setAppearance(appearance),
+        ]
+        if let duplicate = try? MapCommand.duplicate(id: nodeID, in: model) {
+            commands.append(duplicate)
+        }
+        return commands
     }
 
     private func conditionalCommands(
@@ -151,6 +173,12 @@ struct CommandPropertyTests {
             commands.append(.detach(id: nodeID))
         }
 
+        // Style commands sometimes act on a multi-selection (F-STY-2:
+        // one command over any number of nodes is one undo step).
+        commands.append(
+            .setStyle(ids: styleCommandIDs(nodeID, model: model, generator: &generator), patch: stylePatch(&generator)))
+        commands.append(.resetStyle(ids: styleCommandIDs(nodeID, model: model, generator: &generator), keys: nil))
+
         let allIDs = Array(model.nodes.keys)
         if allIDs.count >= 2 {
             var multiDelete: [String] = [nodeID]
@@ -167,6 +195,54 @@ struct CommandPropertyTests {
 
 let fixedDate = Date(timeIntervalSince1970: 1_800_000_000)
 
+/// A seeded-random style patch exercising a few fields per call, so the
+/// fuzz covers merge/reset interactions across many field combinations.
+private func stylePatch(_ generator: inout CommandGenerator) -> NodeStylePatch {
+    var patch = NodeStylePatch()
+    if generator.next() % 2 == 0 {
+        patch.fill = generator.next() % 4 == 0 ? "none" : "#\(String(format: "%06X", generator.next() % 0x1000000))"
+    }
+    if generator.next() % 2 == 0 {
+        patch.shape = generator.pick(from: NodeShape.allCases)
+    }
+    if generator.next() % 2 == 0 {
+        patch.fontSize = Double(generator.next() % 40) + 8
+    }
+    if generator.next() % 2 == 0 {
+        patch.padding = Double(generator.next() % 30)
+    }
+    if generator.next() % 2 == 0 {
+        patch.borderColor = "#\(String(format: "%06X", generator.next() % 0x1000000))"
+    }
+    if generator.next() % 2 == 0 {
+        patch.shadow = generator.pick(from: [ShadowStyle.none, .soft, .raised])
+    }
+    if generator.next() % 3 == 0 {
+        patch.fontWeight = Double(generator.next() % 5) / 10
+    }
+    if generator.next() % 3 == 0 {
+        patch.minWidth = Double(generator.next() % 200)
+    }
+    return patch
+}
+
+/// `nodeID` plus sometimes a second, seeded-random node: single- and
+/// multi-selection style edits.
+private func styleCommandIDs(
+    _ nodeID: String, model: MapModel, generator: inout CommandGenerator
+) -> [String] {
+    let allIDs = Array(model.nodes.keys)
+    guard generator.next() % 2 == 0, allIDs.count >= 2,
+        let second = generator.pick(from: allIDs), second != nodeID
+    else {
+        return [nodeID]
+    }
+    return [nodeID, second]
+}
+
+// The fixture builder seeds themes and style overrides, by design a
+// flat sequence of draw-and-assign steps.
+// swiftlint:disable:next cyclomatic_complexity
 func randomModel(seed: UInt64) -> MapModel {
     var generator = CommandGenerator(state: seed)
     var model = MapModel.emptyDocument(docID: "seed-\(seed)")
@@ -192,6 +268,16 @@ func randomModel(seed: UInt64) -> MapModel {
     }
 
     let ids = Array(model.nodes.keys)
+    // Seed a few stored style overrides so the style commands' merge and
+    // reset paths meet pre-existing patches (F-STY-3 "Reset to theme").
+    for index in stride(from: 0, to: ids.count, by: 7) where index < ids.count {
+        let seed = generator.next()
+        var patch = NodeStylePatch()
+        if seed % 2 == 0 { patch.fill = "#FFC53D" }
+        if seed % 3 == 0 { patch.shape = .pill }
+        if seed % 5 == 0 { patch.fontSize = 18 }
+        model.nodes[ids[index]]?.style = patch.isEmpty ? nil : patch
+    }
     let connectionCount = generator.count(in: 0...3)
     var connections: [Connection] = []
     for index in 0..<connectionCount where ids.count >= 2 {
@@ -215,6 +301,15 @@ func randomModel(seed: UInt64) -> MapModel {
                 id: "sm-0", parent: rootID,
                 range: [rootChildren[0], rootChildren[1]], node: ids[3 % ids.count])
         ]
+    }
+
+    // Sometimes a stored theme selection with overrides, so the theme
+    // commands' id/override preservation paths meet non-nil pre-states.
+    if generator.next() % 2 == 0 {
+        model.theme = ThemeSelection(
+            id: generator.next() % 2 == 0 ? "ocean" : "paper",
+            overrides: generator.next() % 2 == 0
+                ? ThemePatch(rainbowBranches: generator.next() % 2 == 0) : nil)
     }
     return model
 }
