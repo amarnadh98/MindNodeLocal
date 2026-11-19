@@ -90,6 +90,11 @@ extension CanvasView {
     /// session, or moves the live one. Returns true when consumed (the
     /// rubber band never runs while a node is grabbed).
     func handleMouseDragged(_ viewPoint: CGPoint) -> Bool {
+        // F-CNT-2: an image-resize drag owns the gesture before any
+        // node drag.
+        if handleImageResizeDragged(to: viewPoint) {
+            return true
+        }
         switch drag {
         case .none:
             return false
@@ -110,6 +115,10 @@ extension CanvasView {
     /// crossed the threshold was a click, and mouseDown already applied
     /// the selection. Returns true when consumed.
     func handleMouseUp(_ viewPoint: CGPoint) -> Bool {
+        // F-CNT-2: committing the image resize.
+        if handleImageResizeDragged(to: viewPoint, ending: true) {
+            return true
+        }
         switch drag {
         case .none:
             return false

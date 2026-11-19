@@ -46,6 +46,13 @@ public enum MarkerCycler {
     /// ring, MindNode's quarter set extended one notch.
     public static let progress = (0...8).map { "sticker:progress-\($0)" }
 
+    /// The cycling family a token belongs to (the click path asks).
+    public static func family(of token: String) -> [String]? {
+        if priorities.contains(token) { return priorities }
+        if progress.contains(token) { return progress }
+        return nil
+    }
+
     private static func next(in family: [String], current: String) -> String? {
         guard let slot = family.firstIndex(of: current) else { return nil }
         let next = slot + 1

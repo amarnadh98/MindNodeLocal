@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import MapCore
 import MapRender
+import MapStudy
 
 /// The layer-tree-facing surface of the canvas (SPEC §11.4): hosting,
 /// scene application, the selection rings and the rubber-band overlay,
@@ -95,9 +96,28 @@ extension CanvasView {
                 matches.insert(id)
             }
             return matches
+        case .filter(let filter):
+            guard let model = dragModel else { return nil }
+            return FilterEngine.matchingIDs(
+                model: model, filter: filter, mastery: filterMastery, now: filterNow)
         case nil:
             return nil
         }
+    }
+
+    /// F-TAG-3's dim mode needs the document's mastery report pinned at
+    /// one instant (a `mastery:` term stays deterministic through a
+    /// rebuild). Host-owned view state; nil disables mastery terms.
+    public var filterMastery: MasteryReport? {
+        get { decorationActions.filterMastery }
+        set { decorationActions.filterMastery = newValue }
+    }
+
+    /// The `now` the filter's mastery and due terms evaluate at
+    /// (host-pinned; defaults to the build moment).
+    public var filterNow: Date {
+        get { decorationActions.filterNow }
+        set { decorationActions.filterNow = newValue }
     }
 
     /// Selection rings follow every selection mutation (they live in

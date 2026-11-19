@@ -29,26 +29,81 @@ public enum TaskMark: Sendable, Hashable {
     }
 }
 
+/// One marker token drawn before the title (F-CNT-3): `sf:<name>`,
+/// `emoji:<char>` or `sticker:<id>` (SPEC §8.2). The token is the
+/// hash identity — the resolved glyph for a token is produced by one
+/// host cache, so equal tokens always mean equal pixels.
+public struct MarkerBadge: Sendable, Hashable {
+    public let token: String
+
+    public init(token: String) {
+        self.token = token
+    }
+}
+
+/// A node's image block (F-CNT-2): the package asset filename (the
+/// thumbnail lookup token), the display size (a **layout input**) and
+/// the placement around the title.
+public struct ImageBlock: Sendable, Hashable {
+    public let asset: String
+    public let size: CGSize
+    public let placement: ImagePlacement
+
+    public init(asset: String, size: CGSize, placement: ImagePlacement = .above) {
+        self.asset = asset
+        self.size = size
+        self.placement = placement
+    }
+}
+
 /// Everything drawn around a node's title (SPEC §7): the leading
-/// decoration column (task checkbox / progress ring, markers
-/// placeholder), the trailing badges (note ≡, link) and the tag pill
-/// row under the title. A `nil`/empty value renders the plain node
+/// decoration column (task checkbox / progress ring, the marker row),
+/// the trailing badges (note ≡, link, attachment, source) and the tag
+/// pill row under the title. A `nil`/empty value renders the plain node
 /// M1/M2 draw today.
 public struct NodeDecorations: Sendable, Hashable {
     public var task: TaskMark?
     public var hasNote: Bool
     public var linkURL: String?
     public var tags: [TagPill]
+    /// Marker glyphs before the title (F-CNT-3).
+    public var markers: [MarkerBadge]
+    /// The image block (F-CNT-2) — its display size is a layout input.
+    public var image: ImageBlock?
+    /// The LaTeX flag (F-CNT-5): the title text is the LaTeX source,
+    /// rendered as math when the host provides a glyph (F-CNT-5's
+    /// fallback is the source text).
+    public var math: Bool
+    /// The source anchor's URL (F-CNT-8) — drawn as a citation chip.
+    public var source: String?
+    /// How many file attachments (F-CNT-7) — the paperclip badge.
+    public var attachmentCount: Int
 
-    public init(task: TaskMark? = nil, hasNote: Bool = false, linkURL: String? = nil, tags: [TagPill] = []) {
+    public init(
+        task: TaskMark? = nil,
+        hasNote: Bool = false,
+        linkURL: String? = nil,
+        tags: [TagPill] = [],
+        markers: [MarkerBadge] = [],
+        image: ImageBlock? = nil,
+        math: Bool = false,
+        source: String? = nil,
+        attachmentCount: Int = 0
+    ) {
         self.task = task
         self.hasNote = hasNote
         self.linkURL = linkURL
         self.tags = tags
+        self.markers = markers
+        self.image = image
+        self.math = math
+        self.source = source
+        self.attachmentCount = attachmentCount
     }
 
     public var isEmpty: Bool {
-        task == nil && !hasNote && linkURL == nil && tags.isEmpty
+        task == nil && !hasNote && linkURL == nil && tags.isEmpty && markers.isEmpty
+            && image == nil && !math && source == nil && attachmentCount == 0
     }
 }
 
@@ -78,17 +133,32 @@ public enum NodeDecorationMetrics {
     public static let doneOpacity: CGFloat = 0.5
     /// The pill label's font size.
     public static let pillFontSize: CGFloat = 10
+    /// One marker glyph's edge (F-CNT-3).
+    public static let markerSize: CGFloat = 14
+    /// The gap before/after and between the marker glyphs.
+    public static let markerGap: CGFloat = 3
+    /// The gap between the image block and the title band (F-CNT-2).
+    public static let imageGap: CGFloat = 6
+
+    /// The marker row's width: a gap on each side plus the glyphs.
+    public static func markerRowWidth(_ count: Int) -> CGFloat {
+        count == 0 ? 0 : markerGap * 2 + CGFloat(count) * markerSize + CGFloat(count - 1) * markerGap
+    }
 
     /// Total leading column width for these decorations (0 when no
-    /// task mark).
+    /// task mark and no markers).
     public static func leadingWidth(_ decorations: NodeDecorations?) -> CGFloat {
-        decorations?.task == nil ? 0 : checkboxSize + leadingGap
+        guard let decorations else { return 0 }
+        var width: CGFloat = decorations.task == nil ? 0 : checkboxSize + leadingGap
+        width += markerRowWidth(decorations.markers.count)
+        return width
     }
 
     /// Total trailing column width for these decorations.
     public static func trailingWidth(_ decorations: NodeDecorations?) -> CGFloat {
         guard let decorations else { return 0 }
         let badges = (decorations.hasNote ? 1 : 0) + (decorations.linkURL != nil ? 1 : 0)
+            + (decorations.source != nil ? 1 : 0) + (decorations.attachmentCount > 0 ? 1 : 0)
         guard badges > 0 else { return 0 }
         return badgeGap + CGFloat(badges) * badgeSize + CGFloat(badges - 1) * badgeGap
     }
@@ -105,7 +175,7 @@ public enum NodeDecorationMetrics {
 /// so a click lands where the checkbox was drawn.
 public struct NodeDecorationLayout {
     /// The rect the title block may occupy (already shrunk by the
-    /// leading/trailing columns and the pill row).
+    /// image band, the leading/trailing columns and the pill row).
     public let titleRow: CGRect
     /// The checkbox's or progress ring's square, nil without a task.
     public let leadingRect: CGRect?
@@ -115,6 +185,15 @@ public struct NodeDecorationLayout {
     public let linkBadgeRect: CGRect?
     /// The pill row's rect, nil without tags.
     public let tagRowRect: CGRect?
+    /// The marker row's rect (F-CNT-3), nil without markers.
+    public let markerRowRect: CGRect?
+    /// The image block's rect (F-CNT-2), nil without an image. The
+    /// bottom-right corner is the resize handle's hit region.
+    public let imageRect: CGRect?
+    /// The citation chip's square (F-CNT-8), nil without a source.
+    public let sourceBadgeRect: CGRect?
+    /// The attachment badge's square (F-CNT-7), nil without attachments.
+    public let attachmentBadgeRect: CGRect?
 
     /// Layouts the decorations inside `frame`'s content rect for a
     /// title block of `textSize` (the size `TextMeasurer` returned).
@@ -124,30 +203,88 @@ public struct NodeDecorationLayout {
         guard let decorations, !decorations.isEmpty else {
             return NodeDecorationLayout(
                 titleRow: contentRect, leadingRect: nil, noteBadgeRect: nil, linkBadgeRect: nil,
-                tagRowRect: nil)
+                tagRowRect: nil, markerRowRect: nil, imageRect: nil, sourceBadgeRect: nil,
+                attachmentBadgeRect: nil)
+        }
+
+        // The image band first (F-CNT-2): above/below take a horizontal
+        // strip, left/right a vertical one; the title row and its
+        // columns live in the remainder.
+        var rect = contentRect
+        var imageRect: CGRect?
+        if let image = decorations.image {
+            let size = CGSize(width: max(1, image.size.width), height: max(1, image.size.height))
+            switch image.placement {
+            case .above:
+                imageRect = CGRect(
+                    x: contentRect.minX + max(0, (contentRect.width - size.width) / 2),
+                    y: contentRect.minY, width: min(size.width, contentRect.width), height: size.height)
+                rect = CGRect(
+                    x: contentRect.minX, y: contentRect.minY + size.height + NodeDecorationMetrics.imageGap,
+                    width: contentRect.width,
+                    height: max(0, contentRect.height - size.height - NodeDecorationMetrics.imageGap))
+            case .below:
+                imageRect = CGRect(
+                    x: contentRect.minX + max(0, (contentRect.width - size.width) / 2),
+                    y: contentRect.maxY - size.height, width: min(size.width, contentRect.width),
+                    height: size.height)
+                rect = CGRect(
+                    x: contentRect.minX, y: contentRect.minY, width: contentRect.width,
+                    height: max(0, contentRect.height - size.height - NodeDecorationMetrics.imageGap))
+            case .left:
+                imageRect = CGRect(
+                    x: contentRect.minX, y: rect.midY - size.height / 2, width: size.width,
+                    height: size.height)
+                rect = CGRect(
+                    x: contentRect.minX + size.width + NodeDecorationMetrics.imageGap, y: contentRect.minY,
+                    width: max(0, contentRect.width - size.width - NodeDecorationMetrics.imageGap),
+                    height: contentRect.height)
+            case .right:
+                imageRect = CGRect(
+                    x: contentRect.maxX - size.width, y: rect.midY - size.height / 2, width: size.width,
+                    height: size.height)
+                rect = CGRect(
+                    x: contentRect.minX, y: contentRect.minY,
+                    width: max(0, contentRect.width - size.width - NodeDecorationMetrics.imageGap),
+                    height: contentRect.height)
+            }
         }
 
         let leading = NodeDecorationMetrics.leadingWidth(decorations)
         let trailing = NodeDecorationMetrics.trailingWidth(decorations)
         let tagRowHeight = NodeDecorationMetrics.tagRowHeight(decorations)
         let titleRow = CGRect(
-            x: contentRect.minX + leading,
-            y: contentRect.minY,
-            width: max(0, contentRect.width - leading - trailing),
-            height: max(0, contentRect.height - tagRowHeight))
+            x: rect.minX + leading,
+            y: rect.minY,
+            width: max(0, rect.width - leading - trailing),
+            height: max(0, rect.height - tagRowHeight))
 
         var leadingRect: CGRect?
         if decorations.task != nil {
             leadingRect = CGRect(
-                x: contentRect.minX,
+                x: rect.minX,
                 y: titleRow.midY - NodeDecorationMetrics.checkboxSize / 2,
                 width: NodeDecorationMetrics.checkboxSize,
                 height: NodeDecorationMetrics.checkboxSize)
         }
 
+        var markerRowRect: CGRect?
+        if !decorations.markers.isEmpty {
+            let taskWidth = decorations.task == nil ? 0 : NodeDecorationMetrics.checkboxSize + NodeDecorationMetrics.leadingGap
+            markerRowRect = CGRect(
+                x: rect.minX + taskWidth,
+                y: titleRow.midY - NodeDecorationMetrics.markerSize / 2,
+                width: NodeDecorationMetrics.markerRowWidth(decorations.markers.count),
+                height: NodeDecorationMetrics.markerSize)
+        }
+
+        // Trailing badges, from the right edge inward: link, note,
+        // attachment, source chip.
         var noteRect: CGRect?
         var linkRect: CGRect?
-        var badgeCursor = contentRect.maxX
+        var attachmentRect: CGRect?
+        var sourceRect: CGRect?
+        var badgeCursor = rect.maxX
         if decorations.linkURL != nil {
             badgeCursor -= NodeDecorationMetrics.badgeSize
             linkRect = CGRect(
@@ -160,18 +297,33 @@ public struct NodeDecorationLayout {
             noteRect = CGRect(
                 x: badgeCursor, y: titleRow.midY - NodeDecorationMetrics.badgeSize / 2,
                 width: NodeDecorationMetrics.badgeSize, height: NodeDecorationMetrics.badgeSize)
+            badgeCursor -= NodeDecorationMetrics.badgeGap
+        }
+        if decorations.attachmentCount > 0 {
+            badgeCursor -= NodeDecorationMetrics.badgeSize
+            attachmentRect = CGRect(
+                x: badgeCursor, y: titleRow.midY - NodeDecorationMetrics.badgeSize / 2,
+                width: NodeDecorationMetrics.badgeSize, height: NodeDecorationMetrics.badgeSize)
+            badgeCursor -= NodeDecorationMetrics.badgeGap
+        }
+        if decorations.source != nil {
+            badgeCursor -= NodeDecorationMetrics.badgeSize
+            sourceRect = CGRect(
+                x: badgeCursor, y: titleRow.midY - NodeDecorationMetrics.badgeSize / 2,
+                width: NodeDecorationMetrics.badgeSize, height: NodeDecorationMetrics.badgeSize)
         }
 
         var tagRowRect: CGRect?
         if !decorations.tags.isEmpty {
             tagRowRect = CGRect(
-                x: contentRect.minX, y: contentRect.maxY - NodeDecorationMetrics.pillHeight,
-                width: contentRect.width, height: NodeDecorationMetrics.pillHeight)
+                x: rect.minX, y: rect.maxY - NodeDecorationMetrics.pillHeight,
+                width: rect.width, height: NodeDecorationMetrics.pillHeight)
         }
 
         return NodeDecorationLayout(
             titleRow: titleRow, leadingRect: leadingRect, noteBadgeRect: noteRect,
-            linkBadgeRect: linkRect, tagRowRect: tagRowRect)
+            linkBadgeRect: linkRect, tagRowRect: tagRowRect, markerRowRect: markerRowRect,
+            imageRect: imageRect, sourceBadgeRect: sourceRect, attachmentBadgeRect: attachmentRect)
     }
 }
 
@@ -180,26 +332,50 @@ extension NodeRenderer {
     /// decorations — what `SceneGeometry` adds padding to. Without
     /// decorations this is exactly `textSize`, so M1/M2 scenes are
     /// unchanged.
+    ///
+    /// F-CNT-2: the image block joins the size — above/below add a
+    /// horizontal band (width grows to the wider of image and text),
+    /// left/right add a vertical one. The LaTeX glyph (F-CNT-5) swaps
+    /// `textSize` itself before this call (the scene builder measures
+    /// through the host's math cache, falling back to the source text).
     public static func contentSize(
         textSize: CGSize, style: ResolvedNodeStyle, decorations: NodeDecorations?
     ) -> CGSize {
         guard let decorations, !decorations.isEmpty else { return textSize }
         let leading = NodeDecorationMetrics.leadingWidth(decorations)
         let trailing = NodeDecorationMetrics.trailingWidth(decorations)
+        let gap = NodeDecorationMetrics.imageGap
+
+        var contentWidth = textSize.width
+        var contentHeight = textSize.height
+        if let image = decorations.image {
+            let width = max(1, image.size.width)
+            let height = max(1, image.size.height)
+            switch image.placement {
+            case .above, .below:
+                contentWidth = max(contentWidth, width)
+                contentHeight += height + gap
+            case .left, .right:
+                contentWidth += width + gap
+                contentHeight = max(contentHeight, height)
+            }
+        }
+
         let rowHeight = max(
-            textSize.height,
+            contentHeight,
             decorations.task == nil ? 0 : NodeDecorationMetrics.checkboxSize)
         let height = rowHeight + NodeDecorationMetrics.tagRowHeight(decorations)
-        return CGSize(width: leading + textSize.width + trailing, height: height)
+        return CGSize(width: leading + contentWidth + trailing, height: height)
     }
 
     /// Draws the decoration columns around the already-drawn title:
-    /// leading task mark, trailing badges and the pill row. (The
-    /// completed task's strikethrough and 50% opacity ride `drawTitle`,
-    /// which owns the text-space transform.)
+    /// leading task mark and marker row, the image block, trailing
+    /// badges, the citation chip and the pill row. (The completed
+    /// task's strikethrough and 50% opacity ride `drawTitle`, which
+    /// owns the text-space transform.)
     static func drawDecorations(
         style: ResolvedNodeStyle, layout: NodeDecorationLayout, decorations: NodeDecorations,
-        measurer: TextMeasurer, in context: CGContext
+        measurer: TextMeasurer, media: NodeMedia?, in context: CGContext
     ) {
         let fillColor = style.borderColor ?? style.textColor
         context.saveGState()
@@ -224,6 +400,18 @@ extension NodeRenderer {
         }
         if let rect = layout.linkBadgeRect {
             drawLinkBadge(in: rect, in: context)
+        }
+        if let rect = layout.attachmentBadgeRect {
+            drawAttachmentBadge(in: rect, in: context)
+        }
+        if let rect = layout.sourceBadgeRect {
+            drawSourceChip(in: rect, in: context)
+        }
+        if let rect = layout.markerRowRect {
+            drawMarkerRow(decorations.markers, in: rect, color: fillColor, measurer: measurer, media: media, in: context)
+        }
+        if let rect = layout.imageRect {
+            drawImageBlock(in: rect, media: media, in: context)
         }
         if let row = layout.tagRowRect {
             drawTagPills(decorations.tags, in: row, in: context, measurer: measurer)

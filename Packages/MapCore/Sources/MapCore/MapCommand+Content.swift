@@ -91,7 +91,7 @@ extension MapCommand {
         id: String, parse: SmartTyping.CommitParse, in model: MapModel
     ) -> MapCommand {
         var commands: [MapCommand] = [.editText(id: id, title: parse.title)]
-        if let task = parse.task {
+        if parse.task != nil {
             // The prefix said "task" — the completion state rides a
             // wholesale task value so `[x] ` commits done in the same
             // step (and `[ ] ` on a done task reopens it).

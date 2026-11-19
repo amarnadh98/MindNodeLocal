@@ -89,7 +89,7 @@ public enum NodeRenderer {
     /// canvas, export and Quick Look (SPEC §11).
     public static func draw(
         style: ResolvedNodeStyle, title: NodeTitle, decorations: NodeDecorations? = nil,
-        measurer: TextMeasurer, in context: CGContext, frame: CGRect
+        measurer: TextMeasurer, media: NodeMedia? = nil, in context: CGContext, frame: CGRect
     ) {
         context.saveGState()
 
@@ -129,12 +129,12 @@ public enum NodeRenderer {
             context.strokePath()
         }
 
-        drawTitle(style: style, title: title, decorations: decorations, measurer: measurer, in: context, frame: frame)
+        drawTitle(style: style, title: title, decorations: decorations, media: media, measurer: measurer, in: context, frame: frame)
         if let decorations, !decorations.isEmpty {
             let layout = decorationLayout(style: style, decorations: decorations, frame: frame)
             drawDecorations(
                 style: style, layout: layout, decorations: decorations,
-                measurer: measurer, in: context)
+                measurer: measurer, media: media, in: context)
         }
         context.restoreGState()
     }
@@ -162,7 +162,7 @@ public enum NodeRenderer {
     /// theme-controlled 50% opacity with a strikethrough (F-TSK-1).
     private static func drawTitle(
         style: ResolvedNodeStyle, title: NodeTitle, decorations: NodeDecorations?,
-        measurer: TextMeasurer, in context: CGContext, frame: CGRect
+        media: NodeMedia?, measurer: TextMeasurer, in context: CGContext, frame: CGRect
     ) {
         guard !title.text.isEmpty else { return }
         let titleRow = NodeDecorationLayout.layout(
@@ -170,6 +170,13 @@ public enum NodeRenderer {
             contentRect: contentRect(style: style, frame: frame)
         ).titleRow
         guard titleRow.width > 1, titleRow.height > 1 else { return }
+
+        // F-CNT-5: a math node draws the rendered glyph; the source
+        // text is the fallback (a parse error or a missing glyph).
+        if decorations?.math == true, let glyph = media?.math {
+            drawMathGlyph(glyph, in: titleRow, in: context)
+            return
+        }
 
         let textSize = measurer.nodeTitleSize(
             title, font: style.font, maxWidth: titleRow.width)

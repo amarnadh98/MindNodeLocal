@@ -21,6 +21,11 @@ public struct SceneNode {
     /// progress ring, note and link badges, tag pills). `nil` = plain
     /// node; part of the raster key, so decoration changes re-raster.
     public var decorations: NodeDecorations? = nil
+    /// The resolved drawing-time media (F-CNT-2/3/5): the decoded
+    /// image thumbnail, SF Symbol glyph rasters and the rendered math
+    /// glyph. `nil` when the node has nothing media-backed; the
+    /// raster/diff comparison uses its `revision`.
+    public var media: NodeMedia? = nil
 }
 
 /// One branch connector: parent outgoing anchor to child incoming anchor.
@@ -156,6 +161,10 @@ public final class SceneBuildCache {
     /// decorations-affecting command marks it dirty in `dirtyIDs`), so
     /// entries never go stale for a visible node.
     var decorations: [String: NodeDecorations?] = [:]
+    /// The host's resolved-media lookup (F-CNT-2/3/5): image
+    /// thumbnails, SF Symbol glyphs and rendered math. Async caches
+    /// live behind it; lookups are dictionary hits.
+    public var media: SceneMediaProvider?
     public let variant: ThemeVariant
     public let spacing: LayoutSpacing
 
@@ -194,12 +203,13 @@ public enum SceneGeometry {
         measurer: TextMeasurer,
         spacing: LayoutSpacing = .default,
         showsTagPills: Bool = true,
+        prunedIDs: Set<String>? = nil,
         editingTitle: (id: String, title: NodeTitle)? = nil,
         theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, editingTitle: editingTitle,
+            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
             cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil,
             theme: theme)
     }
@@ -213,13 +223,14 @@ public enum SceneGeometry {
         measurer: TextMeasurer,
         spacing: LayoutSpacing = .default,
         showsTagPills: Bool = true,
+        prunedIDs: Set<String>? = nil,
         editingTitle: (id: String, title: NodeTitle)? = nil,
         theme: Theme? = nil
     ) -> CanvasScene {
         buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: nil,
-            theme: theme)
+            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
+            cache: cache, dirty: nil, theme: theme)
     }
 
     /// Incremental rebuild after a small change (SPEC §11.3): reuses the
@@ -240,18 +251,20 @@ public enum SceneGeometry {
         spacing: LayoutSpacing = .default,
         dirty: Set<String>,
         showsTagPills: Bool = true,
+        prunedIDs: Set<String>? = nil,
         editingTitle: (id: String, title: NodeTitle)? = nil,
         theme: Theme? = nil
     ) -> CanvasScene {
         guard cache.variant == variant, cache.spacing == spacing else {
             return build(
                 model: model, variant: variant, measurer: measurer, spacing: spacing,
-                showsTagPills: showsTagPills, editingTitle: editingTitle, theme: theme)
+                showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
+                theme: theme)
         }
         return buildCore(
             model: model, variant: variant, measurer: measurer, spacing: spacing,
-            showsTagPills: showsTagPills, editingTitle: editingTitle, cache: cache, dirty: dirty,
-            theme: theme)
+            showsTagPills: showsTagPills, prunedIDs: prunedIDs, editingTitle: editingTitle,
+            cache: cache, dirty: dirty, theme: theme)
     }
 
     // MARK: core build
@@ -262,6 +275,7 @@ public enum SceneGeometry {
         measurer: TextMeasurer,
         spacing: LayoutSpacing,
         showsTagPills: Bool,
+        prunedIDs: Set<String>?,
         editingTitle: (id: String, title: NodeTitle)?,
         cache: SceneBuildCache,
         dirty: Set<String>?,
@@ -300,6 +314,7 @@ public enum SceneGeometry {
                     measurer: measurer, caches: caches,
                     progress: progress, tagByID: tagByID,
                     hasTagDefinitions: hasTagDefinitions, showsTagPills: showsTagPills,
+                    pruned: prunedIDs,
                     editingTitle: editingTitle, cache: cache))
 
             // Full pass: a fresh state, everything recomputed and recorded.
@@ -351,16 +366,20 @@ public enum SceneGeometry {
                 let title = id == editingTitle?.id ? editingTitle?.title : node.title
                 let adjust = adjustments[id] ?? .zero
                 let translated = frame.offsetBy(dx: adjust.x, dy: adjust.y)
+                let resolvedStyle = caches.theme.applyingOverrides(
+                    node.style, to: caches.style(level: info.depth, level1Index: level1Index))
+                let nodeDecorations = cache.decorations[id] ?? nil
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
-                    style: caches.theme.applyingOverrides(
-                        node.style, to: caches.style(level: info.depth, level1Index: level1Index)),
+                    style: resolvedStyle,
                     title: title ?? node.title,
                     level: info.depth,
                     level1Index: level1Index,
                     width: node.width,
-                    decorations: cache.decorations[id] ?? nil)
+                    decorations: nodeDecorations,
+                    media: cache.media?.media(
+                        for: nodeDecorations, title: (title ?? node.title).text, style: resolvedStyle))
                 if translated.maxY > bottom {
                     bottom = translated.maxY
                 }
@@ -438,6 +457,10 @@ public enum SceneGeometry {
         let tagByID: [String: Tag]
         let hasTagDefinitions: Bool
         let showsTagPills: Bool
+        /// F-TAG-3 hide mode: ids kept out of the scene. The host must
+        /// rebuild fully when the pruned set changes (child lists are
+        /// layout inputs — the dirty path can't see filter flips).
+        let pruned: Set<String>?
         let editingTitle: (id: String, title: NodeTitle)?
         let cache: SceneBuildCache
     }
@@ -470,6 +493,15 @@ public enum SceneGeometry {
             let textSize: CGSize
             if let cached = inputs.cache.sizes[key] {
                 textSize = cached
+            } else if node.math == true,
+                let glyph = inputs.cache.media?.math?((title ?? node.title).text, style.font, style.textColor)
+            {
+                // F-CNT-5: a math node measures through the rendered
+                // glyph (the host's cache; a parse error never reaches
+                // here — the provider returns nil and the source text
+                // measures below).
+                inputs.cache.sizes[key] = glyph.size
+                textSize = glyph.size
             } else {
                 let maxWidth: CGFloat?
                 if node.width?.mode == .fixed, let fixed = node.width?.value {
@@ -490,14 +522,17 @@ public enum SceneGeometry {
                 id: id,
                 size: CGSize(width: width, height: height),
                 side: side(of: node),
-                childIDs: node.folded ? [] : node.children)
+                childIDs: node.folded
+                    ? []
+                    : node.children.filter { inputs.pruned?.contains($0) != true })
         }
     }
 
     /// One node's decoration value (M3): the task mark (a checkbox for a
     /// leaf task, F-TSK-1; a progress ring when the subtree holds task
-    /// descendants, F-TSK-2), the note/link badges and the tag pills
-    /// resolved from the document's tag table.
+    /// descendants, F-TSK-2), the note/link badges, the marker row, the
+    /// image block, the citation chip, the attachment badge and the tag
+    /// pills resolved from the document's tag table.
     static func decoration(
         for node: Node, ratio: TaskRatio?, tagByID: [String: Tag],
         hasTagDefinitions: Bool, showsTagPills: Bool
@@ -521,8 +556,27 @@ public enum SceneGeometry {
             }
         }
 
+        // F-CNT-3: the marker row before the title.
+        let markers = (node.markers ?? []).map { MarkerBadge(token: $0) }
+        // F-CNT-2: the image block (its display size is a layout input).
+        var image: ImageBlock?
+        if let stored = node.image, stored.size.count >= 2 {
+            image = ImageBlock(
+                asset: stored.asset,
+                size: CGSize(width: stored.size[0], height: stored.size[1]),
+                placement: stored.placement)
+        }
+
         let value = NodeDecorations(
-            task: task, hasNote: node.note != nil, linkURL: node.link, tags: pills)
+            task: task,
+            hasNote: node.note != nil,
+            linkURL: node.link,
+            tags: pills,
+            markers: markers,
+            image: image,
+            math: node.math == true,
+            source: node.source?.url,
+            attachmentCount: node.attachments?.count ?? 0)
         return value.isEmpty ? nil : value
     }
 
