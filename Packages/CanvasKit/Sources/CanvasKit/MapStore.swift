@@ -129,6 +129,14 @@ public final class MapStore {
         onChange?(.redo(forward))
     }
 
+    /// Ends the open typing session, so the next `editText` opens a new
+    /// undo step. The host calls this after a save: a coalesced edit
+    /// registers no undo group, and NSDocument only marks a saved
+    /// document dirty again when a new group closes.
+    public func closeEditSession() {
+        endSession()
+    }
+
     /// Closes any open edit session: undo/redo navigation must never
     /// coalesce the next perform with the pre-navigation session.
     private func endSession() {

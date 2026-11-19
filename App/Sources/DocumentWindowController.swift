@@ -237,7 +237,7 @@ extension DocumentWindowController {
 
     private func reorder(delta: Int) {
         guard let store else { return }
-        var commands: [MapCommand] = []
+        var moves: [(id: String, slot: Int)] = []
         for id in selectedIDs {
             guard let node = store.model.nodes[id] else { continue }
             let siblings = node.parent.flatMap { store.model.nodes[$0]?.children } ?? store.model.roots
@@ -245,8 +245,12 @@ extension DocumentWindowController {
             // Skip nodes already at the target edge: a clamped reorder
             // would register a no-op undo step.
             guard min(max(slot + delta, 0), siblings.count - 1) != slot else { continue }
-            commands.append(.reorderSibling(id: id, delta: delta))
+            moves.append((id, slot))
         }
+        // Move the node nearest the target edge first, so adjacent
+        // selected siblings shift together instead of swapping places.
+        moves.sort { delta < 0 ? $0.slot < $1.slot : $0.slot > $1.slot }
+        let commands = moves.map { MapCommand.reorderSibling(id: $0.id, delta: delta) }
         if let command = grouped("Move Node", commands) {
             performKeepingSelection(command)
         }
@@ -287,7 +291,8 @@ extension DocumentWindowController {
         guard let store else { return }
         var commands: [MapCommand] = []
         for id in selectedIDs {
-            guard let node = store.model.nodes[id] else { continue }
+            // A leaf has nothing to fold.
+            guard let node = store.model.nodes[id], !node.children.isEmpty else { continue }
             commands.append(.setFolded(id: id, folded: !node.folded))
         }
         if let command = grouped("Fold Node", commands) {

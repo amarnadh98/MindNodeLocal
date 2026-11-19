@@ -56,6 +56,10 @@ final class MapDocument: NSDocument {
 
     override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         let model = store.model
+        // Every save (autosave included) ends the open typing session, so
+        // further typing on the same node closes a fresh undo group and
+        // re-dirties the document.
+        store.closeEditSession()
         let current = meta ?? PackageMeta(appVersion: AppIdentity.appVersion, docID: model.docID)
         let updated = PackageMeta(
             formatVersion: current.formatVersion,
@@ -90,14 +94,12 @@ final class MapDocument: NSDocument {
         }
     }
 
-    /// A store change: a forward perform marks the document dirty; undo
-    /// and redo are covered by NSDocument's own undo-manager integration,
-    /// so they are skipped here to avoid double counting. Every change
-    /// rebuilds the visible scene.
+    /// A store change rebuilds the visible scene. The change count is
+    /// left to NSDocument's undo-manager integration (each closed undo
+    /// group is a change, each undo/redo moves it back/forward); counting
+    /// performs here as well would leave a document undone back to its
+    /// saved state still marked edited.
     private func storeDidChange(_ origin: MapStore.ChangeOrigin) {
-        if case .perform = origin {
-            updateChangeCount(.changeDone)
-        }
         for case let controller as DocumentWindowController in windowControllers {
             controller.modelDidChange()
         }
