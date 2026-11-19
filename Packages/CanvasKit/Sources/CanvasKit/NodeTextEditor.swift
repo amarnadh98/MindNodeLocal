@@ -160,6 +160,8 @@ public final class NodeTextEditor {
 
         syncPosition()
         canvas.window?.makeFirstResponder(view)
+        // VoiceOver follows the editing text field (SPEC §11.6).
+        canvas.announceEditingFocus(to: view)
         canvas.needsDisplay = true
     }
 

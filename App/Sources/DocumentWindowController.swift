@@ -73,6 +73,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         canvas.onDrop = { [weak self] command, selection in
             self?.performDragDrop(command, selection: selection)
         }
+        setupAccessibility()
     }
 
     required init?(coder: NSCoder) {
@@ -496,6 +497,13 @@ extension DocumentWindowController {
             canvas.beginEditing(nodeID: id)
             return
         }
+        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
+    }
+
+    /// Always creates a sibling below the selection, without ⏎'s
+    /// enter-edit rule — for callers with no keyboard context, such as
+    /// VoiceOver's Add Sibling action.
+    func addSiblingBelow() {
         addCommand { .addSibling(anchor: $0, before: false, node: $1) }
     }
 
