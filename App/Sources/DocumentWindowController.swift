@@ -55,6 +55,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// The zoom % pull-down's button, synced on camera moves.
     var zoomPopupButton: NSButton?
 
+    /// M6 (F-PRE): lazily-built presentation coordinator, the Slides
+    /// sidebar, and any in-flight build-order recording. Kept as
+    /// optional boxes because stored properties cannot live in
+    /// extensions; all the presentation logic is in
+    /// DocumentWindowController+Presentation.swift.
+    var presentationCoordinatorBox: PresentationCoordinator?
+    var slidesSidebarBox: SlidesSidebarController?
+
     /// The pasteboard flavours written by copy/cut (F-EDT-9): the
     /// internal lossless payload plus the three interop texts.
     private static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
@@ -102,6 +110,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             self?.documentToolbar?.validateVisibleItems()
             // F-FOC: navigation inside focus moves the focus.
             self?.focusFind.selectionDidChange()
+            // M6 (F-PRE-3): a click during a build recording appends to
+            // the draft order.
+            self?.slidesRecordSelectionChange(ids)
         }
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
@@ -206,7 +217,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The theme variant for the current model and system appearance.
-    private func currentVariant() -> ThemeVariant {
+    /// (Internal since M6: the presentation coordinator resolves the
+    /// same variant for its derived scenes.)
+    func currentVariant() -> ThemeVariant {
         guard let mapDocument = document as? MapDocument else { return .light }
         switch mapDocument.model.appearance {
         case .dark:
@@ -325,6 +338,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // post-change model.
         focusFind.sceneDidChange()
         window?.title = document?.displayName ?? window?.title ?? ""
+        // M6 (F-PRE-2): authored slide changes rebuild the sidebar.
+        refreshSlidesSidebar()
     }
 
     // MARK: view state (F-CAN-8, ADR-0005)

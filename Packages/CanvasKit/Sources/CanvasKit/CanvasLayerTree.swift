@@ -86,6 +86,11 @@ public final class CanvasLayerTree {
     private var grid = SpatialGrid()
     private var editingID: String?
     var lastScale: CGFloat = 1
+    /// M6 (F-PRE/§10): the presentation/recall overlay. Stored on the
+    /// tree so layers realized later by culling pick their state up in
+    /// `configureLayer`/`configureBranchLayer`; applied and animated by
+    /// CanvasLayerTree+Reveal.swift.
+    var revealOverlay: RevealOverlay?
 
     var nodeLayers: [String: NodeVisualLayer] = [:]
     var branchLayers: [BranchKey: BranchVisualLayer] = [:]
@@ -448,6 +453,12 @@ public final class CanvasLayerTree {
         }
 
         configureContents(layer, node: node, camera: camera, backingScale: backingScale)
+        // M6 (F-PRE/§10): the reveal overlay wins over the default
+        // opacity — ghosted, hidden and placeholder nodes ride
+        // opacity only, never a re-raster.
+        if let overlay = revealOverlay {
+            layer.opacity = Float(overlay.nodeOpacity(node.id))
+        }
     }
 
     /// Rasters the node through the shared `NodeRenderer` only when

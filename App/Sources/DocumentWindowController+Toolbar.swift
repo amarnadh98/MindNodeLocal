@@ -21,6 +21,10 @@ extension NSToolbarItem.Identifier {
     static let zoomToFit = NSToolbarItem.Identifier("ArborToolbarZoomToFit")
     /// F-CAN-6.
     static let minimap = NSToolbarItem.Identifier("ArborToolbarMinimap")
+    /// M6 (F-PRE-1): the ▶︎ Present item (§4.1 toolbar order).
+    static let present = NSToolbarItem.Identifier("ArborToolbarPresent")
+    /// M6 (F-PRE-2): the Slides sidebar toggle.
+    static let slidesSidebar = NSToolbarItem.Identifier("ArborToolbarSlidesSidebar")
 }
 
 @MainActor
@@ -36,6 +40,7 @@ extension DocumentWindowController {
     static let defaultToolbarItemOrder: [NSToolbarItem.Identifier] = [
         .addChild, .addSibling, .deleteSelection, .foldUnfold,
         .flexibleSpace,
+        .present, .slidesSidebar,
         .zoomOut, .zoomPercent, .zoomIn, .zoomToFit, .minimap,
     ]
 
@@ -233,6 +238,16 @@ extension DocumentWindowController {
                 identifier: .minimap, label: "Minimap", symbol: "map",
                 tooltip: "Show or hide the minimap (⌥⌘M)",
                 action: #selector(toggleMinimapAction(_:)))
+        case .present:
+            return borderedItem(
+                identifier: .present, label: "Present", symbol: "play.fill",
+                tooltip: "Present this map (⌥⌘⏎)",
+                action: #selector(presentAction(_:)))
+        case .slidesSidebar:
+            return borderedItem(
+                identifier: .slidesSidebar, label: "Slides", symbol: "rectangle.stack.badge.play",
+                tooltip: "Show or hide the Slides sidebar (⌃⌘S)",
+                action: #selector(toggleSlidesSidebarAction(_:)))
         case .zoomPercent:
             return zoomPopupItem()
         default:
@@ -292,6 +307,13 @@ extension DocumentWindowController {
         case #selector(zoomStepAction(_:)):
             menuItem.state =
                 menuItem.tag == Self.zoomPercent(of: canvas.camera.scale) ? .on : .off
+            return true
+        case #selector(resumePresentationAction(_:)):
+            // ⌘⏎ (F-PRE-6) only means "resume" while a run is paused
+            // into live edit; otherwise ⌘⏎ keeps its editing meaning.
+            return presentationCoordinatorBox?.isLiveEditPaused == true
+        case #selector(toggleSlidesSidebarAction(_:)):
+            menuItem.state = slidesSidebarBox?.isVisible == true ? .on : .off
             return true
         case #selector(deleteSubtreeAction(_:)), #selector(deleteNodeOnlyAction(_:)),
             #selector(addChildAction(_:)), #selector(addSiblingBelow(_:)),

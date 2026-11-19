@@ -275,6 +275,12 @@ extension MapCommand {
 
         case .setTheme(let id):
             model.theme = id.map { ThemeSelection(id: $0, overrides: model.theme?.overrides) }
+
+        case .setPresentations(let presentations):
+            // M6 (F-PRE-2/3): a wholesale replace — the authoring layer
+            // builds the whole new list and groups the command under an
+            // action name ("Add Slide", …), one undo step per action.
+            model.presentations = presentations
         }
     }
 

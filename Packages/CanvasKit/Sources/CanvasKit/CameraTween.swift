@@ -9,6 +9,22 @@ public enum CameraEasing {
     /// 500 ms, inside SPEC §7.6's 450–600 ms camera band.
     public static let focusDuration: CFTimeInterval = 0.5
 
+    /// The slide-change camera duration for presentations: 600 ms,
+    /// the top of §7.6's 450–600 ms camera band.
+    public static let slideDuration: CFTimeInterval = 0.6
+    /// §7.6 Reduce Motion: camera moves become a 120 ms crossfade.
+    public static let reduceMotionCrossfade: CFTimeInterval = 0.12
+
+    /// The slide tween duration honoring the motion preference.
+    public static func slideDuration(reduceMotion: Bool) -> CFTimeInterval {
+        reduceMotion ? 0 : slideDuration
+    }
+
+    /// Cubic ease-in-out, clamped to 0…1 (same curve as `value(at:)`).
+    public static func easeInOutCubic(_ progress: Double) -> Double {
+        value(at: progress)
+    }
+
     /// Cubic ease-in-out: 0 at t=0, 1 at t=1, slow at both ends.
     public static func value(at progress: Double) -> Double {
         let clamped = min(max(progress, 0), 1)

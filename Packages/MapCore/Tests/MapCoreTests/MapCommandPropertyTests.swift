@@ -131,6 +131,21 @@ struct CommandPropertyTests {
                         index: generator.next() % 2 == 0 ? Int(generator.next() % 8) : nil)
                 ]),
             (try? MapCommand.duplicate(id: nodeID, in: model)),
+            // M6 (F-PRE-2/3): a wholesale presentation-list replace; the
+            // inverse restores the pre-state list exactly.
+            .setPresentations(
+                model.presentations.map { list in
+                    var updated = list
+                    updated.append(
+                        Presentation(
+                            id: "p\(generator.next())", name: "Deck",
+                            slides: [Slide(id: "s\(generator.next())", title: "slide")]))
+                    return updated
+                } ?? [
+                    Presentation(
+                        id: "p\(generator.next())", name: "Deck",
+                        slides: [Slide(id: "s\(generator.next())", title: "slide")])
+                ]),
         ].compactMap { $0 }
     }
 

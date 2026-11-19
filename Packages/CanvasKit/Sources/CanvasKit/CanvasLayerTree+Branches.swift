@@ -33,6 +33,13 @@ extension CanvasLayerTree {
         _ layer: BranchVisualLayer, branch: SceneBranch, camera: Camera, reduceMotion: Bool
     ) {
         layer.transform = Self.modelSpaceTransform(for: camera)
+        // M6 (F-PRE/§10): the branch dims with the weaker of its two
+        // ends under a reveal overlay.
+        if let overlay = revealOverlay {
+            layer.opacity = Float(overlay.branchOpacity(parentID: branch.parentID, childID: branch.childID))
+        } else if layer.opacity != 1 {
+            layer.opacity = 1
+        }
         guard let old = layer.branch else {
             applyBranchPath(layer, old: nil, branch: branch, reduceMotion: reduceMotion)
             return

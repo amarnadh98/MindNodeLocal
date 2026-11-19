@@ -84,6 +84,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Save As…", #selector(NSDocument.saveAs(_:)), "S"),
                     item("Revert to Saved", #selector(NSDocument.revertToSaved(_:)), ""),
                     .separator(),
+                    // M6 (F-PRE-1/4): present the map; ⌘⏎ resumes a
+                    // run paused into live edit (its item validates
+                    // only then, so ⌘⏎ keeps its editing meaning).
+                    item(
+                        "Present", #selector(DocumentWindowController.presentAction(_:)),
+                        "\r", modifiers: [.command, .option]),
+                    item(
+                        "Resume Presentation", #selector(DocumentWindowController.resumePresentationAction(_:)),
+                        "\r", modifiers: [.command]),
+                    item(
+                        "Export Slides as PDF…",
+                        #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
+                    .separator(),
                     item("Close", #selector(NSWindow.performClose(_:)), "w"),
                 ]))
         mainMenu.addItem(
@@ -310,6 +323,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Command Palette", #selector(DocumentWindowController.commandPaletteAction(_:)),
                         "P", modifiers: [.command, .shift]),
+                    .separator(),
+                    // M6 (F-PRE-2): the Slides sidebar, hidden by
+                    // default (§6.1 View: Sidebar ⌃⌘S).
+                    item(
+                        "Slides Sidebar", #selector(DocumentWindowController.toggleSlidesSidebarAction(_:)),
+                        "s", modifiers: [.control, .command]),
                 ]))
         mainMenu.addItem(
             menu(
@@ -323,7 +342,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(helpMenuItem())
         return mainMenu
     }
+}
 
+// Menu-building helpers, split out to keep the class body small.
+extension AppDelegate {
     /// Edit ▸ Find (F-FOC-3, SPEC §6.1): NSTextFinder-style items whose
     /// actions live on the document window controller and validate
     /// against the find session (DocumentWindowController+FocusFind).
