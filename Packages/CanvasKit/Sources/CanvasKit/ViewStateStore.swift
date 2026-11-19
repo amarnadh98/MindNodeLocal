@@ -1,6 +1,6 @@
 import Foundation
 
-/// Stores one `ViewState` JSON sidecar per document under a base
+/// Stores one `CanvasViewState` JSON sidecar per document under a base
 /// directory, keyed by the document's `docID` (ADR-0005) — the
 /// production base is Application Support. The base directory is
 /// injectable so tests run against a temp folder.
@@ -17,12 +17,12 @@ public struct ViewStateStore: Sendable {
     }
 
     /// The production base directory:
-    /// `~/Library/Application Support/Arbor/ViewState`.
+    /// `~/Library/Application Support/Arbor/CanvasViewState`.
     public static func defaultBaseURL() -> URL {
         let support =
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return support.appending(path: "Arbor/ViewState", directoryHint: .isDirectory)
+        return support.appending(path: "Arbor/CanvasViewState", directoryHint: .isDirectory)
     }
 
     /// `<base>/<docID>.json`, with the id defensively flattened so a
@@ -38,14 +38,14 @@ public struct ViewStateStore: Sendable {
     }
 
     /// The stored state for a document, or nil when absent or corrupt.
-    public func load(docID: String) -> ViewState? {
+    public func load(docID: String) -> CanvasViewState? {
         guard let data = try? Data(contentsOf: fileURL(forDocID: docID)) else { return nil }
-        return try? JSONDecoder().decode(ViewState.self, from: data)
+        return try? JSONDecoder().decode(CanvasViewState.self, from: data)
     }
 
     /// Persists the state atomically, creating the base directory on
     /// first use.
-    public func save(_ state: ViewState, docID: String) throws {
+    public func save(_ state: CanvasViewState, docID: String) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         let data = try encoder.encode(state)

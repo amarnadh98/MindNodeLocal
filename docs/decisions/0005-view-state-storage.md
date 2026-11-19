@@ -13,7 +13,7 @@ F-CAN-8 (SPEC §5.1) requires the per-document view state — zoom, scroll, sele
 Folded flags are different: they change what the document *shows* and already live on `node.folded` in `map.json` (F-LAY-14). They are not duplicated in the sidecar.
 
 ## Decision
-Persist the view state as a JSON sidecar keyed by the document's `docID`, stored outside the package by `ViewStateStore` in CanvasKit:
+Persist the view state as a JSON sidecar keyed by the document's `docID`, stored outside the package by `ViewStateStore` in CanvasKit as `CanvasViewState` (named apart from MapCore's schema `ViewState` so files importing both compile unambiguously):
 
 - Location: `~/Library/Application Support/Arbor/ViewState/<docID>.json` (production base; injectable for tests). Written atomically with sorted-key pretty-printed JSON, per SPEC §8.1's conventions.
 - The host writes it on camera/selection change (debounced by the caller), never through `MapDocument.updateChangeCount` — panning does not dirty the document.

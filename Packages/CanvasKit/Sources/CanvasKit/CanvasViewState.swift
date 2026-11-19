@@ -11,7 +11,7 @@ import MapCore
 /// `MapCore` declares its own schema-level `ViewState` for the
 /// `map.json` `view` field (SPEC §8.2); this is the live per-user copy
 /// the canvas reads and writes.
-public struct ViewState: Codable, Sendable, Equatable {
+public struct CanvasViewState: Codable, Sendable, Equatable {
     public var scale: CGFloat
     public var origin: CGPoint
     public var selection: [String]
@@ -47,7 +47,7 @@ public struct ViewState: Codable, Sendable, Equatable {
     /// F-CAN-8 restore hygiene: selection ids that no longer exist in
     /// the scene (deleted, or folded away since the last session) are
     /// dropped; order is preserved.
-    public func sanitized(for scene: CanvasScene) -> ViewState {
+    public func sanitized(for scene: CanvasScene) -> CanvasViewState {
         var copy = self
         copy.selection = selection.filter { scene.nodes[$0] != nil }
         return copy

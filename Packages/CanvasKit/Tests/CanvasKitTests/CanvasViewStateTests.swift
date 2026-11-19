@@ -6,10 +6,10 @@ import Testing
 
 @testable import CanvasKit
 
-// `MapCore` declares the schema-level `ViewState` for `map.json`'s
+// `MapCore` declares the schema-level `CanvasViewState` for `map.json`'s
 // `view` field; these tests target CanvasKit's live copy (ADR-0005),
 // so the name is pinned to the right module.
-private typealias ViewState = CanvasKit.ViewState
+private typealias CanvasViewState = CanvasKit.CanvasViewState
 
 /// A scene containing only the listed ids, for selection sanitization.
 private func tinyScene(ids: [String]) -> CanvasScene {
@@ -35,7 +35,7 @@ private func freshTempDirectory() throws -> URL {
 
 struct ViewStateTests {
     @Test func defaultsMatchAFreshCamera() {
-        let state = ViewState()
+        let state = CanvasViewState()
         #expect(state.scale == 1)
         #expect(state.origin == .zero)
         #expect(state.selection.isEmpty)
@@ -44,7 +44,7 @@ struct ViewStateTests {
     }
 
     @Test func sanitizedDropsSelectionIdsMissingFromTheScene() {
-        let state = ViewState(selection: ["a", "gone", "b"])
+        let state = CanvasViewState(selection: ["a", "gone", "b"])
         let sanitized = state.sanitized(for: tinyScene(ids: ["a", "b"]))
         // Missing (deleted or folded) ids go; present ids keep order.
         #expect(sanitized.selection == ["a", "b"])
@@ -58,7 +58,7 @@ struct ViewStateStoreTests {
         let base = try freshTempDirectory()
         defer { try? FileManager.default.removeItem(at: base) }
         let store = ViewStateStore(baseURL: base)
-        let state = ViewState(
+        let state = CanvasViewState(
             camera: Camera(origin: CGPoint(x: -42.5, y: 100), scale: 1.5),
             selection: ["root", "branch-1"], activeView: .map)
 
@@ -72,8 +72,8 @@ struct ViewStateStoreTests {
         let base = try freshTempDirectory()
         defer { try? FileManager.default.removeItem(at: base) }
         let store = ViewStateStore(baseURL: base)
-        try store.save(ViewState(scale: 0.5), docID: "doc")
-        try store.save(ViewState(scale: 2), docID: "doc")
+        try store.save(CanvasViewState(scale: 0.5), docID: "doc")
+        try store.save(CanvasViewState(scale: 2), docID: "doc")
         #expect(store.load(docID: "doc")?.scale == 2)
     }
 
@@ -98,7 +98,7 @@ struct ViewStateStoreTests {
     @Test func defaultBaseDirectoryLivesUnderApplicationSupport() {
         let url = ViewStateStore.defaultBaseURL()
         #expect(url.path.contains("Application Support"))
-        #expect(url.path.contains("Arbor/ViewState"))
+        #expect(url.path.contains("Arbor/CanvasViewState"))
     }
 
     @Test func docIDIsFlattenedIntoOneFileComponent() {
