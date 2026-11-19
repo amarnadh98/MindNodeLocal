@@ -134,7 +134,7 @@ public final class MapStore {
     public func performWithoutUndo(_ command: MapCommand) throws {
         var working = model
         try command.apply(to: &working)
-        stampTouchedNodes(previous: model, in: &working)
+        stampTouchedNodes(previous: model, in: &working, author: .user)
         model = working
         endSession()
         onChange?(.nonUndoable(command))

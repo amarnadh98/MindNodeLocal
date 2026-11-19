@@ -176,7 +176,6 @@ extension MapCommand {
         case .setAIPolicy:
             return .setAIPolicy(policy: model.ai)
 
-
         case .setTitle:
             return .setTitle(model.title)
         }

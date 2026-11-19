@@ -294,7 +294,6 @@ extension MapCommand {
         case .setAIPolicy(let policy):
             model.ai = policy
 
-
         case .setTitle(let title):
             model.title = title
         }

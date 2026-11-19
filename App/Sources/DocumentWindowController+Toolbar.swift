@@ -316,6 +316,7 @@ extension DocumentWindowController {
             return presentationCoordinatorBox?.isLiveEditPaused == true
         case #selector(toggleSlidesSidebarAction(_:)):
             menuItem.state = slidesSidebarBox?.isVisible == true ? .on : .off
+            return true
         case #selector(aiExpandAction(_:)), #selector(generateMapAction(_:)),
             #selector(aiSummarizeBranchAction(_:)), #selector(aiRewriteTitlesAction(_:)),
             #selector(aiSuggestTitleAction(_:)):

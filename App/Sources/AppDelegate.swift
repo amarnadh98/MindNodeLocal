@@ -383,45 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "Mastery Overlay", #selector(DocumentWindowController.toggleMasteryOverlayAction(_:)),
                         "h", modifiers: [.command, .option]),
                 ]))
-        mainMenu.addItem(
-            menu(
-                "Study",
-                [
-                    // F-STD-4: the three session scopes.
-                    item(
-                        "Study Branch", #selector(DocumentWindowController.studyBranchAction(_:)), ""),
-                    item(
-                        "Study Document", #selector(DocumentWindowController.studyDocumentAction(_:)), ""),
-                    item(
-                        "Study Due", #selector(DocumentWindowController.studyDueAction(_:)),
-                        "\r", modifiers: [.control, .command]),
-                    .separator(),
-                    // F-STD-6.
-                    item(
-                        "Study Weakest Branch",
-                        #selector(DocumentWindowController.studyWeakestBranchAction(_:)), ""),
-                    // F-STD-7.
-                    item(
-                        "Show Dashboard", #selector(DocumentWindowController.showStudyDashboardAction(_:)),
-                        ""),
-                    .separator(),
-                    // F-STD-1: the deck toggle and the card policy radio
-                    // group (tags: 1 Card, 2 Not a Card, 3 Auto).
-                    item(
-                        "Make Study Deck", #selector(DocumentWindowController.makeStudyDeckAction(_:)),
-                        "s", modifiers: [.command, .option]),
-                    item(
-                        "Card", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 1),
-                    item(
-                        "Not a Card", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 2),
-                    item(
-                        "Auto", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 3),
-                    .separator(),
-                    // F-STD-2: wraps the selected title text in the editor.
-                    item(
-                        "Make Cloze", #selector(DocumentWindowController.makeClozeAction(_:)),
-                        "C", modifiers: [.command, .shift]),
-                ]))
+        mainMenu.addItem(studyMenuItem())
         mainMenu.addItem(
             menu(
                 "Window",
@@ -442,6 +404,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // Menu-building helpers, split out to keep the class body small.
 extension AppDelegate {
+    /// Study (F-STD-1/2/4/6/7, SPEC §6.1).
+    private func studyMenuItem() -> NSMenuItem {
+        menu(
+            "Study",
+            [
+                // F-STD-4: the three session scopes.
+                item(
+                    "Study Branch", #selector(DocumentWindowController.studyBranchAction(_:)), ""),
+                item(
+                    "Study Document", #selector(DocumentWindowController.studyDocumentAction(_:)), ""),
+                item(
+                    "Study Due", #selector(DocumentWindowController.studyDueAction(_:)),
+                    "\r", modifiers: [.control, .command]),
+                .separator(),
+                // F-STD-6.
+                item(
+                    "Study Weakest Branch",
+                    #selector(DocumentWindowController.studyWeakestBranchAction(_:)), ""),
+                // F-STD-7.
+                item(
+                    "Show Dashboard", #selector(DocumentWindowController.showStudyDashboardAction(_:)),
+                    ""),
+                .separator(),
+                // F-STD-1: the deck toggle and the card policy radio
+                // group (tags: 1 Card, 2 Not a Card, 3 Auto).
+                item(
+                    "Make Study Deck", #selector(DocumentWindowController.makeStudyDeckAction(_:)),
+                    "s", modifiers: [.command, .option]),
+                item(
+                    "Card", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 1),
+                item(
+                    "Not a Card", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 2),
+                item(
+                    "Auto", #selector(DocumentWindowController.setCardPolicyAction(_:)), "", tag: 3),
+                .separator(),
+                // F-STD-2: wraps the selected title text in the editor.
+                item(
+                    "Make Cloze", #selector(DocumentWindowController.makeClozeAction(_:)),
+                    "C", modifiers: [.command, .shift]),
+            ])
+    }
+
     /// Edit ▸ Find (F-FOC-3, SPEC §6.1): NSTextFinder-style items whose
     /// actions live on the document window controller and validate
     /// against the find session (DocumentWindowController+FocusFind).
