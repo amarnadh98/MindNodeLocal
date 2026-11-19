@@ -81,4 +81,49 @@ extension MapCommand {
         }
         return palette[Int(hash % UInt64(palette.count))]
     }
+
+    /// F-EDT-10 smart typing on title commit: ONE grouped step for
+    /// the whole parse — the renamed (stripped) title, the task
+    /// prefix, the math flag, the `--` note split and any missing
+    /// tag definitions with their assignments. The one-command
+    /// no-op case returns a plain `editText`.
+    public static func smartCommit(
+        id: String, parse: SmartTyping.CommitParse, in model: MapModel
+    ) -> MapCommand {
+        var commands: [MapCommand] = [.editText(id: id, title: parse.title)]
+        if let task = parse.task {
+            // The prefix said "task" — the completion state rides a
+            // wholesale task value so `[x] ` commits done in the same
+            // step (and `[ ] ` on a done task reopens it).
+            let current = model.nodes[id]?.task
+            commands.append(
+                .setTaskValue(
+                    id: id,
+                    task: NodeTask(
+                        done: parse.taskDone ?? current?.done ?? false,
+                        due: current?.due, priority: current?.priority,
+                        repeat: current?.repeat, reminderID: current?.reminderID)))
+        }
+        if parse.math {
+            commands.append(.setMath(id: id, math: true))
+        }
+        if let note = parse.note {
+            let existing = model.nodes[id]?.note
+            let merged = existing.map { $0.isEmpty ? note : $0 + "\n" + note } ?? note
+            commands.append(.setNote(id: id, note: merged))
+        }
+        var known = model.tags ?? []
+        for name in parse.tags {
+            if let existing = known.first(where: { $0.name == name }) {
+                commands.append(.toggleTag(ids: [id], tagID: existing.id, assigned: true))
+                continue
+            }
+            let tag = Tag(id: UUID().uuidString, name: name, color: Self.defaultTagColor(name))
+            known.append(tag)
+            commands.append(.setTags(known))
+            commands.append(.toggleTag(ids: [id], tagID: tag.id, assigned: true))
+        }
+        guard commands.count > 1 else { return commands[0] }
+        return .group(name: "Edit Node", commands: commands)
+    }
 }

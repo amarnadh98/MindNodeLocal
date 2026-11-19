@@ -174,6 +174,26 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// Replaces `id`'s tag assignment list — the snapshot primitive
     /// `toggleTag`'s inverse is built from.
     case setNodeTags(id: String, tags: [String]?)
+    /// Replaces `id`'s image (F-CNT-2): the asset filename inside the
+    /// package, the display size and the placement around the title.
+    /// `nil` removes the image.
+    case setImage(id: String, image: NodeImage?)
+    /// Replaces `id`'s marker token list (F-CNT-3) — `sf:<name>`,
+    /// `emoji:<char>`, `sticker:<id>` per SPEC §8.2. `nil` clears.
+    case setMarkers(id: String, markers: [String]?)
+    /// Replaces `id`'s file attachments (F-CNT-7), stored in the
+    /// package's `assets/`. `nil` clears.
+    case setAttachments(id: String, attachments: [Attachment]?)
+    /// Sets or clears `id`'s source anchor (F-CNT-8): a URL plus an
+    /// optional page, timestamp and quoted excerpt. `nil` clears.
+    case setSource(id: String, source: SourceRef?)
+    /// Sets or clears the LaTeX flag on `id`'s title (F-CNT-5): the
+    /// title text is the LaTeX source, rendered as math when on.
+    /// `nil` clears back to plain text.
+    case setMath(id: String, math: Bool?)
+    /// Replaces the document's saved filters (F-TAG-3) — one undoable
+    /// snapshot like `setPresentations`.
+    case setFilters(_ filters: [SavedFilter]?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -209,6 +229,12 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setTaskDetails, .setTaskValue: "Task Details"
         case .setTags: "Edit Tags"
         case .toggleTag, .setNodeTags: "Tag"
+        case .setImage: "Set Image"
+        case .setMarkers: "Set Marker"
+        case .setAttachments: "Attach File"
+        case .setSource: "Set Source"
+        case .setMath: "Set Math"
+        case .setFilters: "Save Filter"
         }
     }
 

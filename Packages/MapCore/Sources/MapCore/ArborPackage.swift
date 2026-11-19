@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// What `ArborPackage.read` found in a package: the decoded model and meta,
@@ -142,6 +143,56 @@ public enum ArborPackage {
             validationErrors: MapValidator.validate(model),
             studyLogData: studyLogData(from: root)
         )
+    }
+
+    // MARK: assets (SPEC §8.1: content-addressed `<sha256>.<ext>`)
+
+    /// The package's asset entry filenames (images, attachments),
+    /// sorted. Reading never throws: unreadable entries read as
+    /// absent.
+    public static func assetNames(in root: FileWrapper) -> [String] {
+        guard let assets = entry(root, named: assetsEntryName), assets.isDirectory else { return [] }
+        return (assets.fileWrappers?.keys.sorted()) ?? []
+    }
+
+    /// One asset's bytes by filename, or nil when the package has no
+    /// such entry. Never throws — the validator's "every asset
+    /// reference exists" repair treats an unreadable asset as gone.
+    public static func assetData(_ name: String, in root: FileWrapper) -> Data? {
+        guard let assets = entry(root, named: assetsEntryName), assets.isDirectory else { return nil }
+        guard let file = entry(assets, named: name), file.isRegularFile else { return nil }
+        return file.regularFileContents
+    }
+
+    /// Stores `data` content-addressed and returns the filename
+    /// (`<sha256>.<ext>`): the same bytes always land on the same
+    /// name, so re-drops and undo both reuse the entry. An existing
+    /// entry of the same name is replaced (identical content — the
+    /// write is idempotent).
+    public static func addAsset(_ data: Data, ext: String, in root: FileWrapper) -> String {
+        let name = assetFilename(data, ext: ext)
+        guard let assets = entry(root, named: assetsEntryName), assets.isDirectory else {
+            let assetsDirectory = FileWrapper(directoryWithFileWrappers: [:])
+            assetsDirectory.preferredFilename = assetsEntryName
+            root.addFileWrapper(assetsDirectory)
+            return addAsset(data, ext: ext, in: root)
+        }
+        if let existing = entry(assets, named: name) {
+            assets.removeFileWrapper(existing)
+        }
+        let file = FileWrapper(regularFileWithContents: data)
+        file.preferredFilename = name
+        assets.addFileWrapper(file)
+        return name
+    }
+
+    /// The content-addressed filename: the SHA-256 hex of the bytes
+    /// plus the (lowercased, dot-prefixed) extension.
+    public static func assetFilename(_ data: Data, ext: String) -> String {
+        let digest = SHA256.hash(data: data)
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        let clean = ext.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return clean.isEmpty ? hex : "\(hex).\(clean.lowercased())"
     }
 
     /// Replaces `study/reviews.jsonl` inside an existing package wrapper,

@@ -156,3 +156,44 @@ import Testing
         _ = try ArborPackage.read(at: notAPackage)
     }
 }
+
+// MARK: assets (SPEC §8.1, F-CNT-2/7)
+
+@Test func assetsAreStoredContentAddressed() throws {
+    let model = try sampleTree()
+    let root = try ArborPackage.makeFileWrapper(
+        model: model, meta: PackageMeta(docID: model.docID))
+
+    let data = Data("fake png bytes".utf8)
+    let name = ArborPackage.addAsset(data, ext: "png", in: root)
+    // Content-addressed: sha256 + lowercase ext.
+    #expect(name.hasSuffix(".png"))
+    #expect(name.count == 64 + 4)
+    #expect(ArborPackage.assetNames(in: root) == [name])
+    #expect(ArborPackage.assetData(name, in: root) == data)
+
+    // The same bytes land on the same filename (idempotent re-add).
+    let again = ArborPackage.addAsset(data, ext: ".PNG", in: root)
+    #expect(again == name)
+    #expect(ArborPackage.assetNames(in: root) == [name])
+
+    // Different bytes, different name; both present.
+    let other = ArborPackage.addAsset(Data("other".utf8), ext: "pdf", in: root)
+    #expect(other != name)
+    #expect(ArborPackage.assetNames(in: root) == [name, other].sorted())
+
+    // A missing asset reads as absent, never throws.
+    #expect(ArborPackage.assetData("nope.png", in: root) == nil)
+    #expect(ArborPackage.assetNames(in: FileWrapper(directoryWithFileWrappers: [:])) == [])
+
+    // And the whole thing round-trips through a real write.
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("arbor-asset-\(UUID().uuidString).arbor")
+    defer { try? FileManager.default.removeItem(at: url) }
+    root.preferredFilename = url.lastPathComponent
+    try root.write(to: url, options: [.atomic], originalContentsURL: nil)
+    let readBack = try ArborPackage.read(at: url)
+    let reopened = try FileWrapper(url: url, options: [])
+    #expect(ArborPackage.assetData(name, in: reopened) == data)
+    #expect(readBack.model.docID == model.docID)
+}
