@@ -286,6 +286,11 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             model.nodes[id]?.study = study
+        case .setLink(let id, let link):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.link = link
         }
     }
 

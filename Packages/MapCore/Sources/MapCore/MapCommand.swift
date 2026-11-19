@@ -116,6 +116,10 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// the section. `name` is the undo-menu action name ("Make Study
     /// Deck", "Mark Card", "Grade Card").
     case setStudy(name: String, id: String, study: NodeStudy?)
+    /// Sets the external link of a node (SPEC §8.2 `node.link`) — an
+    /// `x-arbor://…` deep link (Concept Index "Link these", F-LIB-4) or
+    /// a web/file URL. `nil` clears it.
+    case setLink(id: String, link: String?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -136,6 +140,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setTheme: "Set Theme"
         case .setPresentations: "Edit Slides"
         case .setStudy(let name, _, _): name
+        case .setLink: "Set Link"
         }
     }
 

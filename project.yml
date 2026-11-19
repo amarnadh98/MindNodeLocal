@@ -20,6 +20,8 @@ packages:
     path: Packages/MapStudy
   MapIO:
     path: Packages/MapIO
+  MapLibrary:
+    path: Packages/MapLibrary
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -45,6 +47,7 @@ targets:
       # directly (SPEC §10).
       - package: MapStudy
       - package: MapIO
+      - package: MapLibrary
     info:
       path: App/Resources/Info.plist
       properties:
@@ -180,6 +183,7 @@ targets:
         product: SceneExport
       - package: MapStudy
       - package: MapIO
+      - package: MapLibrary
     settings:
       base:
         PRODUCT_NAME: ArborTests
