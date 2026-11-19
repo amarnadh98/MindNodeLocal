@@ -21,8 +21,13 @@ struct MigrationsTests {
         let v2 = try decodeFixture("map-v2")
         let migrated = try Migrations.migrate(v2, from: 2)
         let v3 = try decodeFixture("map-v3")
-        #expect(migrated == v3)
-        #expect(migrated.formatVersion == 3)
+        // `migrate` always lands on the current version: the chain is
+        // v2 → v3 (stamp) → v4 (stamp, ADR-0027), so the expected value
+        // is the v3 fixture plus the v4 stamp.
+        var expected = v3
+        expected.formatVersion = ArborFormat.formatVersion
+        #expect(migrated == expected)
+        #expect(migrated.formatVersion == ArborFormat.formatVersion)
         // The optional AI policy stays unset: old files carry no
         // restriction (SPEC §12).
         #expect(migrated.ai == nil)
@@ -33,8 +38,20 @@ struct MigrationsTests {
         let migrated = try Migrations.migrate(v1, from: 1)
         #expect(migrated.formatVersion == ArborFormat.formatVersion)
         // Compose the steps by hand: the result must be identical.
-        let composed = Migrations.v2ToV3(Migrations.v1ToV2(v1))
+        let composed = Migrations.v3ToV4(Migrations.v2ToV3(Migrations.v1ToV2(v1)))
         #expect(migrated == composed)
+    }
+
+    @Test func v3FixtureMigratesToV4ByStampingOnly() throws {
+        // v3 → v4 (ADR-0027): the new fields (`NodeStylePatch.fontWeight`
+        // / `fontItalic` / `minWidth`, `ThemePatch.rainbowBranches`) are
+        // optional, so a v3 file migrates to itself plus the version.
+        let v3 = try decodeFixture("map-v3-ai-policy")
+        let migrated = try Migrations.migrate(v3, from: 3)
+        var expected = v3
+        expected.formatVersion = 4
+        #expect(migrated == expected)
+        #expect(migrated.formatVersion == ArborFormat.formatVersion)
     }
 
     @Test func migrationIsIdempotent() throws {

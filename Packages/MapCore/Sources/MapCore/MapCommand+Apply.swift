@@ -240,6 +240,17 @@ extension MapCommand {
             }
             model = working
 
+        default:
+            try applyAttribute(to: &model)
+        }
+    }
+
+    /// The attribute, relation, style and content setters, kept out of
+    /// `apply(to:)`. One switch over every case gives `apply` a stack
+    /// frame large enough that nested `group` commands overflow a
+    /// secondary thread's stack in debug builds.
+    private func applyAttribute(to model: inout MapModel) throws {
+        switch self {
         case .setSide(let id, let side):
             guard model.nodes[id] != nil else {
                 throw ArborError.commandFailure("missing node \(id)")
@@ -347,6 +358,52 @@ extension MapCommand {
 
         case .setAppearance(let mode):
             model.appearance = mode
+
+        case .setThemeSelection(let selection):
+            model.theme = selection
+
+        case .setThemeOverrides(let overrides):
+            if let current = model.theme {
+                model.theme = ThemeSelection(id: current.id, overrides: overrides)
+            } else if let overrides {
+                // No stored selection (a fresh document runs the default
+                // theme): the toggle still works by pinning the default
+                // theme with the patch.
+                model.theme = ThemeSelection(overrides: overrides)
+            }
+
+        case .setStyle(let ids, let patch):
+            // All-or-nothing: every id must exist before any style moves.
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                var merged = model.nodes[id]?.style ?? NodeStylePatch()
+                merged.merge(patch)
+                model.nodes[id]?.style = merged.isEmpty ? nil : merged
+            }
+
+        case .resetStyle(let ids, let keys):
+            for id in ids where model.nodes[id] == nil {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            for id in ids {
+                guard var patch = model.nodes[id]?.style else { continue }
+                if let keys {
+                    for key in keys {
+                        patch.clear(key)
+                    }
+                } else {
+                    patch = NodeStylePatch()
+                }
+                model.nodes[id]?.style = patch.isEmpty ? nil : patch
+            }
+
+        case .setStructure(let id, let structure):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.structure = structure
 
         case .setPresentations(let presentations):
             // M6 (F-PRE-2/3): a wholesale replace — the authoring layer
@@ -478,6 +535,10 @@ extension MapCommand {
 
         case .setFilters(let filters):
             model.filters = filters
+
+        default:
+            // Structural commands and `group` are handled by `apply(to:)`.
+            preconditionFailure("applyAttribute reached for \(self)")
         }
     }
 

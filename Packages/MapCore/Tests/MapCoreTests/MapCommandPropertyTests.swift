@@ -93,6 +93,7 @@ struct CommandPropertyTests {
         guard let node = generator.pick(from: Array(model.nodes.values)) else { return [] }
         let nodeID = node.id
         var commands = unconditionalCommands(nodeID: nodeID, model: model, generator: &generator)
+        commands.append(contentsOf: styleCommands(nodeID: nodeID, generator: &generator))
         commands.append(
             contentsOf: conditionalCommands(nodeID: nodeID, node: node, model: model, generator: &generator))
         commands.append(
@@ -262,6 +263,38 @@ struct CommandPropertyTests {
         commands.append(.removeConnection(id: "missing"))
         commands.append(.removeBoundary(id: "missing"))
         commands.append(.removeSummary(id: "missing"))
+        return commands
+    }
+
+    /// M2 style commands (F-STY-2/3/6/8, ADR-0027): merge/reset
+    /// patches, wholesale theme-selection snapshots, the rainbow
+    /// override, appearance flips and structure overrides — exercised
+    /// the same way, apply∘inverse identity over fuzzed trees.
+    private func styleCommands(
+        nodeID: String, generator: inout CommandGenerator
+    ) -> [MapCommand] {
+        var commands: [MapCommand] = []
+        let even = generator.next() % 2 == 0
+        commands.append(
+            .setStyle(
+                ids: [nodeID],
+                patch: NodeStylePatch(
+                    shape: even ? .pill : .underline,
+                    fill: even ? "#E5484D" : "none",
+                    padding: Double(generator.next() % 10),
+                    fontSize: Double(generator.next() % 20) + 10)))
+        commands.append(.resetStyle(ids: [nodeID], keys: even ? [.fill, .shape, .fontSize] : nil))
+        commands.append(
+            .setThemeSelection(
+                generator.next() % 3 == 0
+                ? nil
+                : ThemeSelection(
+                    id: even ? "ocean" : "paper",
+                    overrides: even ? ThemePatch(rainbowBranches: even) : nil)))
+        commands.append(
+            .setThemeOverrides(overrides: even ? nil : ThemePatch(rainbowBranches: even)))
+        commands.append(.setAppearance(mode: even ? .light : .dark))
+        commands.append(.setStructure(id: nodeID, structure: even ? "mindmap.right" : nil))
         return commands
     }
 

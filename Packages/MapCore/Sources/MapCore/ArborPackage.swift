@@ -307,6 +307,8 @@ public enum Migrations {
             return v1ToV2(model)
         case 2:
             return v2ToV3(model)
+        case 3:
+            return v3ToV4(model)
         default:
             return model
         }
@@ -340,6 +342,19 @@ public enum Migrations {
     static func v2ToV3(_ model: MapModel) -> MapModel {
         var migrated = model
         migrated.formatVersion = 3
+        return migrated
+    }
+
+    /// v3 → v4: four optional fields join the schema —
+    /// `NodeStylePatch.fontWeight`, `NodeStylePatch.fontItalic` and
+    /// `NodeStylePatch.minWidth` (F-STY-2, ADR-0027) and
+    /// `ThemePatch.rainbowBranches` (F-STY-8's toggle as a document
+    /// override) — all defaulting to `nil` (the pre-v4 behavior), so
+    /// there is nothing to back-fill; the step only stamps the version
+    /// so the next save writes a v4 file.
+    static func v3ToV4(_ model: MapModel) -> MapModel {
+        var migrated = model
+        migrated.formatVersion = 4
         return migrated
     }
 }
