@@ -17,12 +17,12 @@ public struct ViewStateStore: Sendable {
     }
 
     /// The production base directory:
-    /// `~/Library/Application Support/Arbor/CanvasViewState`.
+    /// `~/Library/Application Support/Arbor/ViewState`.
     public static func defaultBaseURL() -> URL {
         let support =
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return support.appending(path: "Arbor/CanvasViewState", directoryHint: .isDirectory)
+        return support.appending(path: "Arbor/ViewState", directoryHint: .isDirectory)
     }
 
     /// `<base>/<docID>.json`, with the id defensively flattened so a

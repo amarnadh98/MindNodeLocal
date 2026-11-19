@@ -98,7 +98,7 @@ struct ViewStateStoreTests {
     @Test func defaultBaseDirectoryLivesUnderApplicationSupport() {
         let url = ViewStateStore.defaultBaseURL()
         #expect(url.path.contains("Application Support"))
-        #expect(url.path.contains("Arbor/CanvasViewState"))
+        #expect(url.path.contains("Arbor/ViewState"))
     }
 
     @Test func docIDIsFlattenedIntoOneFileComponent() {

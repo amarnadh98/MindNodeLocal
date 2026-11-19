@@ -1,11 +1,33 @@
 import AppKit
 import CanvasKit
 import MapCore
+import MapIO
 import MapRender
 
 @MainActor
-final class DocumentWindowController: NSWindowController {
+final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     let canvas = CanvasView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+
+    /// The pasteboard the clipboard actions exchange (F-EDT-9).
+    /// Injectable so hosted tests use a private `NSPasteboard(name:)`
+    /// instead of the user's clipboard.
+    var clipboard: NSPasteboard = .general
+
+    /// F-CAN-8 (ADR-0005): the per-document view-state sidecar store.
+    /// Injectable so hosted tests run against a temp directory.
+    var viewStateStore = ViewStateStore(baseURL: ViewStateStore.defaultBaseURL())
+
+    /// How long a camera/selection change waits before the view state
+    /// persists (F-CAN-8); injectable so tests don't wait a real second.
+    var viewStateSaveDelay: Duration = .seconds(1)
+
+    private var viewStateSaveTask: Task<Void, Never>?
+
+    /// The pasteboard flavours written by copy/cut (F-EDT-9): the
+    /// internal lossless payload plus the three interop texts.
+    private static let payloadType = NSPasteboard.PasteboardType(PastePayload.uniformTypeIdentifier)
+    private static let markdownType = NSPasteboard.PasteboardType("net.daringfireball.markdown")
+    private static let opmlType = NSPasteboard.PasteboardType("org.opml.opml")
 
     init(document: NSDocument) {
         let window = NSWindow(
@@ -21,9 +43,22 @@ final class DocumentWindowController: NSWindowController {
         // must not set it first — assigning it here makes AppKit's insert
         // a no-op and the document ends up with zero window controllers.
         super.init(window: window)
+        // The window controller must be the window's delegate for two
+        // reasons: `windowWillClose` flushes the view state (F-CAN-8),
+        // and the delegate is the responder-chain hop that lets the
+        // menu's clipboard actions reach this controller (F-EDT-9).
+        // Programmatic windows don't get the nib-loading path's implicit
+        // delegate assignment.
+        window.delegate = self
 
         canvas.onEffectiveAppearanceChange = { [weak self] in
             self?.updateScene(preserveCamera: true)
+        }
+        canvas.onCameraChange = { [weak self] in
+            self?.scheduleViewStateSave()
+        }
+        canvas.onSelectionChange = { [weak self] _ in
+            self?.scheduleViewStateSave()
         }
         canvas.onEditingCommit = { [weak self] id, title, next in
             self?.handleEditingCommit(id: id, title: title, next: next)
@@ -61,7 +96,12 @@ final class DocumentWindowController: NSWindowController {
             updateScene(preserveCamera: false)
         }
         super.showWindow(sender)
-        if canvas.needsInitialFit {
+        // F-CAN-8: a stored view state restores the camera and the
+        // (sanitized) selection INSTEAD of zoom-to-fit; only a document
+        // with no sidecar (or a corrupt one) fits.
+        if restoreViewState() {
+            canvas.needsInitialFit = false
+        } else if canvas.needsInitialFit {
             canvas.zoomToFit()
             canvas.needsInitialFit = false
         }
@@ -140,6 +180,140 @@ final class DocumentWindowController: NSWindowController {
         updateScene(preserveCamera: true)
         canvas.pruneSelection()
         window?.title = document?.displayName ?? window?.title ?? ""
+    }
+
+    // MARK: view state (F-CAN-8, ADR-0005)
+
+    /// Debounces a view-state save after camera/selection moves — the
+    /// state is comfort data, a pan is not a mutation, so it persists
+    /// off the document and never touches the change count.
+    func scheduleViewStateSave() {
+        viewStateSaveTask?.cancel()
+        let delay = viewStateSaveDelay
+        viewStateSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.saveViewStateNow()
+        }
+    }
+
+    /// Flushes the current camera + selection to the sidecar. A write
+    /// failure is deliberately non-fatal: view state can never block the
+    /// app (ADR-0005's "missing sidecar = fresh default" reads the same).
+    func saveViewStateNow() {
+        viewStateSaveTask?.cancel()
+        guard let mapDocument = document as? MapDocument else { return }
+        let state = CanvasViewState(
+            camera: canvas.camera, selection: canvas.selection.sorted(), activeView: .map)
+        try? viewStateStore.save(state, docID: mapDocument.model.docID)
+    }
+
+    /// Window close (which every document close funnels through): flush
+    /// immediately — a debounced save could otherwise be cancelled by
+    /// teardown before firing. (The delegate method isn't exposed to
+    /// Swift through NSWindowController, hence no `override`.)
+    func windowWillClose(_ notification: Notification) {
+        saveViewStateNow()
+    }
+
+    /// Reopen restore: the stored camera and selection come back as they
+    /// were, selection sanitized against the freshly built scene (ids
+    /// deleted or folded away since the last session drop out).
+    private func restoreViewState() -> Bool {
+        guard let mapDocument = document as? MapDocument,
+            let scene = canvas.scene,
+            let stored = viewStateStore.load(docID: mapDocument.model.docID)
+        else { return false }
+        let state = stored.sanitized(for: scene)
+        canvas.camera = state.camera
+        canvas.setSelection(Set(state.selection))
+        return true
+    }
+
+    // MARK: clipboard (F-EDT-9)
+
+    /// ⌘C: writes ALL flavours — the internal payload (the only lossless
+    /// one) plus plain text, Markdown and OPML — as one item. While a
+    /// node is being edited the overlay's text view is first responder
+    /// and answers `copy:` itself; these actions only see map-level
+    /// presses. (AppKit's `-copy:` & co. aren't exposed to Swift, hence
+    /// plain `@objc` declarations rather than overrides.)
+    @objc func copy(_ sender: Any?) {
+        guard !canvas.isEditing, let store, !canvas.selection.isEmpty else { return }
+        let model = store.model
+        let ids = canvas.selection.sorted()
+        guard let payload = try? PasteboardSerializer.payload(from: model, selection: ids) else {
+            return
+        }
+        let item = NSPasteboardItem()
+        item.setData(payload, forType: Self.payloadType)
+        item.setString(PasteboardSerializer.plainText(from: model, selection: ids), forType: .string)
+        item.setString(PasteboardSerializer.markdown(from: model, selection: ids), forType: Self.markdownType)
+        item.setString(PasteboardSerializer.opml(from: model, selection: ids), forType: Self.opmlType)
+        clipboard.clearContents()
+        clipboard.writeObjects([item])
+    }
+
+    /// ⌘X: copy, then ONE `deleteSubtrees` command — a single undo step
+    /// restores the whole cut.
+    @objc func cut(_ sender: Any?) {
+        guard !canvas.isEditing, let store, !canvas.selection.isEmpty else { return }
+        copy(sender)
+        let ids = topmostSelectedIDs(in: store.model)
+        guard !ids.isEmpty else { return }
+        let replacement = MapStore.selectionAfterDelete(
+            model: store.model, deletedIDs: ids, selection: canvas.selection)
+        perform(.deleteSubtrees(ids: ids)) { _ in replacement }
+    }
+
+    /// ⌘V / ⇧⌥⌘V: reads the richest available flavour (internal payload
+    /// first, then OPML, Markdown, plain text) and performs ONE
+    /// `insertSubtrees` command — fresh ids and timestamps, one undo
+    /// step — landing under the first selected node as its last children,
+    /// or as new roots when nothing is selected. The pasted top-level
+    /// nodes become the selection. ⇧⌥⌘V keeps per-node style overrides;
+    /// the plain paste adopts the target's theme (F-EDT-9).
+    @objc func paste(_ sender: Any?) {
+        guard !canvas.isEditing, let store else { return }
+        let keepStyle =
+            (sender as? NSMenuItem)?.keyEquivalentModifierMask.contains(.option) == true
+        let anchor = PasteboardParser.pasteAnchor(selection: canvas.selection.sorted(), in: store.model)
+        guard
+            let command = try? pasteCommand(
+                from: clipboard, parent: anchor.parent, index: anchor.index, keepStyle: keepStyle)
+        else { return }
+        let pasted: Set<String>
+        if case .insertSubtrees(_, let anchors) = command {
+            pasted = Set(anchors.map(\.id))
+        } else {
+            pasted = []
+        }
+        perform(command) { _ in pasted }
+        canvas.scrollSelectionIntoView()
+    }
+
+    /// Builds the paste command from the richest flavour on `pasteboard`
+    /// — the internal payload when present, else the first surviving text
+    /// flavour. Only the first pasteboard item is considered; foreign
+    /// multi-item copies paste their first snippet.
+    private func pasteCommand(
+        from pasteboard: NSPasteboard,
+        parent: String?,
+        index: Int,
+        keepStyle: Bool
+    ) throws -> MapCommand? {
+        guard let store, let item = pasteboard.pasteboardItems?.first else { return nil }
+        if let data = item.data(forType: Self.payloadType) {
+            return try PasteboardParser.pasteCommand(
+                fromPayload: data, parent: parent, index: index, keepStyle: keepStyle, in: store.model)
+        }
+        let textFlavours: [NSPasteboard.PasteboardType] = [Self.opmlType, Self.markdownType, .string]
+        for type in textFlavours {
+            guard let text = item.string(forType: type), !text.isEmpty else { continue }
+            return try PasteboardParser.pasteCommand(
+                fromText: text, parent: parent, index: index, keepStyle: keepStyle, in: store.model)
+        }
+        return nil
     }
 }
 
@@ -484,6 +658,34 @@ extension DocumentWindowController {
             commands.append(.setFolded(id: id, folded: !node.folded))
         }
         if let command = grouped("Fold Node", commands) {
+            performKeepingSelection(command)
+        }
+    }
+
+    /// ⌥⌘.: the selection folds/unfolds together with its siblings — one
+    /// grouped command, one undo step.
+    @objc func foldWithSiblingsAction(_ sender: Any?) {
+        guard !canvas.isEditing, let store else { return }
+        if let command = Folding.toggleWithSiblingsCommand(selection: selectedIDs, in: store.model) {
+            performKeepingSelection(command)
+        }
+    }
+
+    /// ⌃⌥.: unfolds each selected node one level; never folds.
+    @objc func unfoldOneLevelAction(_ sender: Any?) {
+        guard !canvas.isEditing, let store else { return }
+        if let command = Folding.unfoldOneLevelCommand(selection: selectedIDs, in: store.model) {
+            performKeepingSelection(command)
+        }
+    }
+
+    /// ⌃1–⌃5 / ⌃0 (Show Levels, §6.1): one grouped command that folds
+    /// everything below the menu item's level; 0 shows all. No-op states
+    /// emit no command, so no phantom undo step registers.
+    @objc func showLevelsAction(_ sender: Any?) {
+        guard !canvas.isEditing, let store else { return }
+        let levels = (sender as? NSMenuItem)?.tag ?? 0
+        if let command = Folding.showLevelsCommand(levels: levels, in: store.model) {
             performKeepingSelection(command)
         }
     }

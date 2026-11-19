@@ -16,6 +16,8 @@ packages:
     path: Packages/MapRender
   CanvasKit:
     path: Packages/CanvasKit
+  MapIO:
+    path: Packages/MapIO
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -35,6 +37,7 @@ targets:
       - package: MapLayout
       - package: MapRender
       - package: CanvasKit
+      - package: MapIO
     info:
       path: App/Resources/Info.plist
       properties:
@@ -60,6 +63,29 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - arbor
+          # F-EDT-9: the internal lossless clipboard payload. Declared so
+          # the flavour is a real UTI, not an anonymous pasteboard string.
+          - UTTypeIdentifier: com.arbor.paste.nodes
+            UTTypeDescription: Arbor Node Payload
+            UTTypeConformsTo:
+              - public.json
+        UTImportedTypeDeclarations:
+          # The pasteboard's interop text flavours (F-EDT-9).
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - markdown
+                - md
+          - UTTypeIdentifier: org.opml.opml
+            UTTypeDescription: OPML Document
+            UTTypeConformsTo:
+              - public.xml
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - opml
     entitlements:
       path: App/Resources/Arbor.entitlements
       properties:
@@ -72,6 +98,15 @@ targets:
       - App/Tests
     dependencies:
       - target: Arbor
+      # The test bundle imports the packages directly, so it links their
+      # product frameworks itself instead of relying on bundle_loader
+      # symbol resolution from the host executable (which stopped
+      # working once the products became shared frameworks).
+      - package: MapCore
+      - package: MapLayout
+      - package: MapRender
+      - package: CanvasKit
+      - package: MapIO
     settings:
       base:
         PRODUCT_NAME: ArborTests

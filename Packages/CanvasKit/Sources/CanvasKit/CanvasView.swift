@@ -32,8 +32,15 @@ public final class CanvasView: NSView {
             // re-positioned, never re-rendered (SPEC §11.4).
             nodeTextEditor.syncPosition()
             needsDisplay = true
+            // F-CAN-8: the host debounces a view-state save per camera
+            // move; the camera itself is not model state.
+            onCameraChange?()
         }
     }
+
+    /// Called after any camera change (pan, zoom, programmatic) so the
+    /// host can persist view state (F-CAN-8, ADR-0005).
+    public var onCameraChange: (() -> Void)?
 
     public private(set) var selection: Set<String> = []
 
@@ -53,8 +60,9 @@ public final class CanvasView: NSView {
     /// Called after any selection change caused by canvas interaction.
     public var onSelectionChange: ((Set<String>) -> Void)?
 
-    /// The model the scene was built from, so drag-to-reparent can
-    /// resolve drop targets (F-EDT-5). Maintained by the host alongside
+    /// The model the scene was built from, so drag-to-reparent resolves
+    /// drop targets (F-EDT-5) and spatial navigation resolves sibling
+    /// order and roots (F-CAN-4). Maintained by the host alongside
     /// `scene`; the view reads it and never mutates it.
     public var dragModel: MapModel?
 
@@ -255,6 +263,29 @@ public final class CanvasView: NSView {
         grid.id(at: camera.modelPoint(for: viewPoint))
     }
 
+    // MARK: clipboard forwarding (F-EDT-9)
+
+    /// The map-level clipboard lives up the responder chain — the window
+    /// controller writes and reads the pasteboard. `NSResponder`'s own
+    /// implementations of these actions are no-ops that would swallow
+    /// the message, so the canvas explicitly forwards. While a node is
+    /// being edited the overlay `NSTextView` is first responder and
+    /// handles the standard selectors itself; the map never sees them,
+    /// so the editing session can never lose its keys to the clipboard.
+    /// (AppKit's `-copy:` & co. aren't exposed to Swift, hence plain
+    /// `@objc` declarations rather than overrides.)
+    @objc public func copy(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(copy(_:)), with: sender)
+    }
+
+    @objc public func cut(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(cut(_:)), with: sender)
+    }
+
+    @objc public func paste(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(paste(_:)), with: sender)
+    }
+
     // MARK: events
 
     public override func scrollWheel(with event: NSEvent) {
@@ -297,6 +328,15 @@ public final class CanvasView: NSView {
             zoomToFit()
         case ("0", true, true):
             zoomToSelection()
+        case ("\u{f700}", false, false), ("\u{f701}", false, false),
+            ("\u{f702}", false, false), ("\u{f703}", false, false):
+            // F-CAN-4: plain arrows move the selection, ⇧-arrows extend
+            // it. These stay keyDown-only — AppKit swallows unmodified
+            // arrow equivalents in menu tracking — while the Select menu
+            // exposes the same moves as ordinary items (§14.1).
+            if let direction = Direction(keyDown: characters) {
+                navigate(direction, extending: hasShift)
+            }
         case ("\r", _, false) where !hasShift:
             // ⏎/⌘⏎ edit the selected node (F-EDT-2); ⇧⏎ (new root) and
             // ⌥⏎ (sibling above) fall through to the host's menu actions.

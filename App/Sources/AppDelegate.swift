@@ -42,9 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Undo", Selector(("undo:")), "z"),
                     item("Redo", Selector(("redo:")), "Z"),
                     .separator(),
+                    // F-EDT-9: the standard selectors ride the responder
+                    // chain — while a node edits, the overlay text view
+                    // answers cut:/copy:/paste: itself.
                     item("Cut", #selector(NSText.cut(_:)), "x"),
                     item("Copy", #selector(NSText.copy(_:)), "c"),
                     item("Paste", #selector(NSText.paste(_:)), "v"),
+                    item(
+                        "Paste with Style",
+                        #selector(NSText.paste(_:)),
+                        "v", modifiers: [.command, .option, .shift]),
                     .separator(),
                     // Edit title (F-EDT-2): ⏎/⌘⏎ are the Add-Sibling keys
                     // in the menu; F2 is unambiguous.
@@ -98,20 +105,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         #selector(DocumentWindowController.detachAction(_:)),
                         "d", modifiers: [.command, .shift]),
                     .separator(),
+                ]))
+        mainMenu.addItem(
+            menu(
+                "Select",
+                [
+                    // F-CAN-4's spatial moves. The keys themselves are
+                    // keyDown-only: AppKit treats unmodified arrow
+                    // equivalents as menu-tracking keys (see
+                    // CanvasView+Navigation.swift), so the items carry
+                    // no equivalents — the moves stay menu-reachable
+                    // (§14.1) all the same.
                     item(
-                        "Fold/Unfold",
-                        #selector(DocumentWindowController.toggleFoldAction(_:)),
-                        ".", modifiers: [.option]),
+                        "Move Selection Up", #selector(CanvasView.navigateUpAction(_:)), ""),
+                    item(
+                        "Move Selection Down", #selector(CanvasView.navigateDownAction(_:)), ""),
+                    item(
+                        "Move Selection Left", #selector(CanvasView.navigateLeftAction(_:)), ""),
+                    item(
+                        "Move Selection Right", #selector(CanvasView.navigateRightAction(_:)), ""),
+                    item(
+                        "Extend Selection Up", #selector(CanvasView.extendUpAction(_:)), "",
+                        hidden: true),
+                    item(
+                        "Extend Selection Down", #selector(CanvasView.extendDownAction(_:)), "",
+                        hidden: true),
+                    item(
+                        "Extend Selection Left", #selector(CanvasView.extendLeftAction(_:)), "",
+                        hidden: true),
+                    item(
+                        "Extend Selection Right", #selector(CanvasView.extendRightAction(_:)), "",
+                        hidden: true),
+                    .separator(),
+                    // ⌃⌥N / ⌃⌥P (§6.1 Select).
+                    item(
+                        "Next Root", #selector(CanvasView.nextRootAction(_:)), "n",
+                        modifiers: [.control, .option]),
+                    item(
+                        "Previous Root", #selector(CanvasView.previousRootAction(_:)), "p",
+                        modifiers: [.control, .option]),
+                    .separator(),
                     item("Select All", #selector(DocumentWindowController.selectAllAction(_:)), "a"),
                     item(
-                        "Select Children",
-                        #selector(DocumentWindowController.selectChildrenAction(_:)),
+                        "Select Children", #selector(DocumentWindowController.selectChildrenAction(_:)),
                         "a", modifiers: [.command, .option]),
                     item("Select Root", #selector(DocumentWindowController.selectRootAction(_:)), "r"),
+                    .separator(),
                     item(
-                        "Deselect",
-                        #selector(DocumentWindowController.deselectAction(_:)),
+                        "Jump to Selection", #selector(CanvasView.jumpToSelectionAction(_:)), "j"),
+                    item(
+                        "Deselect", #selector(DocumentWindowController.deselectAction(_:)),
                         "\u{1b}", modifiers: []),
+                ]))
+        mainMenu.addItem(
+            menu(
+                "Fold",
+                [
+                    // F-LAY-14, §6.1 Fold: each action is one grouped
+                    // `setFolded` command — one undo step.
+                    item(
+                        "Fold/Unfold", #selector(DocumentWindowController.toggleFoldAction(_:)),
+                        ".", modifiers: [.option]),
+                    item(
+                        "Fold with Siblings",
+                        #selector(DocumentWindowController.foldWithSiblingsAction(_:)),
+                        ".", modifiers: [.command, .option]),
+                    item(
+                        "Unfold One Level",
+                        #selector(DocumentWindowController.unfoldOneLevelAction(_:)),
+                        ".", modifiers: [.control, .option]),
+                    .separator(),
+                    item(
+                        "Show Levels 1", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "1", modifiers: [.control], tag: 1),
+                    item(
+                        "Show Levels 2", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "2", modifiers: [.control], tag: 2),
+                    item(
+                        "Show Levels 3", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "3", modifiers: [.control], tag: 3),
+                    item(
+                        "Show Levels 4", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "4", modifiers: [.control], tag: 4),
+                    item(
+                        "Show Levels 5", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "5", modifiers: [.control], tag: 5),
+                    item(
+                        "Show All Levels", #selector(DocumentWindowController.showLevelsAction(_:)),
+                        "0", modifiers: [.control], tag: 0),
                 ]))
         mainMenu.addItem(
             menu(
@@ -199,12 +280,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func item(
         _ title: String, _ action: Selector, _ key: String,
-        modifiers: NSEvent.ModifierFlags = [.command], hidden: Bool = false
+        modifiers: NSEvent.ModifierFlags = [.command], hidden: Bool = false, tag: Int = 0
     ) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: key)
         menuItem.target = nil
         menuItem.keyEquivalentModifierMask = modifiers
         menuItem.isHidden = hidden
+        menuItem.tag = tag
         return menuItem
     }
 }

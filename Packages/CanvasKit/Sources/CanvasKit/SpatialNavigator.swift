@@ -8,6 +8,18 @@ public enum Direction: String, Sendable, CaseIterable {
     case down
     case left
     case right
+
+    /// The arrow function-key scalar — what a plain arrow press reports
+    /// as `charactersIgnoringModifiers`.
+    public init?(keyDown characters: String) {
+        switch characters {
+        case "\u{f700}": self = .up
+        case "\u{f701}": self = .down
+        case "\u{f702}": self = .left
+        case "\u{f703}": self = .right
+        default: return nil
+        }
+    }
 }
 
 /// Spatial arrow navigation over a laid-out scene (F-CAN-4): pure
