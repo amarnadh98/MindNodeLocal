@@ -40,6 +40,20 @@ struct CanvasLayerTreeTests {
 
     // MARK: culling with margin
 
+    /// Core Animation builds presentation layers with `init(layer:)`
+    /// for every running animation; the pooled subclasses trapped there
+    /// until they implemented it (regression: relayout animation crash).
+    @Test func pooledLayersSupportPresentationCopies() throws {
+        let node = NodeVisualLayer(nodeID: "n1")
+        let nodeCopy = NodeVisualLayer(layer: node)
+        #expect(nodeCopy.nodeID == "n1")
+
+        let key = BranchKey(parentID: "p", childID: "c")
+        let branch = BranchVisualLayer(key: key)
+        let branchCopy = BranchVisualLayer(layer: branch)
+        #expect(branchCopy.key == key)
+    }
+
     @Test func expandedVisibleRectAddsHalfAViewportPerEdge() {
         let camera = Camera(origin: CGPoint(x: 100, y: 100), scale: 2)
         let expanded = CanvasLayerTree.expandedVisibleRect(
