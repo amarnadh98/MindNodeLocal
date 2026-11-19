@@ -72,6 +72,15 @@ public final class MapStore {
         self.undoManager = undoManager
     }
 
+    /// True when the document is read-only for the host's own reasons —
+    /// today a package written by a NEWER app version (F-DOC-4). Every
+    /// mutation path funnels through the store, so the gate here is what
+    /// actually enforces read-only: `perform` and `performWithoutUndo`
+    /// throw and leave the model, the undo stacks and any open edit
+    /// session untouched (ADR-0023). `replaceModel` stays open: it is
+    /// the load/revert path, and a revert must always be able to run.
+    public var isReadOnly = false
+
     /// Replaces the whole model (initial load, revert). Not undoable:
     /// clears the undo stacks and any open edit session.
     public func replaceModel(_ newModel: MapModel) {
@@ -93,6 +102,9 @@ public final class MapStore {
     /// `modifiedBy = .ai`, surfaced in the document metadata as
     /// `lastModifiedBy: "ai"`.
     public func perform(_ command: MapCommand, author: AuthorKind) throws {
+        if isReadOnly {
+            throw ArborError.commandFailure("the document is read-only")
+        }
         let inverse = try command.inverse(in: model)
         var working = model
         try command.apply(to: &working)
@@ -132,6 +144,12 @@ public final class MapStore {
     /// the same all-or-nothing apply path; a throw leaves the model
     /// untouched.
     public func performWithoutUndo(_ command: MapCommand) throws {
+        if isReadOnly {
+            throw ArborError.commandFailure("the document is read-only")
+        }
+        if isReadOnly {
+            throw ArborError.commandFailure("the document is read-only")
+        }
         var working = model
         try command.apply(to: &working)
         stampTouchedNodes(previous: model, in: &working, author: .user)

@@ -95,7 +95,23 @@ final class MapDocument: NSDocument {
     }
 
     override func read(from fileWrapper: FileWrapper, ofType typeName: String) throws {
-        let contents = try ArborPackage.read(from: fileWrapper)
+        // F-DOC-4: a package written by a NEWER app version has no
+        // forward migration, but it still opens — read-only, with a
+        // banner — instead of failing. JSON decoding ignores future
+        // schema keys, so the current view of the model degrades
+        // gracefully; the store's read-only gate (ADR-0023) makes the
+        // enforcement real.
+        let contents: PackageContents
+        let newerFormat: Bool
+        do {
+            contents = try ArborPackage.read(from: fileWrapper)
+            newerFormat = false
+        } catch ArborError.unsupportedFormatVersion(let found, let expected) {
+            contents = try ArborPackage.readWithoutMigration(from: fileWrapper)
+            newerFormat = true
+            packageLog.warning(
+                "Package format \(found) is newer than this app's \(expected); opening read-only.")
+        }
         var loaded = contents.model
         var repairedSomething = false
         if !contents.validationErrors.isEmpty {
@@ -118,11 +134,24 @@ final class MapDocument: NSDocument {
             // tail is the log's normal interrupted-append failure and is
             // tolerated by the codec.
             reviewLog = Self.decodeReviewLog(contents.studyLogData)
+            isReadOnlyFormat = newerFormat
             store.replaceModel(loaded)
+            store.isReadOnly = newerFormat
             if repairedSomething {
                 updateChangeCount(.changeDone)
             }
         }
+    }
+
+    /// True when the document came from a newer app version's package
+    /// (F-DOC-4): the store is read-only and the window shows a banner.
+    /// Set by the read override above; never mutated afterwards.
+    private(set) var isReadOnlyFormat = false
+
+    /// The banner text a read-only document's windows carry.
+    var readOnlyBannerText: String? {
+        isReadOnlyFormat
+            ? "Read-Only — this document was saved by a newer version of Arbor." : nil
     }
 
     override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
@@ -345,6 +374,69 @@ final class MapDocument: NSDocument {
     private static func decodeReviewLog(_ data: Data?) -> [ReviewLog] {
         guard let data, let text = String(data: data, encoding: .utf8) else { return [] }
         return (try? ReviewLogCodec.decode(text)) ?? []
+    }
+
+    // MARK: external modification (F-DOC-3)
+
+    /// NSFilePresenter (NSDocument already conforms): the document's
+    /// file changed under us — iCloud, Dropbox, another copy of Arbor.
+    /// Our own coordinated saves bump `fileModificationDate` in lock
+    /// step, so an equal date is our own write and ignored. A real
+    /// external change reloads automatically when there are no local
+    /// edits; with unsaved edits it offers Reload through a sheet (the
+    /// document is only ever reverted with the user's consent, and
+    /// headless — no window — keeps the edits untouched).
+    ///
+    /// The presenter contract is nonisolated, but AppKit delivers
+    /// NSDocument's presenter callbacks on the main thread (concurrent
+    /// document reading is off and the presenter is registered there),
+    /// so the main-actor hop below is an assumption the app already
+    /// makes in `read(from:ofType:)`.
+    override nonisolated func presentedItemDidChange() {
+        guard let url = fileURL, let known = fileModificationDate else { return }
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date, modified != known
+        else { return }
+        MainActor.assumeIsolated {
+            if isDocumentEdited {
+                offerReloadSheet(url: url)
+            } else {
+                reloadFromDisk(url)
+            }
+        }
+    }
+
+    /// The F-DOC-3 offer: Reload (default) or Keep Mine. Never shown
+    /// headless, and never twice (one sheet per window).
+    private func offerReloadSheet(url: URL) {
+        guard let window = windowForSheet, window.attachedSheet == nil else { return }
+        let documentName = displayName ?? "this document"
+        let alert = NSAlert()
+        alert.messageText = "The document was changed on disk."
+        alert.informativeText =
+            "Another application modified \"\(documentName)\". Reload it and discard your local edits?"
+        alert.addButton(withTitle: "Reload")
+        alert.addButton(withTitle: "Keep Mine")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            if response == .alertFirstButtonReturn {
+                self?.reloadFromDisk(url)
+            }
+        }
+    }
+
+    /// Re-reads the package at `url` through the normal read path and
+    /// refreshes every window's scene. A read-only document (F-DOC-4)
+    /// stays read-only; a revert of one is the one sanctioned reload.
+    private func reloadFromDisk(_ url: URL) {
+        do {
+            try revert(toContentsOf: url, ofType: fileType ?? AppIdentity.documentUTI)
+            for case let controller as DocumentWindowController in windowControllers {
+                controller.refreshAfterRevert()
+            }
+        } catch {
+            packageLog.warning("Reload after external change failed: \(String(describing: error))")
+        }
     }
 }
 

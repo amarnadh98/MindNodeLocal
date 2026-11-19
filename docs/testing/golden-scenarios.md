@@ -10,7 +10,7 @@ where they live, and how to run them.
 | 2 | Paste 40-line Markdown → map → Radial → theme → PDF export | Not yet — depends on paste (M1, partly covered by `ClipboardTests`), Radial (M2), themes (M2), export (M5) | — |
 | 3 | Select branch → Study Branch → 10 cards → mastery colors | **Automated (M7)** | `App/Tests/StudySessionTests.swift` (hosted); the branch can also be recalled on the canvas — `App/Tests/RecallModeTests.swift` (M7) |
 | 4 | Present → auto slides → arrow keys + clicker → presenter notes | **Automated as far as one display can go (M6)** | `App/Tests/PresentationTests.swift` (hosted) |
-| 5 | Global hotkey → Quick Entry → indented list → Create Map | Not yet — M4 (`F-QEN`) | — |
+| 5 | Global hotkey → Quick Entry → indented list → Create Map | **Automated (M4)** | `App/Tests/GoldenScenarioFiveTests.swift` (hosted) |
 
 ## Scenario 4: how it is automated
 
@@ -85,6 +85,30 @@ of `ArborTests`):
 
 ```bash
 xcodebuild -scheme Arbor -destination 'platform=macOS' test
+```
+
+## Scenario 5: how it is automated (M4, Quick Entry)
+
+Same philosophy, adapted for a *global* gesture: the ⌃⌥Space hotkey is
+**actually registered** with Carbon (asserted against
+`GlobalHotkeyCenter.activeSpec` — synthesizing a system-wide key event
+is the one thing a hosted test won't do, since it needs accessibility
+trust). The panel opens through the exact closure the Carbon trampoline
+calls (`QuickEntryCoordinator.togglePanel`), the indented list is typed
+into the panel's real `NSTextView` (`insertText`, like scenario 1's
+overlay editor), and Create Map runs the emphasized button's action
+against the real `NSDocumentController` — asserting the first line as
+root, the indent-descended children, ONE undo group (a single ⌘Z returns
+to the pristine empty map), and the panel closed and cleared. A second
+test covers the other F-QEN-2 destination end to end: an inbox document
+designated through the real bookmark store, appended through the real
+open path, one undo step, reverted in one ⌘Z.
+
+Run it alone:
+
+```bash
+xcodebuild -scheme Arbor -destination 'platform=macOS' test \
+    -only-testing:ArborTests/GoldenScenarioFiveTests
 ```
 
 ## Why there is no XCUITest target (yet)

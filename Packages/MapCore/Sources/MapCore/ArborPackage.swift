@@ -111,6 +111,39 @@ public enum ArborPackage {
         )
     }
 
+    /// Reads a package whose `formatVersion` is NEWER than the app's
+    /// (F-DOC-4). `read(from:)` refuses such files
+    /// (`ArborError.unsupportedFormatVersion`); this entry point decodes
+    /// the model as-is — JSON decoding ignores keys this version doesn't
+    /// know, so a future schema degrades to "opens read-only" instead of
+    /// "refuses to open" — and never migrates (a forward migration is
+    /// impossible by definition). The caller is expected to open the
+    /// document read-only with a banner.
+    public static func readWithoutMigration(from root: FileWrapper) throws -> PackageContents {
+        guard
+            let mapWrapper = entry(root, named: mapEntryName),
+            mapWrapper.isRegularFile
+        else {
+            throw ArborError.missingPackageEntry(mapEntryName)
+        }
+        guard
+            let metaWrapper = entry(root, named: metaEntryName),
+            metaWrapper.isRegularFile
+        else {
+            throw ArborError.missingPackageEntry(metaEntryName)
+        }
+
+        let model = try MapDocumentCoder.decode(mapWrapper.regularFileContents ?? Data())
+        let meta = try decodeMeta(metaWrapper.regularFileContents ?? Data())
+
+        return PackageContents(
+            model: model,
+            meta: meta,
+            validationErrors: MapValidator.validate(model),
+            studyLogData: studyLogData(from: root)
+        )
+    }
+
     /// Replaces `study/reviews.jsonl` inside an existing package wrapper,
     /// creating the `study` directory when missing. A nil `data` removes
     /// the log. The rest of the package is untouched (unchanged
