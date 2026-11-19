@@ -9,6 +9,9 @@ import QuartzCore
 /// where the camera looks, and the presentation state that rides
 /// along. `animated: false` opts out of §7.6 relayout motion (initial
 /// load, live typing growth); Reduce Motion is the caller's to pass.
+/// `diff` may carry a precomputed old→new diff (the canvas view computes
+/// it once to update its spatial grid before applying); nil recomputes
+/// it here.
 @MainActor
 public struct ApplyContext {
     public let scene: CanvasScene
@@ -21,6 +24,7 @@ public struct ApplyContext {
     public var selection: Set<String> = []
     public var selectionColor: CGColor = CGColor(gray: 0, alpha: 1)
     public var editingNodeID: String?
+    public var diff: SceneDiff? = nil
 
     public init(scene: CanvasScene, grid: SpatialGrid, camera: Camera, viewport: CGSize) {
         self.scene = scene
@@ -161,7 +165,11 @@ public final class CanvasLayerTree {
     /// changes, and (unless `animated` is false or Reduce Motion is on)
     /// springs nodes to their new frames, fades new nodes in from the
     /// parent anchor, fades deleted ones out, and morphs branch paths.
-    public func apply(_ context: ApplyContext) {
+    /// Returns the applied diff (the caller may have passed one in;
+    /// either way it describes exactly what this apply changed — the
+    /// canvas view feeds it to its spatial grid).
+    @discardableResult
+    public func apply(_ context: ApplyContext) -> SceneDiff {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
@@ -181,7 +189,7 @@ public final class CanvasLayerTree {
         dyingBranches.removeAll()
 
         let oldScene = scene
-        let diff = SceneDiffer.diff(old: oldScene, new: context.scene)
+        let diff = context.diff ?? SceneDiffer.diff(old: oldScene, new: context.scene)
         let plan =
             context.animated
             ? RelayoutPlanner.plan(
@@ -221,6 +229,7 @@ public final class CanvasLayerTree {
         updateSelection(context.selection, color: context.selectionColor, camera: camera)
         scheduleSettleIfNeeded(camera: camera, backingScale: backingScale)
         lastScale = camera.scale
+        return diff
     }
 
     /// Pan/zoom: re-pins every visible layer at its new screen point and

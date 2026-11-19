@@ -89,6 +89,44 @@ final class BuildCaches {
     }
 }
 
+/// Per-document scene build caches for the incremental path (SPEC §11.3's
+/// `Layout.update(dirty:)`): measured node sizes keyed by id + title +
+/// style + width, and one incremental layout state per root. Main-actor
+/// confined, like the scene it serves — `SceneGeometry` is synchronous, so
+/// the cache never crosses an isolation boundary.
+///
+/// The cache is variant- and spacing-tagged: `update` only reuses a cache
+/// built for the same pair, and the host replaces it when the appearance
+/// flips (sizes are keyed per variant, so a new cache re-measures).
+public final class SceneBuildCache {
+    struct RootInfo {
+        let structure: LayoutStructure
+        var state: LayoutState
+    }
+
+    /// A measured node size: the id, title, theme and level (which select
+    /// the resolved style) and width mode it was derived from, so a cached
+    /// size is only ever reused for the exact same inputs.
+    struct SizeKey: Hashable {
+        let id: String
+        let title: NodeTitle
+        let themeID: String
+        let level: Int
+        let variant: ThemeVariant
+        let width: NodeWidth?
+    }
+
+    var roots: [String: RootInfo] = [:]
+    var sizes: [SizeKey: CGSize] = [:]
+    public let variant: ThemeVariant
+    public let spacing: LayoutSpacing
+
+    public init(variant: ThemeVariant, spacing: LayoutSpacing = .default) {
+        self.variant = variant
+        self.spacing = spacing
+    }
+}
+
 /// Builds a `CanvasScene` from a `MapModel`: measures every visible node
 /// once through the shared `TextMeasurer`, lays out each root's tree with
 /// `TreeLayout` (stacking multiple roots), resolves the document's theme
@@ -96,16 +134,159 @@ final class BuildCaches {
 /// ancestor's stored palette index) per level and branch, and derives
 /// branch connectors with the theme's branch widths. Folded subtrees are
 /// skipped (F-LAY-14).
+///
+/// `update` is the incremental path (SPEC §11.3): with the per-document
+/// caches from a previous build it re-measures only the dirty nodes'
+/// titles, relayouts only the changed chain through
+/// `IncrementalLayout.update`, and rebuilds the scene — producing exactly
+/// the scene a full rebuild would (both share this file's assembly and
+/// the same layout core).
 public enum SceneGeometry {
     /// Gap between the stacked root trees of a multi-root document.
     public static let rootStackGap: CGFloat = 120
 
+    /// Full rebuild, keeping no caches (tests, probes, one-shot callers).
     public static func build(
         model: MapModel,
         variant: ThemeVariant,
         measurer: TextMeasurer,
         spacing: LayoutSpacing = .default,
         editingTitle: (id: String, title: NodeTitle)? = nil
+    ) -> CanvasScene {
+        buildCore(
+            model: model, variant: variant, measurer: measurer, spacing: spacing,
+            editingTitle: editingTitle,
+            cache: SceneBuildCache(variant: variant, spacing: spacing), dirty: nil)
+    }
+
+    /// Full rebuild that also fills `cache`, so later small changes can
+    /// go through `update`.
+    public static func build(
+        model: MapModel,
+        cache: SceneBuildCache,
+        variant: ThemeVariant,
+        measurer: TextMeasurer,
+        spacing: LayoutSpacing = .default,
+        editingTitle: (id: String, title: NodeTitle)? = nil
+    ) -> CanvasScene {
+        buildCore(
+            model: model, variant: variant, measurer: measurer, spacing: spacing,
+            editingTitle: editingTitle, cache: cache, dirty: nil)
+    }
+
+    /// Incremental rebuild after a small change (SPEC §11.3): reuses the
+    /// cache's measured sizes and per-root layout state, relayouts only
+    /// `dirty`'s chain through `IncrementalLayout.update`, and emits the
+    /// same scene a full rebuild would. `dirty` names the nodes whose own
+    /// layout inputs changed (`dirtyIDs(for:in:)` derives them from a
+    /// command); ancestors are closed inside the layout engine.
+    ///
+    /// The cache must have been built for the same variant and spacing —
+    /// otherwise this falls back to a full build without touching it
+    /// (the host owns the cache's lifetime).
+    public static func update(
+        model: MapModel,
+        cache: SceneBuildCache,
+        variant: ThemeVariant,
+        measurer: TextMeasurer,
+        spacing: LayoutSpacing = .default,
+        dirty: Set<String>,
+        editingTitle: (id: String, title: NodeTitle)? = nil
+    ) -> CanvasScene {
+        guard cache.variant == variant, cache.spacing == spacing else {
+            return build(
+                model: model, variant: variant, measurer: measurer, spacing: spacing,
+                editingTitle: editingTitle)
+        }
+        return buildCore(
+            model: model, variant: variant, measurer: measurer, spacing: spacing,
+            editingTitle: editingTitle, cache: cache, dirty: dirty)
+    }
+
+    /// The layout-dirty node ids for `command` applied to `model` (the
+    /// post-command model): every node whose own layout inputs — measured
+    /// size, child list, pinned side — changed, plus enough ids for the
+    /// incremental walk to find them (a deleted or moved node's stale
+    /// parent link still resolves to the parent whose child list
+    /// changed). `nil` = unrecognized command; the caller falls back to a
+    /// full rebuild. Over-marking is always safe; the engine validates
+    /// every reused entry's own size and child ids as a second line.
+    public static func dirtyIDs(for command: MapCommand, in model: MapModel) -> Set<String>? {
+        func withParent(_ id: String) -> Set<String> {
+            var ids = Set<String>([id])
+            if let parent = model.nodes[id]?.parent {
+                ids.insert(parent)
+            }
+            return ids
+        }
+        switch command {
+        case .editText(let id, _),
+            .setSide(let id, _),
+            .setFolded(let id, _),
+            .reorderSibling(let id, _),
+            .detach(let id),
+            .deleteNodePromotingChildren(let id):
+            return [id]
+        case .addChild(let parent, _, let node):
+            return [parent, node.id]
+        case .addSibling(_, _, let node), .insertParent(_, let node):
+            return withParent(node.id)
+        case .moveNode(let id, _, _), .promote(let id), .demote(let id):
+            return withParent(id)
+        case .addRoot(_, let node):
+            return [node.id]
+        case .deleteSubtrees(let ids):
+            // The ids are gone from the model; their stale parent links
+            // (kept in the layout state) mark the parents that lost them.
+            return Set(ids)
+        case .insertSubtrees(_, let anchors):
+            return anchorDirtyIDs(anchors)
+        case .group(_, let commands):
+            return groupDirtyIDs(commands, in: model)
+        case .setTheme:
+            // Every node's font and padding may change: full rebuild.
+            return nil
+        case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches:
+            // The layout frames don't move; offsets apply after layout,
+            // and the list replacements are not layout inputs.
+            return []
+        }
+    }
+
+    /// Inserted top-level ids plus every parent that gained children.
+    private static func anchorDirtyIDs(_ anchors: [InsertionAnchor]) -> Set<String> {
+        var ids = Set(anchors.map(\.id))
+        for anchor in anchors {
+            if let parent = anchor.parent {
+                ids.insert(parent)
+            }
+        }
+        return ids
+    }
+
+    /// Union of a group's members' dirty sets; nil as soon as one member
+    /// is unrecognized.
+    private static func groupDirtyIDs(
+        _ commands: [MapCommand], in model: MapModel
+    ) -> Set<String>? {
+        var ids = Set<String>()
+        for command in commands {
+            guard let child = dirtyIDs(for: command, in: model) else { return nil }
+            ids.formUnion(child)
+        }
+        return ids
+    }
+
+    // MARK: core build
+
+    private static func buildCore(
+        model: MapModel,
+        variant: ThemeVariant,
+        measurer: TextMeasurer,
+        spacing: LayoutSpacing,
+        editingTitle: (id: String, title: NodeTitle)?,
+        cache: SceneBuildCache,
+        dirty: Set<String>?
     ) -> CanvasScene {
         // F-STY-3/F-STY-4: styles resolve from the document's theme
         // selection (default Paper) at the current appearance variant.
@@ -118,17 +299,30 @@ public enum SceneGeometry {
         for rootID in model.roots {
             guard model.nodes[rootID] != nil else { continue }
             let structure = rootStructure(model, rootID: rootID)
-            // Depth and level-1 ancestry are recorded by the same walk
-            // that measures and prunes (they used to be a per-node chain
-            // walk — O(depth²) per node on a 5k rebuild).
-            var ancestry: [String: AncestryInfo] = [:]
-            let layoutRoot = layoutTree(
-                model: model, rootID: rootID, measurer: measurer,
-                caches: caches, ancestry: &ancestry, editingTitle: editingTitle)
-            guard let layoutRoot else { continue }
+            // Depth and level-1 ancestry are recorded by one walk honoring
+            // folding — the same recording the measuring walk used to do.
+            let ancestry = ancestryMap(model: model, rootID: rootID)
+            let source = layoutSource(
+                model: model, ancestry: ancestry, variant: variant,
+                measurer: measurer, caches: caches, editingTitle: editingTitle,
+                cache: cache)
 
-            let frames = TreeLayout.layout(
-                root: layoutRoot, structure: structure, spacing: spacing)
+            // Full pass: a fresh state, everything recomputed and recorded.
+            // Incremental: the root's cached state plus the dirty set —
+            // unfiltered on purpose: an id that moved OUT of this root
+            // still has a stale parent link in this state, and that link
+            // is what marks the parent whose child list changed. Foreign
+            // ids (no link here) close to nothing and are harmless.
+            let rootState =
+                dirty == nil
+                ? LayoutState()
+                : (cache.roots[rootID]?.state ?? LayoutState())
+            let (frames, state) = IncrementalLayout.update(
+                rootID: rootID, structure: structure, spacing: spacing,
+                state: rootState, dirty: dirty, source: source)
+            cache.roots[rootID] = SceneBuildCache.RootInfo(
+                structure: structure, state: state)
+
             // Flexible positioning (F-LAY-11): a node's manual offset moves
             // it and its descendants after auto layout (also how a
             // floating root lands where it was created, F-CAN-5).
@@ -186,54 +380,73 @@ public enum SceneGeometry {
         return structure
     }
 
-    /// Builds the layout tree for one root: measured node sizes, folded
-    /// subtrees pruned. The editing node measures its live draft title so
-    /// the node grows while typing (F-EDT-8). The same walk records each
-    /// node's depth and level-1 ancestor.
-    static func layoutTree(
-        model: MapModel,
-        rootID: String,
-        measurer: TextMeasurer,
-        caches: BuildCaches,
-        ancestry: inout [String: AncestryInfo],
-        editingTitle: (id: String, title: NodeTitle)? = nil
-    ) -> LayoutNode? {
-        func measuredSize(for node: Node, depth: Int) -> CGSize {
-            let style = caches.style(level: depth, level1Index: 0)
-            let maxWidth: CGFloat?
-            if node.width?.mode == .fixed, let fixed = node.width?.value {
-                maxWidth = fixed
-            } else {
-                maxWidth = style.maxWidth
-            }
-            let title = node.id == editingTitle?.id ? editingTitle?.title : node.title
-            let textSize: CGSize = measurer.nodeTitleSize(
-                title ?? node.title, font: style.font, maxWidth: maxWidth)
-            let width: CGFloat = textSize.width + style.paddingWidth * 2
-            let height: CGFloat = textSize.height + style.paddingHeight * 2
-            return CGSize(width: width, height: height)
-        }
-
-        func buildNode(_ id: String, depth: Int, level1: String) -> LayoutNode? {
-            guard let node: Node = model.nodes[id] else { return nil }
-            ancestry[id] = AncestryInfo(
+    /// Depth from the root and the level-1 ancestor that colors this
+    /// node's branch, for every node the scene can show (folded subtrees
+    /// pruned) — one walk, no ancestor chains per node.
+    static func ancestryMap(model: MapModel, rootID: String) -> [String: AncestryInfo] {
+        var result: [String: AncestryInfo] = [:]
+        func walk(_ id: String, depth: Int, level1: String) {
+            guard let node = model.nodes[id] else { return }
+            result[id] = AncestryInfo(
                 depth: depth,
                 // The level-1 ancestor of a root (depth 0) and of a
                 // first-level node is the node itself.
                 level1AncestorID: depth <= 1 ? id : level1)
-            let size = measuredSize(for: node, depth: depth)
-            var children: [LayoutNode] = []
-            if !node.folded {
-                let childLevel1 = depth == 0 ? id : (depth == 1 ? id : level1)
-                for childID in node.children {
-                    if let child = buildNode(childID, depth: depth + 1, level1: childLevel1) {
-                        children.append(child)
-                    }
-                }
+            guard !node.folded else { return }
+            let childLevel1 = depth == 0 ? id : (depth == 1 ? id : level1)
+            for childID in node.children {
+                walk(childID, depth: depth + 1, level1: childLevel1)
             }
-            return LayoutNode(id: id, size: size, side: side(of: node), children: children)
         }
-        return buildNode(rootID, depth: 0, level1: rootID)
+        walk(rootID, depth: 0, level1: rootID)
+        return result
+    }
+
+    /// The incremental layout source: measured sizes come from the
+    /// per-document cache (a miss measures once through the shared
+    /// `TextMeasurer` and stores), and children are the folded-pruned
+    /// child list. The editing node measures its live draft title so the
+    /// node grows while typing (F-EDT-8).
+    static func layoutSource(
+        model: MapModel,
+        ancestry: [String: AncestryInfo],
+        variant: ThemeVariant,
+        measurer: TextMeasurer,
+        caches: BuildCaches,
+        editingTitle: (id: String, title: NodeTitle)?,
+        cache: SceneBuildCache
+    ) -> (String) -> LayoutSourceNode? {
+        { id in
+            guard let node: Node = model.nodes[id] else { return nil }
+            let depth = ancestry[id]?.depth ?? 0
+            let style = caches.style(level: depth, level1Index: 0)
+            let title = id == editingTitle?.id ? editingTitle?.title : node.title
+            let key = SceneBuildCache.SizeKey(
+                id: id, title: title ?? node.title, themeID: caches.theme.id, level: depth,
+                variant: variant, width: node.width)
+            let textSize: CGSize
+            if let cached = cache.sizes[key] {
+                textSize = cached
+            } else {
+                let maxWidth: CGFloat?
+                if node.width?.mode == .fixed, let fixed = node.width?.value {
+                    maxWidth = fixed
+                } else {
+                    maxWidth = style.maxWidth
+                }
+                let measured = measurer.nodeTitleSize(
+                    title ?? node.title, font: style.font, maxWidth: maxWidth)
+                cache.sizes[key] = measured
+                textSize = measured
+            }
+            let width = textSize.width + style.paddingWidth * 2
+            let height = textSize.height + style.paddingHeight * 2
+            return LayoutSourceNode(
+                id: id,
+                size: CGSize(width: width, height: height),
+                side: side(of: node),
+                childIDs: node.folded ? [] : node.children)
+        }
     }
 
     /// A node's manual offset, plus the accumulated offsets of its

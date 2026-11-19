@@ -102,9 +102,12 @@ struct CanvasPerformanceTests {
                 + " — build + grid + layer-tree apply at fit")
         #expect(built.nodes.count == 5_000)
 
-        // --- Keystroke → relayout → paint at a working zoom: one title
-        // change, full scene rebuild, diff apply. The viewport is at
-        // 100% around the edited node's subtree.
+        // --- Keystroke → relayout → paint at a working zoom (SPEC §11.8:
+        // 8 ms): one title change through the incremental path —
+        // `SceneGeometry.update` re-measures one node, relayouts only the
+        // dirty chain, and the grid/diff apply touches only changed
+        // nodes. The viewport is at 100% around the edited node's
+        // subtree.
         let tree = CanvasLayerTree()
         let workingCamera = Camera(
             origin: CGPoint(x: -viewport.width / 2, y: -viewport.height / 2), scale: 1)
@@ -117,49 +120,63 @@ struct CanvasPerformanceTests {
         initial.selectionColor = accent
         tree.apply(initial)
 
+        // The per-document caches a real window holds: filled by a full
+        // build, then reused by every keystroke.
+        let cache = SceneBuildCache(variant: .light)
+        var incrementalGrid = grid(for: built)
         var edited = model
+        _ = SceneGeometry.build(model: model, cache: cache, variant: .light, measurer: measurer)
         var best: Double?
         for _ in 0..<10 {
             edited.nodes["n600"]?.title = NodeTitle(
                 text: "Node 600 retitled \(Int.random(in: 0..<1000))")
             let start = DispatchTime.now()
-            let rebuilt = SceneGeometry.build(
-                model: edited, variant: .light, measurer: measurer)
-            let rebuiltGrid = grid(for: rebuilt)
+            let rebuilt = SceneGeometry.update(
+                model: edited, cache: cache, variant: .light, measurer: measurer,
+                dirty: ["n600"])
             var keystrokeContext = ApplyContext(
-                scene: rebuilt, grid: rebuiltGrid,
+                scene: rebuilt, grid: incrementalGrid,
                 camera: workingCamera, viewport: viewport)
             keystrokeContext.backingScale = 1
             keystrokeContext.animated = false
             keystrokeContext.reduceMotion = false
             keystrokeContext.selectionColor = accent
-            tree.apply(keystrokeContext)
+            let diff = tree.apply(keystrokeContext)
+            // The canvas view's grid sync: only the touched cells change.
+            for (id, change) in diff.nodes {
+                switch change {
+                case .removed:
+                    incrementalGrid.remove(id: id)
+                case .added:
+                    if let frame = rebuilt.nodes[id]?.frame {
+                        incrementalGrid.insert(id: id, frame: frame)
+                    }
+                case .moved(_, let to), .restyled(_, let to):
+                    incrementalGrid.update(id: id, frame: to)
+                }
+            }
             let elapsedSeconds = elapsed(since: start)
             best = min(best ?? elapsedSeconds, elapsedSeconds)
         }
         let keystroke = try #require(best)
         print(
             "perf keystroke (5k, best of 10): \(format(keystroke))"
-                + " — rebuild + grid + layer diff apply at 100% zoom")
+                + " — incremental update + grid delta + layer diff apply at 100% zoom")
 
         #if !DEBUG
-            // §11.8's 8 ms keystroke→relayout→paint budget assumes the
-            // incremental relayout of §11.3 (`Layout.update(dirty:)`).
-            // Today a title change rebuilds the whole scene: the
-            // measured split is ≈8 ms SceneGeometry.build (≈4 ms of it
-            // TreeLayout's whole-tree layout pass), ≈0.4 ms grid,
-            // ≈2 ms layer diff apply. The guard below pins today's
-            // ~10.7 ms full-rebuild number plus headroom; the 8 ms
-            // target lands with incremental layout.
+            // §11.8's 8 ms keystroke→relayout→paint budget, now enforced:
+            // the incremental path (§11.3's `Layout.update(dirty:)`,
+            // re-measuring one node and relayouting only its chain) keeps
+            // the measured split at roughly 1 ms incremental layout + ~1 ms
+            // scene assembly + ~2 ms layer diff apply.
             //
             // The budgets are for an Apple M1 (§11.8). Shared CI runners
-            // measure 2–3× slower (728 ms open, 24.7 ms keystroke), so CI
-            // (which sets `CI`) only prints the numbers; local release
-            // runs enforce them.
+            // measure 2–3× slower, so CI (which sets `CI`) only prints the
+            // numbers; local release runs enforce them.
             if ProcessInfo.processInfo.environment["CI"] == nil {
                 #expect(
-                    keystroke < 0.012,
-                    "full-rebuild keystroke regression guard (SPEC §11.8 target is 8 ms via incremental relayout): \(format(keystroke))"
+                    keystroke < 0.008,
+                    "SPEC §11.8 keystroke→relayout→paint budget (8 ms): \(format(keystroke))"
                 )
                 #expect(
                     coldOpen < 0.300,

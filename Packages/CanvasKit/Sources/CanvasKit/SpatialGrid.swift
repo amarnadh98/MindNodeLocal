@@ -16,8 +16,13 @@ public struct SpatialGrid {
         (x &* 1_000_003) &+ y &* 7_919
     }
 
-    /// Inserts a frame for `id`, covering every cell it touches.
+    /// Inserts a frame for `id`, covering every cell it touches. Replaces
+    /// any previous placement first, so calling it twice never duplicates
+    /// a cell entry.
     public mutating func insert(id: String, frame: CGRect) {
+        if let old = frames[id] {
+            removeFromCells(id: id, frame: old)
+        }
         frames[id] = frame
         let firstColumn = Int(floor(frame.minX / Self.cellSize))
         let lastColumn = Int(floor((frame.maxX - 0.001) / Self.cellSize))
@@ -26,6 +31,40 @@ public struct SpatialGrid {
         for column in firstColumn...max(firstColumn, lastColumn) {
             for row in firstRow...max(firstRow, lastRow) {
                 cells[Self.key(x: column, y: row), default: []].append(id)
+            }
+        }
+    }
+
+    /// Removes `id`'s frame and its cell entries.
+    public mutating func remove(id: String) {
+        guard let frame = frames.removeValue(forKey: id) else { return }
+        removeFromCells(id: id, frame: frame)
+    }
+
+    /// Moves `id` to a new frame: out of the old cells, into the new ones —
+    /// the incremental form of a full rebuild (only the touched cells
+    /// change, SPEC §11.8's keystroke path).
+    public mutating func update(id: String, frame: CGRect) {
+        insert(id: id, frame: frame)
+    }
+
+    private mutating func removeFromCells(id: String, frame: CGRect) {
+        let firstColumn = Int(floor(frame.minX / Self.cellSize))
+        let lastColumn = Int(floor((frame.maxX - 0.001) / Self.cellSize))
+        let firstRow = Int(floor(frame.minY / Self.cellSize))
+        let lastRow = Int(floor((frame.maxY - 0.001) / Self.cellSize))
+        for column in firstColumn...max(firstColumn, lastColumn) {
+            for row in firstRow...max(firstRow, lastRow) {
+                let key = Self.key(x: column, y: row)
+                guard var ids = cells[key] else { continue }
+                if let index = ids.firstIndex(of: id) {
+                    ids.remove(at: index)
+                }
+                if ids.isEmpty {
+                    cells[key] = nil
+                } else {
+                    cells[key] = ids
+                }
             }
         }
     }

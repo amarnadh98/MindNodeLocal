@@ -1,126 +1,32 @@
 import CoreGraphics
 import Foundation
 
-/// Shared contour machinery for the one-sided structures. Children are
-/// stacked along one axis; consecutive siblings are separated by walking the
-/// accumulated outer contour against the new subtree's inner contour
-/// (van der Ploeg-style band merge over struct arrays, no class graph).
-enum Contours {
-    static func shift(_ bands: [Band], dx: CGFloat, dy: CGFloat) -> [Band] {
-        bands.map { Band(lo: $0.lo + dx, hi: $0.hi + dx, value: $0.value + dy) }
-    }
-
-    /// Merges two band sets, taking the outer boundary value (`take` = max
-    /// for bottom contours, min for top contours) wherever bands overlap.
-    /// Both inputs must be sorted and internally non-overlapping — an
-    /// invariant this function maintains for its outputs. Linear two-pointer
-    /// sweep, no sorting, no intermediate allocations.
-    static func merge(
-        _ leftBands: [Band], _ rightBands: [Band], take: (CGFloat, CGFloat) -> CGFloat
-    ) -> [Band] {
-        guard !leftBands.isEmpty else { return rightBands }
-        guard !rightBands.isEmpty else { return leftBands }
-
-        var result: [Band] = []
-        var i = 0
-        var j = 0
-        var consumedA: CGFloat = -.infinity
-        var consumedB: CGFloat = -.infinity
-
-        func emit(_ lo: CGFloat, _ hi: CGFloat, _ value: CGFloat) {
-            guard hi > lo else { return }
-            if let last = result.last, last.hi == lo, last.value == value {
-                result[result.count - 1].hi = hi
-            } else {
-                result.append(Band(lo: lo, hi: hi, value: value))
-            }
-        }
-
-        while i < leftBands.count, j < rightBands.count {
-            let bandA = leftBands[i]
-            let bandB = rightBands[j]
-            let aStart = max(bandA.lo, consumedA)
-            let bStart = max(bandB.lo, consumedB)
-            let aEnd = bandA.hi
-            let bEnd = bandB.hi
-
-            if aStart < bStart {
-                emit(aStart, min(aEnd, bStart), bandA.value)
-                consumedA = min(aEnd, bStart)
-            } else if bStart < aStart {
-                emit(bStart, min(bEnd, aStart), bandB.value)
-                consumedB = min(bEnd, aStart)
-            }
-
-            let overlapLo = max(aStart, bStart)
-            let overlapHi = min(aEnd, bEnd)
-            if overlapHi > overlapLo {
-                emit(overlapLo, overlapHi, take(bandA.value, bandB.value))
-                consumedA = overlapHi
-                consumedB = overlapHi
-            }
-
-            if aEnd <= consumedA {
-                i += 1
-                consumedA = -.infinity
-            }
-            if bEnd <= consumedB {
-                j += 1
-                consumedB = -.infinity
-            }
-        }
-
-        while i < leftBands.count {
-            emit(max(leftBands[i].lo, consumedA), leftBands[i].hi, leftBands[i].value)
-            consumedA = -.infinity
-            i += 1
-        }
-        while j < rightBands.count {
-            emit(max(rightBands[j].lo, consumedB), rightBands[j].hi, rightBands[j].value)
-            consumedB = -.infinity
-            j += 1
-        }
-        return result
-    }
-
-    /// Minimal extra distance so that `incoming` (already positioned) clears
-    /// `accumulated` everywhere their bands overlap.
-    static func separation(
-        accumulated: [Band], incoming: [Band], gap: CGFloat
-    ) -> CGFloat {
-        var required: CGFloat = 0
-        var i = 0
-        var j = 0
-        while i < accumulated.count, j < incoming.count {
-            let acc = accumulated[i]
-            let inc = incoming[j]
-            let lo = max(acc.lo, inc.lo)
-            let hi = min(acc.hi, inc.hi)
-            if lo < hi {
-                required = max(required, acc.value + gap - inc.value)
-            }
-            if acc.hi < inc.hi {
-                i += 1
-            } else if acc.hi > inc.hi {
-                j += 1
-            } else {
-                i += 1
-                j += 1
-            }
-        }
-        return max(0, required)
-    }
-}
-
 /// One-sided horizontal mind map (right, or mirrored for left).
 enum MindmapLayout {
     static func layout(
         root: LayoutNode, spacing: LayoutSpacing, mirror: Bool
     ) -> LayoutResult {
-        var frames: LayoutResult = [:]
-        _ = place(root, spacing: spacing, depth: 0, frames: &frames)
+        let placed = placeTree(root, spacing: spacing, depth: 0)
+        return assemble(placed, mirror: mirror)
+    }
+
+    /// Full-path recursion: children are placed directly.
+    static func placeTree(_ node: LayoutNode, spacing: LayoutSpacing, depth: Int) -> Placed {
+        TidyTree.place(
+            node, spacing: spacing, depth: depth, vertical: false,
+            resolve: { placeTree($0, spacing: spacing, depth: $1) })
+    }
+
+    /// Top-level transform shared by the full and incremental paths: the
+    /// frames dictionary, mirrored around the root for the left structure.
+    static func assemble(_ placed: Placed, mirror: Bool) -> LayoutResult {
+        var frames = LayoutResult(minimumCapacity: placed.ids.count)
+        for (index, id) in placed.ids.enumerated() {
+            frames[id] = placed.frames[index]
+        }
         if mirror {
-            let rootWidth = root.size.width
+            // The root's own width (its frame sits at the origin).
+            let rootWidth = placed.frames[0].width
             for (id, frame) in frames {
                 frames[id] = CGRect(
                     x: rootWidth - frame.minX - frame.width,
@@ -131,101 +37,33 @@ enum MindmapLayout {
         }
         return frames
     }
-
-    /// Places `node`'s subtree with the node itself at the origin. Frames are
-    /// written relative to that origin; the caller translates them.
-    private static func place(
-        _ node: LayoutNode, spacing: LayoutSpacing, depth: Int, frames: inout LayoutResult
-    ) -> Placed {
-        frames[node.id] = CGRect(origin: .zero, size: node.size)
-
-        let ownTop = [Band(lo: 0, hi: node.size.width, value: 0)]
-        let ownBottom = [Band(lo: 0, hi: node.size.width, value: node.size.height)]
-
-        guard !node.children.isEmpty else {
-            return Placed(
-                ids: [node.id], top: ownTop, bottom: ownBottom,
-                extentMaxX: node.size.width, minY: 0, maxY: node.size.height)
-        }
-
-        let gapToChildren = depth == 0 ? spacing.rootGap : spacing.levelGap
-        let siblingGap = depth == 0 ? spacing.subtreeGap : spacing.siblingGap
-        let childX = node.size.width + gapToChildren
-
-        var accumulatedBottom: [Band] = []
-        var childrenTop: [Band] = []
-        var childrenBottom: [Band] = []
-        var childIDs: [String] = []
-        var childExtentMaxX: CGFloat = 0
-        var childMinY: CGFloat = 0
-        var childMaxY: CGFloat = 0
-        var cursor: CGFloat = 0
-        var firstChildMid: CGFloat?
-        var lastChildMid: CGFloat = 0
-
-        for child in node.children {
-            let childPlaced = place(child, spacing: spacing, depth: depth + 1, frames: &frames)
-            let candidateTop = Contours.shift(childPlaced.top, dx: childX, dy: cursor)
-            let dy = Contours.separation(
-                accumulated: accumulatedBottom, incoming: candidateTop, gap: siblingGap)
-            let childY = cursor + dy
-
-            for id in childPlaced.ids {
-                if let frame = frames[id] {
-                    frames[id] = frame.offsetBy(dx: childX, dy: childY)
-                }
-            }
-
-            let shiftedTop = Contours.shift(childPlaced.top, dx: childX, dy: childY)
-            let shiftedBottom = Contours.shift(childPlaced.bottom, dx: childX, dy: childY)
-            accumulatedBottom = Contours.merge(accumulatedBottom, shiftedBottom, take: max)
-            childrenTop = Contours.merge(childrenTop, shiftedTop, take: min)
-            childrenBottom = Contours.merge(childrenBottom, shiftedBottom, take: max)
-
-            cursor = childY + childPlaced.maxY
-            let mid = childY + (childPlaced.minY + childPlaced.maxY) / 2
-            firstChildMid = firstChildMid ?? mid
-            lastChildMid = mid
-            childExtentMaxX = max(childExtentMaxX, childX + childPlaced.extentMaxX)
-            childMinY = min(childMinY, childY + childPlaced.minY)
-            childMaxY = max(childMaxY, childY + childPlaced.maxY)
-            childIDs += childPlaced.ids
-        }
-
-        let stackCenter = ((firstChildMid ?? 0) + lastChildMid) / 2
-        let centerShift = node.size.height / 2 - stackCenter
-        if centerShift != 0 {
-            for id in childIDs {
-                if let frame = frames[id] {
-                    frames[id] = frame.offsetBy(dx: 0, dy: centerShift)
-                }
-            }
-        }
-
-        let finalTop = Contours.merge(
-            ownTop, Contours.shift(childrenTop, dx: 0, dy: centerShift), take: min)
-        let finalBottom = Contours.merge(
-            ownBottom, Contours.shift(childrenBottom, dx: 0, dy: centerShift), take: max)
-
-        return Placed(
-            ids: [node.id] + childIDs,
-            top: finalTop,
-            bottom: finalBottom,
-            extentMaxX: max(node.size.width, childExtentMaxX),
-            minY: min(0, childMinY + centerShift),
-            maxY: max(node.size.height, childMaxY + centerShift))
-    }
 }
 
-/// Vertical org chart (down, or mirrored for up), obtained by transposing the
-/// mind-map engine: children stack horizontally, subtrees separate along x.
+/// Vertical org chart (down, or mirrored for up), obtained by transposing
+/// the mind-map engine: node sizes swap on the way in, frames swap on the
+/// way out.
 enum OrgLayout {
     static func layout(root: LayoutNode, spacing: LayoutSpacing, mirror: Bool) -> LayoutResult {
-        let transposed = transpose(root)
-        let horizontal = MindmapLayout.layout(root: transposed, spacing: spacing, mirror: false)
-        let rootHeight = root.size.height
-        var frames: LayoutResult = [:]
-        for (id, frame) in horizontal {
+        let placed = placeTree(root, spacing: spacing, depth: 0)
+        return assemble(placed, mirror: mirror)
+    }
+
+    /// Full-path recursion with the vertical transpose applied inline —
+    /// the same values the materialized transposed tree used to carry.
+    static func placeTree(_ node: LayoutNode, spacing: LayoutSpacing, depth: Int) -> Placed {
+        TidyTree.place(
+            node, spacing: spacing, depth: depth, vertical: true,
+            resolve: { placeTree($0, spacing: spacing, depth: $1) })
+    }
+
+    /// Top-level transform shared by the full and incremental paths:
+    /// frame transposition plus the up-mirror.
+    static func assemble(_ placed: Placed, mirror: Bool) -> LayoutResult {
+        var frames = MindmapLayout.assemble(placed, mirror: false)
+        // The root's raw height: its placed frame carries the working
+        // (transposed) size, so width there is height here.
+        let rootHeight = placed.frames[0].width
+        for (id, frame) in frames {
             let swapped = CGRect(
                 x: frame.minY, y: frame.minX, width: frame.height, height: frame.width)
             frames[id] =
@@ -236,14 +74,6 @@ enum OrgLayout {
                 : swapped
         }
         return frames
-    }
-
-    private static func transpose(_ node: LayoutNode) -> LayoutNode {
-        LayoutNode(
-            id: node.id,
-            size: CGSize(width: node.size.height, height: node.size.width),
-            side: node.side,
-            children: node.children.map(transpose))
     }
 }
 
@@ -287,18 +117,30 @@ enum BalancedLayout {
 
         if !rightChildren.isEmpty {
             let subtree = LayoutNode(id: root.id, size: root.size, children: rightChildren)
-            let side = MindmapLayout.layout(root: subtree, spacing: spacing, mirror: false)
-            let (sideFrames, mid) = excludingRoot(side, rootID: root.id)
-            let dy = rootMidY - mid
-            for (id, frame) in sideFrames {
-                frames[id] = frame.offsetBy(dx: 0, dy: dy)
-            }
+            let side = MindmapLayout.placeTree(subtree, spacing: spacing, depth: 0)
+            placeSide(side, rootID: root.id, rootWidth: rootWidth, rootMidY: rootMidY, mirror: false, into: &frames)
         }
         if !leftChildren.isEmpty {
             let subtree = LayoutNode(id: root.id, size: root.size, children: leftChildren)
-            let side = MindmapLayout.layout(root: subtree, spacing: spacing, mirror: false)
-            let (sideFrames, mid) = excludingRoot(side, rootID: root.id)
-            let dy = rootMidY - mid
+            let side = MindmapLayout.placeTree(subtree, spacing: spacing, depth: 0)
+            placeSide(side, rootID: root.id, rootWidth: rootWidth, rootMidY: rootMidY, mirror: true, into: &frames)
+        }
+        return frames
+    }
+
+    /// One side's placed frames, centered on the root and (left) mirrored —
+    /// shared by the full and incremental paths.
+    static func placeSide(
+        _ placed: Placed,
+        rootID: String,
+        rootWidth: CGFloat,
+        rootMidY: CGFloat,
+        mirror: Bool,
+        into frames: inout LayoutResult
+    ) {
+        let (sideFrames, mid) = excludingRoot(placed, rootID: rootID)
+        let dy = rootMidY - mid
+        if mirror {
             for (id, frame) in sideFrames {
                 frames[id] = CGRect(
                     x: rootWidth - frame.minX - frame.width,
@@ -306,19 +148,24 @@ enum BalancedLayout {
                     width: frame.width,
                     height: frame.height)
             }
+        } else {
+            for (id, frame) in sideFrames {
+                frames[id] = frame.offsetBy(dx: 0, dy: dy)
+            }
         }
-        return frames
     }
 
     private static func excludingRoot(
-        _ subtree: LayoutResult, rootID: String
+        _ placed: Placed, rootID: String
     ) -> (frames: LayoutResult, midY: CGFloat) {
-        var frames = subtree
+        var frames: LayoutResult = [:]
         frames[rootID] = nil
         var minY = 0 as CGFloat
         var maxY = 0 as CGFloat
         var hasContent = false
-        for frame in frames.values {
+        for (index, id) in placed.ids.enumerated() where id != rootID {
+            let frame = placed.frames[index]
+            frames[id] = frame
             if hasContent {
                 minY = min(minY, frame.minY)
                 maxY = max(maxY, frame.maxY)

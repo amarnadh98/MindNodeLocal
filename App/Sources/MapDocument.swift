@@ -160,14 +160,15 @@ final class MapDocument: NSDocument {
         }
     }
 
-    /// A store change rebuilds the visible scene. The change count is
-    /// left to NSDocument's undo-manager integration (each closed undo
-    /// group is a change, each undo/redo moves it back/forward); counting
-    /// performs here as well would leave a document undone back to its
-    /// saved state still marked edited.
+    /// A store change rebuilds the visible scene — incrementally when the
+    /// change set is small (SPEC §11.3), a full rebuild otherwise. The
+    /// change count is left to NSDocument's undo-manager integration (each
+    /// closed undo group is a change, each undo/redo moves it
+    /// back/forward); counting performs here as well would leave a
+    /// document undone back to its saved state still marked edited.
     private func storeDidChange(_ origin: MapStore.ChangeOrigin) {
         for case let controller as DocumentWindowController in windowControllers {
-            controller.modelDidChange()
+            controller.modelDidChange(origin: origin)
         }
     }
 }

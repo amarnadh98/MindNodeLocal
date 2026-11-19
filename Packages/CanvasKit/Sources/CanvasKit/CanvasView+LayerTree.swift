@@ -46,7 +46,9 @@ extension CanvasView {
 
     /// Applies the current scene to the layer tree (diffing against
     /// the tree's previous scene and animating per §7.6 when allowed).
-    func applyScene(animated: Bool) {
+    /// `precomputedDiff` skips the differ when the caller already ran
+    /// it (the grid sync).
+    func applyScene(animated: Bool, precomputedDiff: SceneDiff? = nil) {
         ensureTreeHosted()
         guard let scene else {
             layerTree.clear()
@@ -60,6 +62,7 @@ extension CanvasView {
         context.selection = selection
         context.selectionColor = selectionColor
         context.editingNodeID = nodeTextEditor.editingNodeID
+        context.diff = precomputedDiff
         layerTree.apply(context)
     }
 
