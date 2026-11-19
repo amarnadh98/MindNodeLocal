@@ -418,6 +418,12 @@ extension AppDelegate {
                     "Study Due", #selector(DocumentWindowController.studyDueAction(_:)),
                     "\r", modifiers: [.control, .command]),
                 .separator(),
+                // F-STD-5: spatial self-testing on the canvas.
+                // ⌥⌘R is free (⌘R alone is Select ▸ Select Root).
+                item(
+                    "Recall", #selector(DocumentWindowController.recallAction(_:)),
+                    "r", modifiers: [.command, .option]),
+                .separator(),
                 // F-STD-6.
                 item(
                     "Study Weakest Branch",

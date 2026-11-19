@@ -463,9 +463,11 @@ public final class CanvasLayerTree {
         configureContents(layer, node: node, camera: camera, backingScale: backingScale)
         // M6 (F-PRE/§10): the reveal overlay wins over the default
         // opacity — ghosted, hidden and placeholder nodes ride
-        // opacity only, never a re-raster.
+        // opacity only, never a re-raster. M7: placeholders carry the
+        // F-STD-5 blur effect the same way (see +Reveal.swift).
         if let overlay = revealOverlay {
             layer.opacity = Float(overlay.nodeOpacity(node.id))
+            applyRevealState(to: layer, id: node.id, overlay: overlay)
         }
     }
 

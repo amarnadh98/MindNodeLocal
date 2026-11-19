@@ -1,12 +1,32 @@
 import Foundation
 import MapCore
 
+/// F-STD-7's per-deck dashboard row.
+public struct DeckDue: Sendable, Equatable, Identifiable {
+    /// The deck node's id (a deck is a branch marked Study, F-STD-1).
+    public let id: String
+    /// The deck node's title.
+    public let name: String
+    /// Cards due right now in this deck (learning + review, not new).
+    public let due: Int
+    /// Every card attributed to the deck.
+    public let total: Int
+
+    public init(id: String, name: String, due: Int, total: Int) {
+        self.id = id
+        self.name = name
+        self.due = due
+        self.total = total
+    }
+}
+
 /// Dashboard computations (F-STD-7), per document: due counts, the
-/// 30-day forecast, retention, streak and the heatmap's daily counts.
-/// All pure over (cards, states, review log, now) — the dashboard UI is
-/// a thin shell over these, and the cross-map aggregation seam starts
-/// here too: a Library dashboard later feeds several documents' cards
-/// and one merged log through the same functions.
+/// 30-day forecast, retention, streak, the heatmap's daily counts and
+/// the per-deck due breakdown. All pure over (cards, states, review
+/// log, now) — the dashboard UI is a thin shell over these, and the
+/// cross-map aggregation seam starts here too: a Library dashboard
+/// later feeds several documents' cards and one merged log through
+/// the same functions.
 public enum StudyStats {
     /// Cards due now that are not new (learning + review states).
     public static func dueCount(cards: [Card], states: [String: FSRSCard], now: Date) -> Int {
@@ -14,6 +34,62 @@ public enum StudyStats {
             guard let state = states[card.id], state.state != .new else { return false }
             return state.due <= now
         }.count
+    }
+
+    /// F-STD-7 "due per deck": every branch marked Study (F-STD-1),
+    /// in map order, with the cards attributed to their **nearest**
+    /// deck ancestor — a nested deck owns its subtree's cards, the
+    /// outer deck keeps the rest. Due follows `dueCount`'s rule.
+    /// Decks with no cards still list (total 0) so the row a user
+    /// just marked shows up.
+    public static func deckBreakdown(
+        model: MapModel, cards: [Card], states: [String: FSRSCard], now: Date
+    ) -> [DeckDue] {
+        // Deck ids in map order.
+        var deckOrder: [String] = []
+        var isDeck: Set<String> = []
+        func visit(_ id: String) {
+            guard let node = model.nodes[id] else { return }
+            if node.study?.deck == true {
+                deckOrder.append(id)
+                isDeck.insert(id)
+            }
+            for child in node.children {
+                visit(child)
+            }
+        }
+        for root in model.roots {
+            visit(root)
+        }
+        // Attribute each card to its nearest deck (itself included).
+        var buckets: [String: (due: Int, total: Int)] = [:]
+        buckets.reserveCapacity(deckOrder.count)
+        for card in cards {
+            var owner: String?
+            var cursor: String? = card.nodeID
+            while let id = cursor {
+                if isDeck.contains(id) {
+                    owner = id
+                    break
+                }
+                cursor = model.nodes[id]?.parent
+            }
+            guard let deck = owner else { continue }
+            var bucket = buckets[deck] ?? (0, 0)
+            bucket.total += 1
+            if let state = states[card.id], state.state != .new, state.due <= now {
+                bucket.due += 1
+            }
+            buckets[deck] = bucket
+        }
+        return deckOrder.map { id in
+            let bucket = buckets[id] ?? (0, 0)
+            return DeckDue(
+                id: id,
+                name: model.nodes[id]?.title.text ?? "Deck",
+                due: bucket.due,
+                total: bucket.total)
+        }
     }
 
     /// Reviews due per day for the next `days` days, index 0 = today

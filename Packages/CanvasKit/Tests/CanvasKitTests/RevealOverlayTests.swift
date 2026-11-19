@@ -107,6 +107,63 @@ struct RevealOverlayTests {
         #expect(tree.nodeLayers["leaf-0-0"]?.opacity == 1)
     }
 
+    // MARK: F-STD-5's placeholder refinement (M7): blurred bodies,
+    // outlines visible — an effect on existing contents, never a
+    // re-raster, applied and cleared with the overlay's states.
+
+    /// True when the layer carries the placeholder blur.
+    private func hasPlaceholderBlur(_ layer: CALayer?) -> Bool {
+        (layer?.filters?.first as? CIFilter)?.name
+            .hasPrefix("arbor.reveal.placeholder-blur.") == true
+    }
+
+    @Test func placeholdersBlurWithoutRerasteringAndClearOnReveal() throws {
+        let scene = SceneGeometry.build(
+            model: sceneModel(), variant: .light, measurer: SceneRenderer.sharedMeasurer)
+        let tree = CanvasLayerTree()
+        apply(tree, scene, camera: fitCamera)
+        let keyBefore = tree.nodeRasterKey("branch-0")
+
+        // Recall's overlay: every descendant a placeholder, the branch
+        // node itself untouched (it is the prompt).
+        tree.setRevealOverlay(
+            RevealOverlay(states: ["branch-0": .placeholder, "leaf-0-0": .placeholder]))
+        #expect(tree.nodeLayers["branch-0"]?.opacity == Float(RevealOverlay.placeholderOpacity))
+        #expect(hasPlaceholderBlur(tree.nodeLayers["branch-0"]))
+        #expect(hasPlaceholderBlur(tree.nodeLayers["leaf-0-0"]))
+        // Unmanaged ids keep no effect.
+        #expect(tree.nodeLayers["root"]?.filters == nil)
+        // The blur rides the existing raster: the key never changed.
+        #expect(tree.nodeRasterKey("branch-0") == keyBefore)
+
+        // Revealing one node clears its blur and opacity.
+        tree.setRevealOverlay(
+            RevealOverlay(states: ["branch-0": .visible, "leaf-0-0": .placeholder]))
+        #expect(tree.nodeLayers["branch-0"]?.opacity == 1)
+        #expect(!hasPlaceholderBlur(tree.nodeLayers["branch-0"]))
+        #expect(hasPlaceholderBlur(tree.nodeLayers["leaf-0-0"]))
+
+        // Exiting the mode (overlay cleared) leaves no blur behind.
+        tree.setRevealOverlay(nil)
+        #expect(tree.nodeLayers["leaf-0-0"]?.opacity == 1)
+        #expect(tree.nodeLayers.values.allSatisfy { $0.filters == nil })
+    }
+
+    @Test func lateRealizedPlaceholdersPickUpTheBlur() throws {
+        let scene = SceneGeometry.build(
+            model: sceneModel(), variant: .light, measurer: SceneRenderer.sharedMeasurer)
+        let tree = CanvasLayerTree()
+        // Park the camera away, install recall's overlay, then pan in:
+        // the culling path must realize placeholders with their blur.
+        apply(tree, scene, camera: Camera(origin: CGPoint(x: 100_000, y: 100_000), scale: 1))
+        tree.setRevealOverlay(
+            RevealOverlay(states: ["branch-0": .placeholder, "leaf-0-0": .placeholder]))
+        tree.updateCamera(camera: fitCamera, viewport: viewport, backingScale: 1)
+        #expect(hasPlaceholderBlur(tree.nodeLayers["branch-0"]))
+        #expect(hasPlaceholderBlur(tree.nodeLayers["leaf-0-0"]))
+        #expect(tree.nodeLayers["root"]?.filters == nil)
+    }
+
     @Test func revealAnimationAttachesPerMotionTable() throws {
         let scene = SceneGeometry.build(
             model: sceneModel(), variant: .light, measurer: SceneRenderer.sharedMeasurer)

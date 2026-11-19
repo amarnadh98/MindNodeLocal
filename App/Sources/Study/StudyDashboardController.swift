@@ -23,6 +23,9 @@ struct DashboardSnapshot {
     let streak: Int
     let heatmap: [Int]
     let totalCards: Int
+    /// F-STD-7 "due per deck": each Study-marked branch (F-STD-1) with
+    /// the cards attributed to their nearest deck ancestor.
+    let decks: [DeckDue]
 
     static let forecastDays = 30
     static let heatmapWeeks = 12
@@ -44,7 +47,9 @@ struct DashboardSnapshot {
             streak: StudyStats.streak(reviews: document.reviewLog, now: now),
             heatmap: StudyStats.dailyReviewCounts(
                 reviews: document.reviewLog, now: now, days: heatmapWeeks * 7),
-            totalCards: cards.count)
+            totalCards: cards.count,
+            decks: StudyStats.deckBreakdown(
+                model: model, cards: cards, states: states, now: now))
     }
 }
 
@@ -95,16 +100,19 @@ final class StudyDashboardController: NSWindowController {
 /// The opt-in daily reminder (F-STD-7): a local UserNotifications
 /// trigger, authorized ONLY when the user flips the toggle — the
 /// permission prompt is a consequence of the opt-in, never a launch
-/// side effect (SPEC §12: no un-asked-for anything).
+/// side effect (SPEC §12: no un-asked-for anything). The time is the
+/// dashboard's picker (9:00 default), persisted per user; nothing is
+/// ever sent anywhere.
 enum StudyReminder {
     static let identifier = "arbor.study.daily-reminder"
-    static let hour = 9
 
-    /// Enables or disables the reminder; returns whether it ended up
+    /// Enables, disables or reschedules the reminder at the persisted
+    /// time (F-STD-7 "toggle + time"); returns whether it ended up
     /// enabled (a denied permission reads as off).
     @MainActor
     static func setEnabled(_ enabled: Bool) async -> Bool {
         let center = UNUserNotificationCenter.current()
+        let time = StudyPreferences.reminderTime()
         if !enabled {
             center.removePendingNotificationRequests(withIdentifiers: [identifier])
             UserDefaults.standard.set(false, forKey: StudyPreferences.dailyReminderKey)
@@ -117,12 +125,15 @@ enum StudyReminder {
         }
         UserDefaults.standard.set(true, forKey: StudyPreferences.dailyReminderKey)
 
+        // (Re)schedule at the chosen time: a time change while enabled
+        // replaces the pending request atomically.
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
         let content = UNMutableNotificationContent()
         content.title = "Arbor"
         content.body = "Time for today's study session."
         content.sound = .default
-        var components = DateComponents()
-        components.hour = hour
+        var components = Calendar.current.dateComponents([.hour, .minute], from: time)
+        components.second = 0
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
         try? await center.add(request)

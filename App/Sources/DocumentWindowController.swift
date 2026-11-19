@@ -65,6 +65,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// The frontmost study session of this window (kept so hosted tests
     /// and VoiceOver scripts can reach it; a new session replaces it).
     var activeStudySession: StudySessionController?
+    /// F-STD-5: the live recall run on this window's canvas, if any —
+    /// pure view state (an overlay + an input shield); the logic lives
+    /// in App/Sources/Study/RecallSession.swift and the menu hooks in
+    /// DocumentWindowController+Recall.swift.
+    var recallSessionBox: RecallSession?
 
     /// The pasteboard flavours written by copy/cut (F-EDT-9): the
     /// internal lossless payload plus the three interop texts.
@@ -363,6 +368,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-STD-6: a live mastery overlay recolors after every change
         // (a grading moves a card's retrievability bucket).
         applyMasteryOverlay()
+        // F-STD-5: recall is view state over the scene; a real edit
+        // (the shield blocks canvas gestures, but menus still fire)
+        // ends the mode so the overlay can never go stale against the
+        // tree. A grading write (ADR-0015, keys 1/2) keeps it alive.
+        if case .nonUndoable = origin {
+        } else {
+            recallSessionBox?.stop()
+        }
         window?.title = document?.displayName ?? window?.title ?? ""
         // M6 (F-PRE-2): authored slide changes rebuild the sidebar.
         refreshSlidesSidebar()
@@ -929,6 +942,15 @@ extension DocumentWindowController {
             canvas.commitEditing(next: .none)
             return
         }
+        // F-STD-5: while a recall run is live, ⎋ exits it first. The
+        // bare-⎋ "Deselect" menu equivalent is how AppKit delivers Esc
+        // at the map level (the same route F-FOC's overlays take
+        // below) — the shield's performKeyEquivalent usually consumes
+        // the key first; this is the menu-item half of the same exit.
+        if recallSessionBox != nil {
+            recallSessionBox?.stop()
+            return
+        }
         // F-AI-2: ⎋ with ghosts presented dismisses them first —
         // without touching the document (no undo step, not even dirty).
         if ai.presentingGhosts {
@@ -944,48 +966,6 @@ extension DocumentWindowController {
         canvas.setSelection([])
     }
 
-    // MARK: AI (F-AI-1…F-AI-5) — actions the AI menu targets
-
-    /// ⌘. — expand the selected node with AI; with ghosts presented,
-    /// regenerates them (F-AI-2).
-    @objc func aiExpandAction(_ sender: Any?) {
-        guard !canvas.isEditing else { return }
-        ai.expandAction()
-    }
-
-    /// F-AI-3: the "Generate Map From…" sheet.
-    @objc func generateMapAction(_ sender: Any?) {
-        guard ai.menuAvailable else { return }
-        GenerateMapSheetPresenter.present(on: ai)
-    }
-
-    /// F-AI-4 (P2): summarize the selected branch into its note.
-    @objc func aiSummarizeBranchAction(_ sender: Any?) {
-        guard !canvas.isEditing, !canvas.selection.isEmpty else { return }
-        Task { await ai.summarizeBranchAction() }
-    }
-
-    /// F-AI-4 (P2): rewrite the selected subtree's titles concisely.
-    @objc func aiRewriteTitlesAction(_ sender: Any?) {
-        guard !canvas.isEditing, !canvas.selection.isEmpty else { return }
-        Task { await ai.rewriteTitlesAction() }
-    }
-
-    /// F-AI-4 (P2): suggest a title for the document.
-    @objc func aiSuggestTitleAction(_ sender: Any?) {
-        guard !canvas.isEditing else { return }
-        Task { await ai.suggestTitleAction() }
-    }
-
-    /// SPEC §12: the per-document "Never send to cloud AI" flag — one
-    /// undoable `setAIPolicy` command, mirrored by the menu's state.
-    @objc func aiToggleNeverSendToCloudAction(_ sender: Any?) {
-        ai.toggleNeverSendToCloud()
-        documentToolbar?.validateVisibleItems()
-    }
-}
-
-extension DocumentWindowController {
     // MARK: drag drop (F-EDT-5)
 
     /// A finished canvas drag hands over exactly one command: performed
