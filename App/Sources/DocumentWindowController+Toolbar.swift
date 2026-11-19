@@ -383,7 +383,7 @@ extension DocumentWindowController {
         default:
             return validateRelationMenuItem(menuItem) ?? validateFocusFindMenuItem(menuItem)
                 ?? validateThemesMenuItem(menuItem) ?? validateMediaMenuItem(menuItem)
-                ?? validateInspectorMenuItem(menuItem)
+                ?? validateInspectorMenuItem(menuItem) ?? validatePrintMenuItem(menuItem)
                 ?? validateDocumentSafetyMenuItem(menuItem) ?? true
         }
     }

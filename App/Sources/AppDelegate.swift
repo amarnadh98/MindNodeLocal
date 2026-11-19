@@ -136,6 +136,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             "Export Slides as PDF…",
                             #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
                         .separator(),
+                        // F-INT-9: Print keeps the macOS-standard ⌘P (the
+                        // Quick Open conflict was settled in ADR-0013 —
+                        // Quick Open ⇧⌘O, Command Palette ⇧⌘P — so Page
+                        // Setup carries no shortcut).
+                        item("Print…", #selector(NSDocument.printDocument(_:)), "p"),
+                        item("Page Setup…", #selector(NSDocument.runPageLayout(_:)), ""),
+                        .separator(),
                         item("Close", #selector(NSWindow.performClose(_:)), "w"),
                     ]))
         mainMenu.addItem(

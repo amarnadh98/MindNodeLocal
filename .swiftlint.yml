@@ -1,6 +1,7 @@
 included:
   - Packages
   - App
+  - Extensions
 excluded:
   - Tests/Fixtures
   - '**/.build/**'

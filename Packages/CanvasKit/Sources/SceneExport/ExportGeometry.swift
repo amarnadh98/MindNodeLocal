@@ -16,6 +16,15 @@ public struct ExportScene {
     public let bounds: CGRect
     /// The scene's canvas color, for background fills.
     public let canvasColor: CGColor
+
+    public init(
+        nodes: [SceneNode], branches: [SceneBranch], bounds: CGRect, canvasColor: CGColor
+    ) {
+        self.nodes = nodes
+        self.branches = branches
+        self.bounds = bounds
+        self.canvasColor = canvasColor
+    }
 }
 
 /// Filters a scene down to an `ExportContent` and computes the bounds
