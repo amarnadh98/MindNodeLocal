@@ -1,8 +1,8 @@
 import AppKit
 import CanvasKit
 import MapIO
-import UniformTypeIdentifiers
 import MapLibrary
+import UniformTypeIdentifiers
 
 @main
 @MainActor
