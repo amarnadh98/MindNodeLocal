@@ -32,6 +32,7 @@
 		366C31B27BFC3AFCD008124C /* AIController+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C94B33A49B1BB7C33D21CC /* AIController+Helpers.swift */; };
 		3690C51ACBAC1D6A60B3F445 /* FindBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA2E24730DAC637172ADCC7 /* FindBarView.swift */; };
 		40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */; };
+		40E497A7686DE6574D5C4DBC /* DocumentWindowController+DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = A716105D46C0FACDB2930F65 /* DocumentWindowController+DragDrop.swift */; };
 		4196E094F43B370CE7E86DC7 /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = F54E21355F96F5AD144FD37A /* MapLayout */; };
 		435ADE0545CD50536420B5F2 /* AIController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6356A6EDFCC1044A5C5B4DEB /* AIController.swift */; };
 		440690FEC0E3A4A7ADE089B6 /* AppDelegate+CaptureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42C1F9B425AAEAC9E578FBD /* AppDelegate+CaptureSettings.swift */; };
@@ -207,6 +208,7 @@
 		9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Toolbar.swift"; sourceTree = "<group>"; };
 		9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditingTests.swift; sourceTree = "<group>"; };
 		A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Recall.swift"; sourceTree = "<group>"; };
+		A716105D46C0FACDB2930F65 /* DocumentWindowController+DragDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+DragDrop.swift"; sourceTree = "<group>"; };
 		AE6C9D64B91E53430239C925 /* QuickEntryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryTests.swift; sourceTree = "<group>"; };
 		B42C1F9B425AAEAC9E578FBD /* AppDelegate+CaptureSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+CaptureSettings.swift"; sourceTree = "<group>"; };
 		B5164CC0990929E94BEC9ACC /* AppDelegate+Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Updater.swift"; sourceTree = "<group>"; };
@@ -237,7 +239,7 @@
 		F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewController.swift; sourceTree = "<group>"; };
 		F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindCoordinator.swift; sourceTree = "<group>"; };
 		FD17D79F4E90F384126B103B /* DocumentSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSafetyTests.swift; sourceTree = "<group>"; };
-		"TEMP_6B1E8328-58F3-4F6D-BF1A-A74AD303C655" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_EDF5BC6F-EE6E-4517-9718-06FFFEAA26F0" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -299,6 +301,7 @@
 				5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */,
 				61BDD25E07D931762D4F0912 /* DocumentWindowController+Accessibility.swift */,
 				6F9FE469B25CC202669D871F /* DocumentWindowController+Content.swift */,
+				A716105D46C0FACDB2930F65 /* DocumentWindowController+DragDrop.swift */,
 				32D300087E25FEF1296F15CF /* DocumentWindowController+Presentation.swift */,
 				009591F17B4F0D075B6B3B74 /* DocumentWindowController+Relations.swift */,
 				9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */,
@@ -499,10 +502,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_1B77935B-7AEE-4F20-8508-66FF3957EFDD" /* t3-14d9fd57-266a9aa6751aec53 */ = {
+		"TEMP_B743FE79-405A-4E0C-B96C-107892DC56F9" /* t3-14d9fd57-266a9aa6751aec53 */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_6B1E8328-58F3-4F6D-BF1A-A74AD303C655" /* Config.xcconfig */,
+				"TEMP_EDF5BC6F-EE6E-4517-9718-06FFFEAA26F0" /* Config.xcconfig */,
 			);
 			path = "t3-14d9fd57-266a9aa6751aec53";
 			sourceTree = "<group>";
@@ -669,6 +672,7 @@
 				B8668155FAC515BB501A30DC /* DocumentWindowController+Accessibility.swift in Sources */,
 				B9A1EA58E5DDF8A224EFFEB4 /* DocumentWindowController+Content.swift in Sources */,
 				199246915733610BCA4775D8 /* DocumentWindowController+DocumentSafety.swift in Sources */,
+				40E497A7686DE6574D5C4DBC /* DocumentWindowController+DragDrop.swift in Sources */,
 				24746A5E041AA7CF7FCEBC12 /* DocumentWindowController+FocusFind.swift in Sources */,
 				82A741B2B723A653B09FCBBE /* DocumentWindowController+Outline.swift in Sources */,
 				F8A854299DA70227916EB438 /* DocumentWindowController+Presentation.swift in Sources */,
@@ -783,7 +787,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_6B1E8328-58F3-4F6D-BF1A-A74AD303C655" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_EDF5BC6F-EE6E-4517-9718-06FFFEAA26F0" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -865,7 +869,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_6B1E8328-58F3-4F6D-BF1A-A74AD303C655" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_EDF5BC6F-EE6E-4517-9718-06FFFEAA26F0" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

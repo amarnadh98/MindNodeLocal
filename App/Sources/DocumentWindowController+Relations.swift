@@ -27,10 +27,6 @@ extension DocumentWindowController {
         }
     }
 
-    private var store: MapStore? {
-        (document as? MapDocument)?.store
-    }
-
     // MARK: connections (F-REL-1)
 
     /// ⌘L (Insert ▸ Connection): with one node selected, the next node
@@ -189,5 +185,27 @@ extension DocumentWindowController {
         canvas.setConnectionSelection([])
         canvas.setSelection([nodeID])
         canvas.scrollSelectionIntoView()
+    }
+}
+
+extension DocumentWindowController {
+    /// Menu validation for the relation actions (F-REL-1/2/3, F-REL-5),
+    /// chained from the one `validateMenuItem`; nil = not a relation item.
+    func validateRelationMenuItem(_ menuItem: NSMenuItem) -> Bool? {
+        switch menuItem.action {
+        case #selector(deleteSubtreeAction(_:)):
+            // F-REL-1: Delete also works on a selected connection.
+            return canvas.isEditing || !canvas.selection.isEmpty
+                || !canvas.selectedConnectionIDs.isEmpty
+        case #selector(addConnectionAction(_:)):
+            // One selection enters ⌘L's connect mode; two connect.
+            return canvas.selection.count == 1 || canvas.selection.count == 2
+        case #selector(addBoundaryAction(_:)), #selector(addSummaryAction(_:)):
+            return !canvas.selection.isEmpty
+        case #selector(copyNodeLinkAction(_:)):
+            return canvas.selection.count == 1
+        default:
+            return nil
+        }
     }
 }
