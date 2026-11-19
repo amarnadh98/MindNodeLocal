@@ -249,7 +249,8 @@ public enum SceneGeometry {
         case .setTheme:
             // Every node's font and padding may change: full rebuild.
             return nil
-        case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches:
+        case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches,
+            .setPresentations:
             // The layout frames don't move; offsets apply after layout,
             // and the list replacements are not layout inputs.
             return []

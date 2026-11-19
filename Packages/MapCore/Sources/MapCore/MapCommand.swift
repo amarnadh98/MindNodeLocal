@@ -101,6 +101,13 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// stored theme overrides. `nil` clears the selection back to the
     /// default theme.
     case setTheme(id: String?)
+    /// Replaces the whole presentation list (M6, F-PRE-2/3). Every
+    /// slide-authoring action (add/reorder/duplicate/rename/delete
+    /// slide, notes, build orders, presentation create/rename/delete)
+    /// performs ONE grouped replacement with a meaningful name — one
+    /// undo step — and the inverse restores the pre-action list
+    /// exactly, `nil` included.
+    case setPresentations(_ presentations: [Presentation]?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -119,6 +126,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setConnections, .setBoundaries, .setSummaries: "Delete Node"
         case .recolorBranches: "Recolor Branches"
         case .setTheme: "Set Theme"
+        case .setPresentations: "Edit Slides"
         }
     }
 

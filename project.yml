@@ -16,6 +16,8 @@ packages:
     path: Packages/MapRender
   CanvasKit:
     path: Packages/CanvasKit
+  MapStudy:
+    path: Packages/MapStudy
   MapIO:
     path: Packages/MapIO
 settings:
@@ -39,6 +41,9 @@ targets:
       - package: CanvasKit
       - package: CanvasKit
         product: SceneExport
+      # M6: the presentation coordinator drives the shared RevealEngine
+      # directly (SPEC §10).
+      - package: MapStudy
       - package: MapIO
     info:
       path: App/Resources/Info.plist
@@ -173,6 +178,7 @@ targets:
       - package: CanvasKit
       - package: CanvasKit
         product: SceneExport
+      - package: MapStudy
       - package: MapIO
     settings:
       base:

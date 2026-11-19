@@ -12,6 +12,10 @@ let package = Package(
         .package(path: "../MapCore"),
         .package(path: "../MapLayout"),
         .package(path: "../MapRender"),
+        // M6: the RevealEngine's `RevealState` is the one vocabulary the
+        // canvas overlay, presentation builds and study recall read
+        // (SPEC §10). CanvasKit → MapStudy → MapCore; no cycle.
+        .package(path: "../MapStudy"),
     ],
     targets: [
         .target(
@@ -20,6 +24,7 @@ let package = Package(
                 .product(name: "MapCore", package: "MapCore"),
                 .product(name: "MapLayout", package: "MapLayout"),
                 .product(name: "MapRender", package: "MapRender"),
+                .product(name: "MapStudy", package: "MapStudy"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

@@ -19,6 +19,10 @@ public enum SceneRenderer {
         selection: Set<String> = [],
         selectionColor: CGColor,
         editingNodeID: String? = nil,
+        /// M6 (SPEC §10): reveal-state overlay — hidden nodes and
+        /// branches are skipped, ghosted ones draw at their overlay
+        /// opacity. Export and the slide PDF writer share it.
+        revealOverlay: RevealOverlay? = nil,
         measurer: TextMeasurer = SceneRenderer.sharedMeasurer,
         in context: CGContext,
         viewport: CGSize
@@ -41,6 +45,10 @@ public enum SceneRenderer {
                 dx: -max(branch.startWidth, branch.endWidth),
                 dy: -max(branch.startWidth, branch.endWidth))
             guard visible.intersects(bounds) else { continue }
+            // M6 (SPEC §10): the branch dims with the weaker of its
+            // ends; a hidden branch draws nothing.
+            let alpha = revealOverlay?.branchOpacity(parentID: branch.parentID, childID: branch.childID) ?? 1
+            guard alpha > 0.01 else { continue }
             let path =
                 branch.tapered
                 ? MapRender.BranchPath.tapered(
@@ -48,17 +56,25 @@ public enum SceneRenderer {
                     startWidth: branch.startWidth, endWidth: branch.endWidth,
                     axis: branch.axis)
                 : MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+            context.saveGState()
+            context.setAlpha(alpha)
             context.setFillColor(branch.color)
             context.addPath(path)
             context.fillPath()
+            context.restoreGState()
         }
 
         for node in scene.nodes.values {
             guard visible.intersects(node.frame) else { continue }
+            let alpha = revealOverlay?.nodeOpacity(node.id) ?? 1
+            guard alpha > 0.01 else { continue }
             let title = node.id == editingNodeID ? NodeTitle(text: "", runs: []) : node.title
+            context.saveGState()
+            context.setAlpha(alpha)
             NodeRenderer.draw(
                 style: node.style, title: title, measurer: measurer,
                 in: context, frame: node.frame)
+            context.restoreGState()
         }
 
         for id in selection {
