@@ -89,18 +89,40 @@ CI-able form):
 
 ## Verification log
 
-### 2026-11-19 (ad-hoc debug build, local machine)
+### 2026-11-19 (ad-hoc debug + release builds, local machine)
 
-See CHANGELOG/PR body for the captured outputs. Summary: the Debug
-`Arbor.app` embeds all three `.appex` bundles in `PlugIns/`
-(ad-hoc-signed with the app). Because ad-hoc signatures are machine-local
-and not trusted for plugin registration, `pluginkit` did not list the
-extensions as registered on this machine, and Finder/Quick Look showed
-the generic package listing. `qlmanage -t` still produced a thumbnail
-via qlmanage's own fallback rendering of the package contents
-(`QuickLook/Thumbnail.png` inside the package is what the M5 save slice
-writes — the file Finder/QL fall back to), and `mdimport -d2` reported
-no importer claiming the file beyond the system's default package
-handling. This is the expected SPEC §13 path-B behaviour; it will be
-re-verified under a Developer ID / Personal Team signing when
-distribution happens (SPEC §13 path A).
+Builds: the Debug build (`/tmp/arbor-dd-ql`) and `scripts/release/build-app.sh
+--adhoc` both embed all three `.appex` bundles in `PlugIns/` — the archive's
+`codesign --verify --deep --strict` passes for the app AND each extension
+(ad-hoc signature, `com.example.arbor.*` bundle ids).
+
+`qlmanage` on a sample `.arbor` (a hand-built package from the MapCore
+migration fixture): **`qlmanage -r` works** (reset quicklookd), but
+`qlmanage -t` and `qlmanage -p` **hang on this machine for ANY package
+type** — a plain `.docx` and a bare directory-based `.xmind` hang
+identically (the ThumbnailsAgent spins in `CFURLResolveBookmarkData`
+loops; flat files like `.txt` thumbnail fine), so this is a local
+quicklookd-state issue, not Arbor's extension. `pluginkit -m` lists no
+Arbor extension registered either way — the expected SPEC §13 path-B
+behaviour for untrusted ad-hoc signatures.
+
+What IS proven on this machine, without the system registration dance:
+a harness executed **the exact functions the appex shells call** —
+`ArborPreviewRenderer.thumbnailImage(at:maximumPixelSize:scale:)` and
+`ArborPreviewRenderer.previewPDF(at:)` — against the sample package:
+a **1024×463 PNG** (1,508 non-white colors — the Paper-theme canvas
+with nodes and branches rendered) and a **1-page 19 KB vector PDF**.
+The extension targets link this same `SystemIntegration` product, so
+the render code the extensions run is verified end to end; what remains
+unverifiable without a trusted signature is only pluginkit registration
+itself (re-verify under Developer ID / Personal Team signing when
+distribution happens, SPEC §13 path A — see "How to verify locally"
+above).
+
+`mdimport -t -d2` on the same sample: the file resolves as
+**`com.arbor.map`** with the full type tree (`com.apple.package`,
+`public.directory`, `public.composite-content`) — the app's UTI
+declaration is live through LaunchServices — and imports "with no
+plugIn", the honest ad-hoc-build result: the SpotlightImporter is not
+registered, so attribute extraction is verified by the same
+`SpotlightRecordTests` the importer maps from.
