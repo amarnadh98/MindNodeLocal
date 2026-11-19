@@ -45,7 +45,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Cut", #selector(NSText.cut(_:)), "x"),
                     item("Copy", #selector(NSText.copy(_:)), "c"),
                     item("Paste", #selector(NSText.paste(_:)), "v"),
-                    item("Select All", #selector(NSText.selectAll(_:)), "a"),
+                    .separator(),
+                    // Create (F-EDT-1) and edit (F-EDT-4/9) keys per SPEC §6.1.
+                    item(
+                        "Add Child",
+                        #selector(DocumentWindowController.addChildAction(_:)),
+                        "\t", modifiers: []),
+                    item(
+                        "Add Sibling Below",
+                        #selector(DocumentWindowController.addSiblingBelowAction(_:)),
+                        "\r", modifiers: []),
+                    item(
+                        "Add Sibling Above",
+                        #selector(DocumentWindowController.addSiblingAboveAction(_:)),
+                        "\r", modifiers: [.option]),
+                    item(
+                        "Insert Parent",
+                        #selector(DocumentWindowController.insertParentAction(_:)),
+                        "\t", modifiers: [.option]),
+                    item(
+                        "New Root",
+                        #selector(DocumentWindowController.addRootAction(_:)),
+                        "\r", modifiers: [.shift]),
+                    .separator(),
+                    item(
+                        "Delete",
+                        #selector(DocumentWindowController.deleteSubtreeAction(_:)),
+                        "\u{7f}", modifiers: []),
+                    item(
+                        "Delete",
+                        #selector(DocumentWindowController.deleteSubtreeAction(_:)),
+                        "\u{f728}", modifiers: [], hidden: true),
+                    item(
+                        "Delete Node Only",
+                        #selector(DocumentWindowController.deleteNodeOnlyAction(_:)),
+                        "\u{7f}", modifiers: [.option]),
+                    .separator(),
+                    item("Move Up", #selector(DocumentWindowController.reorderUpAction(_:)), "\u{f700}"),
+                    item("Move Down", #selector(DocumentWindowController.reorderDownAction(_:)), "\u{f701}"),
+                    item("Promote", #selector(DocumentWindowController.promoteAction(_:)), "\u{f702}"),
+                    item("Demote", #selector(DocumentWindowController.demoteAction(_:)), "\u{f703}"),
+                    item("Duplicate", #selector(DocumentWindowController.duplicateAction(_:)), "d"),
+                    item(
+                        "Detach",
+                        #selector(DocumentWindowController.detachAction(_:)),
+                        "d", modifiers: [.command, .shift]),
+                    .separator(),
+                    item(
+                        "Fold/Unfold",
+                        #selector(DocumentWindowController.toggleFoldAction(_:)),
+                        ".", modifiers: [.option]),
+                    item("Select All", #selector(DocumentWindowController.selectAllAction(_:)), "a"),
+                    item(
+                        "Select Children",
+                        #selector(DocumentWindowController.selectChildrenAction(_:)),
+                        "a", modifiers: [.command, .option]),
+                    item("Select Root", #selector(DocumentWindowController.selectRootAction(_:)), "r"),
+                    item(
+                        "Deselect",
+                        #selector(DocumentWindowController.deselectAction(_:)),
+                        "\u{1b}", modifiers: []),
                 ]))
         mainMenu.addItem(
             menu(
@@ -56,7 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Zoom Out", #selector(CanvasView.zoomOutAction(_:)), "-"),
                     item("Actual Size", #selector(CanvasView.actualSizeAction(_:)), "0"),
                     item("Zoom to Fit", #selector(CanvasView.zoomToFitAction(_:)), "9"),
-                    item("Zoom to Selection", #selector(CanvasView.zoomToSelectionAction(_:)), "0", option: true),
+                    item(
+                        "Zoom to Selection", #selector(CanvasView.zoomToSelectionAction(_:)),
+                        "0", modifiers: [.command, .option]),
                 ]))
         mainMenu.addItem(
             menu(
@@ -119,14 +180,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func item(
-        _ title: String, _ action: Selector, _ key: String, option: Bool = false,
-        hidden: Bool = false
+        _ title: String, _ action: Selector, _ key: String,
+        modifiers: NSEvent.ModifierFlags = [.command], hidden: Bool = false
     ) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: key)
         menuItem.target = nil
-        if option {
-            menuItem.keyEquivalentModifierMask = [.command, .option]
-        }
+        menuItem.keyEquivalentModifierMask = modifiers
         menuItem.isHidden = hidden
         return menuItem
     }
