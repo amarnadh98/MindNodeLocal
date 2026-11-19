@@ -341,10 +341,21 @@ extension DocumentWindowController {
         case #selector(aiToggleNeverSendToCloudAction(_:)):
             menuItem.state = ai.neverSendToCloud ? .on : .off
             return true
-        case #selector(deleteSubtreeAction(_:)), #selector(deleteNodeOnlyAction(_:)),
-            #selector(addChildAction(_:)), #selector(addSiblingBelow(_:)),
-            #selector(addSiblingAboveAction(_:)), #selector(insertParentAction(_:)):
+        case #selector(deleteSubtreeAction(_:)):
+            // F-REL-1: Delete also works on a selected connection.
             return canvas.isEditing || !canvas.selection.isEmpty
+                || !canvas.selectedConnectionIDs.isEmpty
+        case #selector(deleteNodeOnlyAction(_:)), #selector(addChildAction(_:)),
+            #selector(addSiblingBelow(_:)), #selector(addSiblingAboveAction(_:)),
+            #selector(insertParentAction(_:)):
+            return canvas.isEditing || !canvas.selection.isEmpty
+        case #selector(addConnectionAction(_:)):
+            // One selection enters ⌘L's connect mode; two connect.
+            return canvas.selection.count == 1 || canvas.selection.count == 2
+        case #selector(addBoundaryAction(_:)), #selector(addSummaryAction(_:)):
+            return !canvas.selection.isEmpty
+        case #selector(copyNodeLinkAction(_:)):
+            return canvas.selection.count == 1
         case #selector(toggleFoldAction(_:)):
             return canvas.isEditing || foldSelectionState() != nil
         case #selector(makeStudyDeckAction(_:)), #selector(setCardPolicyAction(_:)),

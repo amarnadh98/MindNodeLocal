@@ -151,6 +151,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         setupAccessibility()
         // M3: notes/links/tasks/tags closures (DocumentWindowController+Content).
         setupContent()
+        // F-REL: connection interactions and the relation accessibility
+        // hooks route through the same store paths as the menus.
+        installRelationHandlers()
         // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
         installChrome()
     }
@@ -765,6 +768,9 @@ extension DocumentWindowController {
             canvas.nodeTextEditor.deleteInEditor(forward: forwardDelete)
             return
         }
+        // F-REL-1: ⌫ on a selected connection deletes the connection,
+        // not a node.
+        if deleteConnectionSelection() { return }
         guard let store, !canvas.selection.isEmpty else { return }
         let ids = topmostSelectedIDs(in: store.model)
         guard !ids.isEmpty else { return }

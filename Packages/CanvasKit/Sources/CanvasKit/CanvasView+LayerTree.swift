@@ -64,6 +64,7 @@ extension CanvasView {
         context.reduceMotion = MotionPreferences.reduceMotion
         context.selection = selection
         context.selectionColor = selectionColor
+        context.selectedConnections = selectedConnectionIDs
         context.editingNodeID = nodeTextEditor.editingNodeID
         context.diff = precomputedDiff
         context.highlightedIDs = highlightedIDs()

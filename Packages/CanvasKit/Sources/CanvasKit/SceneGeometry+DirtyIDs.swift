@@ -55,7 +55,15 @@ extension SceneGeometry {
             // Every node's font and padding may change: full rebuild.
             return nil
         case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches,
-            .setPresentations, .setAIPolicy, .setTitle:
+            .setPresentations, .setAIPolicy, .setTitle,
+            // F-REL-1/2/3: the fine-grained relation edits are post-layout
+            // overlays — `RelationGeometry.build` recomputes them from the
+            // placed frames on every scene build, so no node's layout
+            // inputs change. A summary's node is added through the grouped
+            // `addChild` its command carries, which dirties on its own.
+            .addConnection, .removeConnection, .editConnection,
+            .addBoundary, .removeBoundary, .editBoundary,
+            .addSummary, .removeSummary:
             // The layout frames don't move; offsets apply after layout,
             // and the list replacements are not layout inputs.
             return []

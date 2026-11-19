@@ -226,6 +226,149 @@ struct CanvasPerformanceTests {
         #endif
     }
 
+    /// F-REL budgets on the same 5k map with 500 connections and 50
+    /// boundaries: overlay-inclusive build, a pan-frame pass and the
+    /// keystroke→relayout→paint loop, printed like the budgets above.
+    @Test func fiveThousandNodeRelationBudgets() throws {
+        var model = bigMap(nodeCount: 5_000)
+        let measurer = TextMeasurer()
+        let accent = CGColor(gray: 0, alpha: 1)
+
+        // 500 connections across branch levels + 50 sibling boundaries.
+        var connections: [Connection] = []
+        var boundaries: [Boundary] = []
+        for index in 0..<500 {
+            let from = "n\(index + 20)"
+            let to = "n\(index * 3 + 400)"
+            guard from != to else { continue }
+            connections.append(
+                Connection(
+                    id: "conn\(index)", from: from, to: to,
+                    label: index % 4 == 0 ? "link \(index)" : nil))
+        }
+        model.connections = connections
+        for group in 0..<50 {
+            let parent = "n\(group + 1)"
+            guard let children = model.nodes[parent]?.children, children.count >= 2 else {
+                continue
+            }
+            boundaries.append(
+                Boundary(
+                    id: "bd\(group)", nodes: [children[0], children[1]],
+                    title: "Group \(group)"))
+        }
+        model.boundaries = boundaries
+
+        // --- Build with overlays.
+        var buildBest: Double?
+        var scene: CanvasScene?
+        for _ in 0..<10 {
+            let start = DispatchTime.now()
+            let built = SceneGeometry.build(model: model, variant: .light, measurer: measurer)
+            let elapsedSeconds = elapsed(since: start)
+            buildBest = min(buildBest ?? elapsedSeconds, elapsedSeconds)
+            scene = built
+        }
+        let built = try #require(scene)
+        #expect(built.connections.count == 500)
+        #expect(built.boundaries.count == 50)
+        print(
+            "perf relation build (5k + 500 connections + 50 boundaries, best of 10): "
+                + "\(format(try #require(buildBest)))")
+
+        // --- A pan frame: layer-tree camera update only — placements
+        // and transforms, never a raster.
+        let tree = CanvasLayerTree()
+        let camera = fitCamera(for: built)
+        var initial = ApplyContext(
+            scene: built, grid: grid(for: built), camera: camera, viewport: viewport)
+        initial.backingScale = 1
+        initial.animated = false
+        initial.reduceMotion = false
+        initial.selectionColor = accent
+        tree.apply(initial)
+
+        var panBest: Double?
+        var panCamera = camera
+        for _ in 0..<120 {
+            panCamera.origin.x += 4
+            panCamera.origin.y -= 2
+            let start = DispatchTime.now()
+            tree.updateCamera(camera: panCamera, viewport: viewport, backingScale: 1)
+            let elapsedSeconds = elapsed(since: start)
+            panBest = min(panBest ?? elapsedSeconds, elapsedSeconds)
+        }
+        print(
+            "perf relation pan frame (5k + overlays, best of 120): \(format(try #require(panBest)))")
+
+        // --- The keystroke loop: one title change, full rebuild, diff
+        // apply — first relation-free, then with the overlays, so the
+        // guard prices the overlay cost, not the machine (the absolute
+        // §11.8 8 ms budget stays with the node-only test above and
+        // lands with the §11.3 incremental relayout).
+        var plain = model
+        plain.connections = nil
+        plain.boundaries = nil
+        var plainBest: Double?
+        for _ in 0..<10 {
+            plain.nodes["n600"]?.title = NodeTitle(
+                text: "Node 600 retitled \(Int.random(in: 0..<1000))")
+            let start = DispatchTime.now()
+            let plainScene = SceneGeometry.build(
+                model: plain, variant: .light, measurer: measurer)
+            var plainContext = ApplyContext(
+                scene: plainScene, grid: grid(for: plainScene),
+                camera: Camera(origin: CGPoint(x: -600, y: -400), scale: 1),
+                viewport: viewport)
+            plainContext.backingScale = 1
+            plainContext.animated = false
+            plainContext.reduceMotion = false
+            plainContext.selectionColor = accent
+            tree.apply(plainContext)
+            plainBest = min(plainBest ?? elapsed(since: start), elapsed(since: start))
+        }
+
+        var edited = model
+        var best: Double?
+        for _ in 0..<10 {
+            edited.nodes["n600"]?.title = NodeTitle(
+                text: "Node 600 retitled \(Int.random(in: 0..<1000))")
+            let start = DispatchTime.now()
+            let rebuilt = SceneGeometry.build(model: edited, variant: .light, measurer: measurer)
+            let rebuiltGrid = grid(for: rebuilt)
+            var keystrokeContext = ApplyContext(
+                scene: rebuilt, grid: rebuiltGrid,
+                camera: Camera(origin: CGPoint(x: -600, y: -400), scale: 1),
+                viewport: viewport)
+            keystrokeContext.backingScale = 1
+            keystrokeContext.animated = false
+            keystrokeContext.reduceMotion = false
+            keystrokeContext.selectionColor = accent
+            tree.apply(keystrokeContext)
+            best = min(best ?? elapsed(since: start), elapsed(since: start))
+        }
+        let keystroke = try #require(best)
+        let plainKeystroke = try #require(plainBest)
+        print(
+            "perf relation keystroke (5k + overlays, best of 10): \(format(keystroke))"
+                + " (relation-free same loop: \(format(plainKeystroke)))"
+                + " — SPEC §11.8's 8 ms target lands with the §11.3 incremental relayout")
+
+        #if !DEBUG
+            if ProcessInfo.processInfo.environment["CI"] == nil {
+                // The overlay cost on the keystroke path stays bounded:
+                // 500 connections + 50 boundaries may add no more than
+                // 4 ms to the relation-free rebuild+apply.
+                #expect(
+                    keystroke < plainKeystroke + 0.004,
+                    "relation overlay keystroke cost: free \(format(plainKeystroke)), overlays \(format(keystroke))")
+                #expect(
+                    (buildBest ?? 1) < 0.450,
+                    "relation-inclusive open budget (SPEC §11.8: 300 ms + overlay build): \(format(buildBest ?? -1))")
+            }
+        #endif
+    }
+
     private func elapsed(since start: DispatchTime) -> Double {
         Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000
     }

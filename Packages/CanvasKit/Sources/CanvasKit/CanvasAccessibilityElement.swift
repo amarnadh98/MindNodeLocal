@@ -60,12 +60,13 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
         setAccessibilityValue(
             Self.valueText(
                 nodeID: nodeID, model: model, taskText: hooks.taskProgressText?(nodeID),
-                decorations: node.decorations))
+                decorations: node.decorations,
+                relationText: hooks.relationValueText?(nodeID)))
         setAccessibilitySelected(isSelected)
         let folded = model?.nodes[nodeID]?.folded ?? false
         setAccessibilityDisclosed(!folded)
         setAccessibilityCustomActions(
-            Self.actions(for: nodeID, model: model, canvas: canvas))
+            Self.actions(for: nodeID, model: model, canvas: canvas, hooks: hooks))
     }
 
     /// Wires the outline hierarchy: a row's disclosed rows are its
@@ -79,10 +80,12 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
 
     /// The row's subtree description (SPEC §11.6: "3 children,
     /// collapsed" — with M3's decorations appended: task state and
-    /// progress, the tag names, note/link presence; plus the
-    /// task-progress hook for hosts that don't model decorations).
+    /// progress, the tag names, note/link presence; the task-progress
+    /// hook for hosts that don't model decorations; and with relations,
+    /// "…, in boundary <title>" / "summarized").
     static func valueText(
-        nodeID: String, model: MapModel?, taskText: String?, decorations: NodeDecorations?
+        nodeID: String, model: MapModel?, taskText: String?, decorations: NodeDecorations?,
+        relationText: String? = nil
     ) -> String {
         let node = model?.nodes[nodeID]
         let base: String
@@ -99,6 +102,9 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
             parts.append(contentsOf: Self.decorationText(decorations))
         } else if let taskText, !taskText.isEmpty {
             parts.append(taskText)
+        }
+        if let relationText, !relationText.isEmpty {
+            parts.append(relationText)
         }
         return parts.joined(separator: ", ")
     }
@@ -129,10 +135,12 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
     }
 
     /// The custom actions this row offers (SPEC §11.6): Add Child, Add
-    /// Sibling, Fold/Unfold (only nodes with children) and Edit, each
-    /// forwarding the node id to the host's closure.
+    /// Sibling, Fold/Unfold (only nodes with children), Edit, and — for
+    /// a node with connections (F-REL-1) — one "Connected to <title>"
+    /// jump per peer.
+    @MainActor
     private static func actions(
-        for nodeID: String, model: MapModel?, canvas: CanvasView?
+        for nodeID: String, model: MapModel?, canvas: CanvasView?, hooks: CanvasAccessibility
     ) -> [NSAccessibilityCustomAction] {
         var actions: [NSAccessibilityCustomAction] = []
         actions.append(
@@ -166,6 +174,16 @@ final class CanvasAccessibilityElement: NSAccessibilityElement {
                 }
                 return true
             })
+        for peer in hooks.connectionPeers?(nodeID) ?? [] {
+            let peerID = peer.id
+            actions.append(
+                NSAccessibilityCustomAction(name: "Connected to \(peer.title)") { [weak canvas] in
+                    MainActor.assumeIsolated {
+                        canvas?.accessibility.onSelectConnectionPeer?(peerID)
+                    }
+                    return true
+                })
+        }
         return actions
     }
 

@@ -35,6 +35,9 @@ public final class CanvasView: NSView {
             // nil one) rebuilds the grid outright.
             let diff = syncGrid(previous: layerTree.scene)
             accessibility.needsRebuild = true
+            // A connection whose endpoints fell out of the scene (folded
+            // or deleted) drops out of the overlay selection too.
+            pruneConnectionSelection()
             // The editing node's frame may have moved (or vanished) in
             // the rebuilt scene; the overlay follows or tears down.
             nodeTextEditor.reconcileWithScene()
@@ -140,6 +143,31 @@ public final class CanvasView: NSView {
     /// CanvasView+Decorations.swift.
     let decorationActions = DecorationActions()
 
+    /// F-REL-1: the selected connections (rendered with a halo, ⌫
+    /// deletes them). The view never mutates the model — the host
+    /// performs the commands these interactions request.
+    public internal(set) var selectedConnectionIDs: Set<String> = []
+    /// F-REL-1: the ⌘L source — the next node click makes a connection.
+    var pendingConnectionSource: String?
+    /// A live midpoint-handle drag (F-REL-1); see
+    /// CanvasView+Connections.swift.
+    var relationDrag: RelationHandleDrag?
+    /// The inline connection-label editor overlay (F-REL-1), the same
+    /// overlay approach the node editor uses.
+    let connectionLabelEditor = ConnectionLabelEditor()
+    /// The live curve preview while a handle is dragged (model-space
+    /// path, camera transform — no raster).
+    let relationPreviewLayer = CAShapeLayer()
+
+    /// Called with the pair a ⌘L-next-click connection creates
+    /// (F-REL-1); the host performs ONE `addConnection` through its
+    /// `MapStore`.
+    public var onCreateConnection: ((String, String) -> Void)?
+    /// Called with the one command a connection edit produced (label
+    /// commit, handle move, double-click handle reset — F-REL-1); the
+    /// host performs it through its `MapStore`.
+    public var onMutateConnection: ((MapCommand) -> Void)?
+
     /// Called when the system appearance changes, so the host can rebuild
     /// the scene for the new variant (dark mode is part of §14.1).
     public var onEffectiveAppearanceChange: (() -> Void)?
@@ -161,6 +189,8 @@ public final class CanvasView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         nodeTextEditor.canvas = self
+        connectionLabelEditor.canvas = self
+        configureRelationPreviewLayer()
         rubberBandLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
         rubberBandLayer.strokeColor = NSColor.controlAccentColor.cgColor
         rubberBandLayer.lineWidth = 1
@@ -175,6 +205,8 @@ public final class CanvasView: NSView {
         super.init(coder: coder)
         wantsLayer = true
         nodeTextEditor.canvas = self
+        connectionLabelEditor.canvas = self
+        configureRelationPreviewLayer()
         rubberBandLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
         rubberBandLayer.strokeColor = NSColor.controlAccentColor.cgColor
         rubberBandLayer.lineWidth = 1
@@ -196,104 +228,6 @@ public final class CanvasView: NSView {
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         onEffectiveAppearanceChange?()
-    }
-
-    // MARK: camera actions
-
-    /// Pans by a screen-space delta. The canvas is flipped and follows
-    /// natural scrolling: a positive delta moves the *content* with the
-    /// fingers, so the camera origin moves the opposite way (the same
-    /// `origin -= delta` an `NSClipView` applies).
-    public func panByScreen(dx: CGFloat, dy: CGFloat) {
-        camera.origin.x -= dx / camera.scale
-        camera.origin.y -= dy / camera.scale
-        needsDisplay = true
-    }
-
-    /// Zooms keeping the model point under `screenAnchor` fixed on screen.
-    public func zoom(scale newScale: CGFloat, around screenAnchor: CGPoint) {
-        let clamped = min(max(newScale, 0.1), 4)
-        let anchorModel = camera.modelPoint(for: screenAnchor)
-        camera.scale = clamped
-        camera.origin = CGPoint(
-            x: anchorModel.x - screenAnchor.x / clamped,
-            y: anchorModel.y - screenAnchor.y / clamped)
-        needsDisplay = true
-    }
-
-    /// Snaps to the next (or previous) F-CAN-2 zoom stop around the
-    /// viewport center. Zooming in accepts the `=` character as ⌘+ (US
-    /// layouts send it unshifted).
-    public func zoomStep(_ direction: ZoomDirection) {
-        let target: CGFloat
-        switch direction {
-        case .closer:
-            let next = Self.zoomSteps.first { $0 > camera.scale + 0.01 } ?? Self.zoomSteps.last!
-            target = next
-        case .farther:
-            let previous = Self.zoomSteps.last { $0 < camera.scale - 0.01 } ?? Self.zoomSteps.first!
-            target = previous
-        }
-        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
-    }
-
-    public enum ZoomDirection {
-        case closer
-        case farther
-    }
-
-    /// Zooms to the given scale around the viewport center.
-    public func zoomToScale(_ target: CGFloat) {
-        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
-    }
-
-    /// Actual size (F-CAN-2: ⌘0).
-    public func zoomToActualSize() {
-        zoomToScale(1)
-    }
-
-    /// Zooms so the whole scene fits the viewport with padding
-    /// (F-CAN-2: ⌘9, also ⌘*).
-    public func zoomToFit(padding: CGFloat = 40) {
-        guard let scene, !scene.nodes.isEmpty, bounds.width > 1, bounds.height > 1 else { return }
-        let content = scene.bounds.insetBy(dx: -padding, dy: -padding)
-        guard content.width > 0, content.height > 0 else { return }
-        let scale = min(
-            bounds.width / content.width,
-            bounds.height / content.height,
-            4)
-        camera.scale = min(max(scale, 0.1), 4)
-        camera.origin = CGPoint(
-            x: content.midX - bounds.midX / camera.scale,
-            y: content.midY - bounds.midY / camera.scale)
-        needsDisplay = true
-    }
-
-    /// Zooms so the selection fills the viewport (F-CAN-2: ⌥⌘0).
-    public func zoomToSelection(padding: CGFloat = 40) {
-        guard !selection.isEmpty, bounds.width > 1, bounds.height > 1 else {
-            zoomToFit(padding: padding)
-            return
-        }
-        var content: CGRect = .null
-        for id in selection {
-            if let node = scene?.nodes[id] {
-                content = content.union(node.frame)
-            }
-        }
-        guard !content.isNull else { return }
-        content = content.insetBy(dx: -padding, dy: -padding)
-        let scale = min(
-            bounds.width / content.width, bounds.height / content.height, 4)
-        camera.scale = min(max(scale, 0.1), 4)
-        camera.origin = CGPoint(
-            x: content.midX - bounds.midX / camera.scale,
-            y: content.midY - bounds.midY / camera.scale)
-        needsDisplay = true
-    }
-
-    private func clampCameraScale() {
-        camera.scale = min(max(camera.scale, 0.1), 4)
     }
 
     // MARK: hit-testing
@@ -362,6 +296,13 @@ public final class CanvasView: NSView {
             if let direction = Direction(keyDown: characters) {
                 navigate(direction, extending: hasShift)
             }
+        case ("\r", false, false) where selectedConnectionIDs.count == 1 && selection.isEmpty:
+            // F-REL-1: ⏎ on a single selected connection edits its label.
+            beginConnectionLabelEditing()
+        case ("\u{1b}", false, false) where pendingConnectionSource != nil:
+            // F-REL-1: ⎋ cancels the pending ⌘L connection mode (the
+            // menu's Deselect equivalent would otherwise swallow it).
+            pendingConnectionSource = nil
         case ("\r", _, false) where !hasShift:
             // ⏎/⌘⏎ edit the selected node (F-EDT-2); ⇧⏎ (new root) and
             // ⌥⏎ (sibling above) fall through to the host's menu actions.
@@ -386,6 +327,21 @@ public final class CanvasView: NSView {
         // lands on the committed model (F-EDT-1: ⎋-equivalent behavior).
         if nodeTextEditor.editingNodeID != nil {
             nodeTextEditor.commit(next: .none)
+        }
+        if connectionLabelEditor.isEditing {
+            connectionLabelEditor.commit()
+        }
+        // ⌘L's next click (F-REL-1): a click on another node makes the
+        // connection; a click anywhere else just cancels the mode.
+        if pendingConnectionSource != nil {
+            completeConnectionMode(at: point)
+            return
+        }
+        // Connection interactions come before node hits (F-REL-1): the
+        // stroke selects, the midpoint handle drags, a double-click
+        // resets the handle or edits the label.
+        if handleRelationMouseDown(point, clickCount: event.clickCount) {
+            return
         }
         // Double-click: a node edits its title (F-EDT-2); empty canvas
         // creates a floating root at the point (F-CAN-5) instead of
@@ -419,6 +375,12 @@ public final class CanvasView: NSView {
             return
         }
         if let id = nodeID(at: point) {
+            // Selecting a node clears the connection overlay selection
+            // (the two selections are exclusive, F-REL-1).
+            if !selectedConnectionIDs.isEmpty {
+                selectedConnectionIDs = []
+                syncRelationRasters()
+            }
             if event.modifierFlags.contains(.command) {
                 if selection.contains(id) {
                     selection.remove(id)
@@ -436,7 +398,8 @@ public final class CanvasView: NSView {
                     startView: point,
                     startModel: camera.modelPoint(for: point),
                     optionDown: event.modifierFlags.contains(.option),
-                    commandDown: event.modifierFlags.contains(.command)))
+                    commandDown: event.modifierFlags.contains(.command),
+                    shiftDown: event.modifierFlags.contains(.shift)))
             rubberBandStart = nil
         } else {
             drag = nil
@@ -447,6 +410,10 @@ public final class CanvasView: NSView {
                 selection = []
                 onSelectionChange?(selection)
                 syncSelectionRings()
+                if !selectedConnectionIDs.isEmpty {
+                    selectedConnectionIDs = []
+                    syncRelationRasters()
+                }
             }
         }
         needsDisplay = true
@@ -454,6 +421,9 @@ public final class CanvasView: NSView {
 
     public override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if updateRelationDrag(at: point) {
+            return
+        }
         if handleMouseDragged(point) {
             needsDisplay = true
             return
@@ -468,6 +438,9 @@ public final class CanvasView: NSView {
 
     public override func mouseUp(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if finishRelationDrag(at: point) {
+            return
+        }
         if handleMouseUp(point) {
             needsDisplay = true
             return
@@ -566,5 +539,107 @@ extension CanvasView {
     /// heads left — so promote/demote mirror there (F-EDT-6).
     public func isOnLeftSide(_ id: String) -> Bool {
         scene?.branches.contains { $0.childID == id && $0.direction == .left } ?? false
+    }
+}
+
+/// The F-CAN-2 camera actions (zoom steps, fit, actual size) — an
+/// extension so the class body stays reviewable.
+extension CanvasView {
+    // MARK: camera actions
+
+    /// Pans by a screen-space delta. The canvas is flipped and follows
+    /// natural scrolling: a positive delta moves the *content* with the
+    /// fingers, so the camera origin moves the opposite way (the same
+    /// `origin -= delta` an `NSClipView` applies).
+    public func panByScreen(dx: CGFloat, dy: CGFloat) {
+        camera.origin.x -= dx / camera.scale
+        camera.origin.y -= dy / camera.scale
+        needsDisplay = true
+    }
+
+    /// Zooms keeping the model point under `screenAnchor` fixed on screen.
+    public func zoom(scale newScale: CGFloat, around screenAnchor: CGPoint) {
+        let clamped = min(max(newScale, 0.1), 4)
+        let anchorModel = camera.modelPoint(for: screenAnchor)
+        camera.scale = clamped
+        camera.origin = CGPoint(
+            x: anchorModel.x - screenAnchor.x / clamped,
+            y: anchorModel.y - screenAnchor.y / clamped)
+        needsDisplay = true
+    }
+
+    /// Snaps to the next (or previous) F-CAN-2 zoom stop around the
+    /// viewport center. Zooming in accepts the `=` character as ⌘+ (US
+    /// layouts send it unshifted).
+    public func zoomStep(_ direction: ZoomDirection) {
+        let target: CGFloat
+        switch direction {
+        case .closer:
+            let next = Self.zoomSteps.first { $0 > camera.scale + 0.01 } ?? Self.zoomSteps.last!
+            target = next
+        case .farther:
+            let previous = Self.zoomSteps.last { $0 < camera.scale - 0.01 } ?? Self.zoomSteps.first!
+            target = previous
+        }
+        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    public enum ZoomDirection {
+        case closer
+        case farther
+    }
+
+    /// Zooms to the given scale around the viewport center.
+    public func zoomToScale(_ target: CGFloat) {
+        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    /// Actual size (F-CAN-2: ⌘0).
+    public func zoomToActualSize() {
+        zoomToScale(1)
+    }
+
+    /// Zooms so the whole scene fits the viewport with padding
+    /// (F-CAN-2: ⌘9, also ⌘*).
+    public func zoomToFit(padding: CGFloat = 40) {
+        guard let scene, !scene.nodes.isEmpty, bounds.width > 1, bounds.height > 1 else { return }
+        let content = scene.bounds.insetBy(dx: -padding, dy: -padding)
+        guard content.width > 0, content.height > 0 else { return }
+        let scale = min(
+            bounds.width / content.width,
+            bounds.height / content.height,
+            4)
+        camera.scale = min(max(scale, 0.1), 4)
+        camera.origin = CGPoint(
+            x: content.midX - bounds.midX / camera.scale,
+            y: content.midY - bounds.midY / camera.scale)
+        needsDisplay = true
+    }
+
+    /// Zooms so the selection fills the viewport (F-CAN-2: ⌥⌘0).
+    public func zoomToSelection(padding: CGFloat = 40) {
+        guard !selection.isEmpty, bounds.width > 1, bounds.height > 1 else {
+            zoomToFit(padding: padding)
+            return
+        }
+        var content: CGRect = .null
+        for id in selection {
+            if let node = scene?.nodes[id] {
+                content = content.union(node.frame)
+            }
+        }
+        guard !content.isNull else { return }
+        content = content.insetBy(dx: -padding, dy: -padding)
+        let scale = min(
+            bounds.width / content.width, bounds.height / content.height, 4)
+        camera.scale = min(max(scale, 0.1), 4)
+        camera.origin = CGPoint(
+            x: content.midX - bounds.midX / camera.scale,
+            y: content.midY - bounds.midY / camera.scale)
+        needsDisplay = true
+    }
+
+    private func clampCameraScale() {
+        camera.scale = min(max(camera.scale, 0.1), 4)
     }
 }

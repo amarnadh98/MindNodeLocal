@@ -23,6 +23,8 @@ public struct ApplyContext {
     public var reduceMotion = false
     public var selection: Set<String> = []
     public var selectionColor: CGColor = CGColor(gray: 0, alpha: 1)
+    /// F-REL-1: the selected connections (rendered with a halo).
+    public var selectedConnections: Set<String> = []
     public var editingNodeID: String?
     public var diff: SceneDiff? = nil
     /// F-TAG-2 / F-TSK-5 highlight mode: the ids that stay at full
@@ -78,22 +80,22 @@ public final class CanvasLayerTree {
     /// recycles it (the 160 ms delete fade plus slack).
     static let dyingSweepDelay: Duration = .milliseconds(240)
 
+    var scene: CanvasScene?
+    private var grid = SpatialGrid()
+    private var editingID: String?
+    var lastScale: CGFloat = 1
+
     /// The tree's root: paints the canvas background and hosts the
     /// camera-transformed content. Added to the view's backing layer;
     /// `isGeometryFlipped` mirrors the flipped view (AppKit does not
     /// propagate flippedness to sublayers) so model space (y-down)
     /// maps straight onto layer positions.
     public let root = CALayer()
-    private let content = CALayer()
+    let content = CALayer()
     /// F-STD-6: the mastery overlay rides the content layer above node
     /// rasters; the host assigns its marks table.
     public let mastery = MasteryOverlay()
     var masteryMarks: [String: MasteryMark]?
-
-    var scene: CanvasScene?
-    private var grid = SpatialGrid()
-    private var editingID: String?
-    var lastScale: CGFloat = 1
     /// M6 (F-PRE/§10): the presentation/recall overlay. Stored on the
     /// tree so layers realized later by culling pick their state up in
     /// `configureLayer`/`configureBranchLayer`; applied and animated by
@@ -107,6 +109,12 @@ public final class CanvasLayerTree {
     var branchLayers: [BranchKey: BranchVisualLayer] = [:]
     var nodePool: [NodeVisualLayer] = []
     var branchPool: [BranchVisualLayer] = []
+    /// Relation overlay layers (F-REL-1/2/3), keyed by overlay id.
+    var relationLayers: [String: RelationVisualLayer] = [:]
+    var relationPool: [RelationVisualLayer] = []
+    /// The connection ids the apply marked selected — carried through
+    /// camera updates so relation re-rasters keep their halos.
+    var selectedConnections: Set<String> = []
     /// Fading-out layers of removed nodes/branches, recycled when their
     /// 160 ms window closes (or on the next apply at the latest).
     var dyingNodes: [String: NodeVisualLayer] = [:]
@@ -121,7 +129,9 @@ public final class CanvasLayerTree {
     /// observable while panning.
     var allocatedNodeLayers = 0
     var allocatedBranchLayers = 0
+    var allocatedRelationLayers = 0
     var pooledNodeLayerReuses = 0
+    var pooledRelationLayerReuses = 0
 
     public var activeNodeLayerIDs: Set<String> { Set(nodeLayers.keys) }
     public var pooledNodeLayerCount: Int { nodePool.count }
@@ -219,6 +229,7 @@ public final class CanvasLayerTree {
         root.backgroundColor = context.scene.canvasColor
         editingID = context.editingNodeID
         highlightedIDs = context.highlightedIDs
+        selectedConnections = context.selectedConnections
         // CA culls sublayers of a zero-bounds layer: the content layer
         // must cover the viewport even though its own content is empty.
         content.frame = CGRect(origin: .zero, size: viewport)
@@ -286,6 +297,11 @@ public final class CanvasLayerTree {
             guard let node = scene?.nodes[layer.nodeID] else { continue }
             configureContents(layer, node: node, camera: camera, backingScale: backingScale)
         }
+        for layer in relationLayers.values {
+            guard let overlay = layer.overlay else { continue }
+            configureRelationContents(
+                layer, overlay: overlay, camera: camera, backingScale: backingScale)
+        }
     }
 
     /// Selection rings for the visible selected ids (§7.6's 120 ms
@@ -352,6 +368,10 @@ public final class CanvasLayerTree {
         for (key, layer) in Array(branchLayers) {
             branchLayers.removeValue(forKey: key)
             recycleBranchLayer(layer)
+        }
+        for (id, layer) in Array(relationLayers) {
+            relationLayers.removeValue(forKey: id)
+            recycleRelationLayer(layer)
         }
         for (id, ring) in Array(selectionRings) {
             ring.removeFromSuperlayer()
@@ -423,6 +443,10 @@ public final class CanvasLayerTree {
                 configureBranchLayer(layer, branch: branch, camera: camera, reduceMotion: reduceMotion)
             }
         }
+
+        // F-REL-1/2/3: one pooled overlay layer per visible connection,
+        // boundary or brace, culled by the same expanded rect (§11.4).
+        realizeRelations(camera: camera, viewport: viewport, backingScale: backingScale)
     }
 
     /// Final geometry + contents for one node layer, plus its move
