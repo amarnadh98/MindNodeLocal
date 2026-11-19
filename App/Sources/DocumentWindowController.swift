@@ -55,6 +55,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// The zoom % pull-down's button, synced on camera moves.
     var zoomPopupButton: NSButton?
 
+    /// F-DOC-4: the read-only banner pinned to the window's top edge
+    /// while the document came from a newer app version. Managed by
+    /// DocumentWindowController+DocumentSafety.
+    var readOnlyBanner: ReadOnlyBannerView?
+
     /// M6 (F-PRE): lazily-built presentation coordinator, the Slides
     /// sidebar, and any in-flight build-order recording. Kept as
     /// optional boxes because stored properties cannot live in
@@ -183,6 +188,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // M4: the outline pane builds its rows before it can be shown
         // (⌘2/⌘3 or a restored active view).
         outlineController.reloadPreservingSelection()
+        // F-DOC-4: a document from a newer app version shows its
+        // read-only banner from the first frame.
+        installReadOnlyBannerIfNeeded()
         super.showWindow(sender)
         // F-CAN-8: a stored view state restores the camera and the
         // (sanitized) selection INSTEAD of zoom-to-fit; only a document

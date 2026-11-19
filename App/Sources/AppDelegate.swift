@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppUpdater.registerPrivacyDefaults()
         NSApp.mainMenu = buildMenu()
         libraryCoordinator = LibraryCoordinator()
+        // F-QEN-1: the global hotkey and the menu-bar extra.
+        QuickEntryCoordinator.shared.start()
     }
 
     /// Window ▸ Library (⇧⌘L, SPEC §4). AppKit calls delegate actions on
@@ -90,6 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"),
                     // F-IO: foreign files import as new untitled documents.
                     item("Import…", #selector(AppDelegate.importAction(_:)), ""),
+                    // F-QEN-1: the capture panel, also reachable by the
+                    // global ⌃⌥Space hotkey (registered in-app via
+                    // Carbon — ADR-0020).
+                    quickEntryMenuItem(),
                     .separator(),
                     // F-IO export UI: ⌥⌘E (SPEC §5.17).
                     item(
@@ -98,23 +104,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .separator(),
                     item("Save", #selector(NSDocument.save(_:)), "s"),
                     item("Save As…", #selector(NSDocument.saveAs(_:)), "S"),
-                    item("Revert to Saved", #selector(NSDocument.revertToSaved(_:)), ""),
-                    .separator(),
-                    // M6 (F-PRE-1/4): present the map; ⌘⏎ resumes a
-                    // run paused into live edit (its item validates
-                    // only then, so ⌘⏎ keeps its editing meaning).
-                    item(
-                        "Present", #selector(DocumentWindowController.presentAction(_:)),
-                        "\r", modifiers: [.command, .option]),
-                    item(
-                        "Resume Presentation", #selector(DocumentWindowController.resumePresentationAction(_:)),
-                        "\r", modifiers: [.command]),
-                    item(
-                        "Export Slides as PDF…",
-                        #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
-                    .separator(),
-                    item("Close", #selector(NSWindow.performClose(_:)), "w"),
-                ]))
+                ]
+                    // F-DOC-1: Versions browser, Duplicate and Lock ride
+                    // NSDocument's own actions; validation lives with the
+                    // window controller.
+                    + documentSafetyItems() + [
+                        .separator(),
+                        // M6 (F-PRE-1/4): present the map; ⌘⏎ resumes a
+                        // run paused into live edit (its item validates
+                        // only then, so ⌘⏎ keeps its editing meaning).
+                        item(
+                            "Present", #selector(DocumentWindowController.presentAction(_:)),
+                            "\r", modifiers: [.command, .option]),
+                        item(
+                            "Resume Presentation", #selector(DocumentWindowController.resumePresentationAction(_:)),
+                            "\r", modifiers: [.command]),
+                        item(
+                            "Export Slides as PDF…",
+                            #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
+                        .separator(),
+                        item("Close", #selector(NSWindow.performClose(_:)), "w"),
+                    ]))
         mainMenu.addItem(
             menu(
                 "Edit",
@@ -493,6 +503,10 @@ extension AppDelegate {
         // AppDelegate+Updater so this type stays under
         // swiftlint's type_body_length.
         addUpdaterItems(to: appMenu)
+        // F-SET (SPEC §5.20): the Settings window, ⌘,.
+        appMenu.addItem(
+            withTitle: "Settings…", action: #selector(AppDelegate.settingsAction(_:)),
+            keyEquivalent: ",")
         appMenu.addItem(.separator())
         let services = NSMenuItem()
         services.title = "Services"

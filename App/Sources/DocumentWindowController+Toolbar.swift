@@ -298,8 +298,13 @@ extension DocumentWindowController {
     /// NSMenuItemValidation: the View ▸ Minimap checkmark, the zoom
     /// menu's step marks, the AI menu's availability (F-AI-1) and the
     /// per-document cloud flag's state (SPEC §12); editing actions
-    /// disable with no selection.
+    /// disable with no selection. Read-only documents (F-DOC-4) deny
+    /// every mutating action first, and the F-DOC safety items validate
+    /// through their own helper in the default chain.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if let readOnly = validateReadOnlyMenuItem(menuItem) {
+            return readOnly
+        }
         switch menuItem.action {
         case #selector(toggleMinimapAction(_:)):
             menuItem.state =
@@ -347,7 +352,8 @@ extension DocumentWindowController {
             // needs a branch with descendants).
             return validateRecallMenuItem(menuItem)
         default:
-            return validateFocusFindMenuItem(menuItem) ?? true
+            return validateFocusFindMenuItem(menuItem) ?? validateDocumentSafetyMenuItem(menuItem)
+                ?? true
         }
     }
 }
