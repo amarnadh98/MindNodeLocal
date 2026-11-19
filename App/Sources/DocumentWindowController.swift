@@ -20,8 +20,8 @@ final class DocumentWindowController: NSWindowController {
         super.init(window: window)
         self.document = document
 
-        if let mapDocument = document as? MapDocument {
-            updateScene(from: mapDocument)
+        canvas.onEffectiveAppearanceChange = { [weak self] in
+            self?.updateScene(preserveCamera: true)
         }
     }
 
@@ -31,28 +31,33 @@ final class DocumentWindowController: NSWindowController {
 
     override func windowDidLoad() {
         super.windowDidLoad()
-        rebuildScene()
+        updateScene(preserveCamera: false)
     }
 
-    /// Rebuilds and displays the canvas scene from the document's model,
-    /// then fits it into the viewport.
-    func rebuildScene() {
-        guard let mapDocument = document as? MapDocument,
-            let contentFrame = window?.contentRect(forFrameRect: window?.frame ?? .zero)
-        else {
-            return
+    /// Rebuilds the scene from the document's model at the view's
+    /// effective appearance. The document's explicit override wins; `auto`
+    /// follows the system (and re-renders when it changes).
+    func updateScene(preserveCamera: Bool) {
+        guard let mapDocument = document as? MapDocument else { return }
+        let variant: ThemeVariant
+        switch mapDocument.model.appearance {
+        case .dark:
+            variant = .dark
+        case .light:
+            variant = .light
+        case .auto, .none:
+            variant = canvas.effectiveVariant
         }
-        canvas.frame = NSRect(origin: .zero, size: contentFrame.size)
-        updateScene(from: mapDocument)
-    }
-
-    private func updateScene(from document: MapDocument) {
-        let variant: ThemeVariant = document.effectiveAppearance == .dark ? .dark : .light
+        let previousCamera = canvas.camera
         let scene = SceneGeometry.build(
-            model: document.model,
+            model: mapDocument.model,
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer)
         canvas.scene = scene
-        canvas.zoomToFit()
+        if preserveCamera {
+            canvas.camera = previousCamera
+        } else {
+            canvas.zoomToFit()
+        }
     }
 }

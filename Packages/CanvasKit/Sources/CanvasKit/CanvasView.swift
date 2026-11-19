@@ -3,19 +3,20 @@ import CoreGraphics
 import MapCore
 import MapRender
 
-/// The mind-map canvas: a flipped, layer-backed `NSView` that renders a
-/// `CanvasScene` through a camera. Pan with two-finger scroll, zoom with
-/// pinch (anchored at the cursor), ⌘+/⌘−/⌘0/⌘9 step and fit. Click and
-/// ⌘-click select, drag on empty canvas rubber-bands (F-CAN-1..4).
+/// The mind-map canvas: a flipped `NSView` that renders a `CanvasScene`
+/// through a camera, drawing into its standard backing layer. Pan with
+/// two-finger scroll (content follows the fingers), zoom with pinch
+/// (anchored at the cursor), ⌘+/⌘−/⌘0/⌘9/⌘* step, fit and zoom-to-
+/// selection per F-CAN-2. Click and ⌘-click select, drag on empty canvas
+/// rubber-bands (F-CAN-4).
 ///
-/// Rendering is one `SceneRenderer` pass into the view's layer; the
-/// virtualized CALayer tree with pooling and culling (SPEC §11.4) is the
-/// performance pass planned with the animated-relayout slice.
+/// Zoom steps are exposed as methods so the View menu can target them
+/// with key equivalents (§14.1: reachable from menus); the canvas handles
+/// the keys itself when it is first responder.
 public final class CanvasView: NSView {
     public var scene: CanvasScene? {
         didSet {
             rebuildGrid()
-            clampCameraIntoContent()
             needsDisplay = true
         }
     }
@@ -33,16 +34,22 @@ public final class CanvasView: NSView {
     /// Called after any selection change caused by canvas interaction.
     public var onSelectionChange: ((Set<String>) -> Void)?
 
+    /// Called when the system appearance changes, so the host can rebuild
+    /// the scene for the new variant (dark mode is part of §14.1).
+    public var onEffectiveAppearanceChange: (() -> Void)?
+
+    /// The F-CAN-2 zoom step list: ⌘+ and ⌘− snap to the next stop.
+    public static let zoomSteps: [CGFloat] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
+
     private var grid = SpatialGrid()
     private var rubberBandStart: CGPoint?
     private var rubberBandRect: NSRect?
+    private var lastRenderedVariant: ThemeVariant?
 
     public override init(frame frameRect: NSRect) {
         self.camera = Camera()
         super.init(frame: frameRect)
         wantsLayer = true
-        layer = CALayer()
-        layer?.frame = NSRect(origin: .zero, size: frameRect.size)
     }
 
     @available(*, unavailable)
@@ -50,11 +57,22 @@ public final class CanvasView: NSView {
         self.camera = Camera()
         super.init(coder: coder)
         wantsLayer = true
-        layer = CALayer()
     }
 
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
+
+    /// The theme variant matching this view's effective appearance.
+    public var effectiveVariant: ThemeVariant {
+        let names = [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]
+        let best = effectiveAppearance.bestMatch(from: names) ?? .aqua
+        return best == .darkAqua ? .dark : .light
+    }
+
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        onEffectiveAppearanceChange?()
+    }
 
     // MARK: drawing
 
@@ -84,9 +102,13 @@ public final class CanvasView: NSView {
 
     // MARK: camera actions
 
+    /// Pans by a screen-space delta. The canvas is flipped and follows
+    /// natural scrolling: a positive delta moves the *content* with the
+    /// fingers, so the camera origin moves the opposite way (the same
+    /// `origin -= delta` an `NSClipView` applies).
     public func panByScreen(dx: CGFloat, dy: CGFloat) {
-        camera.origin.x += dx / camera.scale
-        camera.origin.y += dy / camera.scale
+        camera.origin.x -= dx / camera.scale
+        camera.origin.y -= dy / camera.scale
         needsDisplay = true
     }
 
@@ -101,13 +123,39 @@ public final class CanvasView: NSView {
         needsDisplay = true
     }
 
+    /// Snaps to the next (or previous) F-CAN-2 zoom stop around the
+    /// viewport center. Zooming in accepts the `=` character as ⌘+ (US
+    /// layouts send it unshifted).
+    public func zoomStep(_ direction: ZoomDirection) {
+        let target: CGFloat
+        switch direction {
+        case .closer:
+            let next = Self.zoomSteps.first { $0 > camera.scale + 0.01 } ?? Self.zoomSteps.last!
+            target = next
+        case .farther:
+            let previous = Self.zoomSteps.last { $0 < camera.scale - 0.01 } ?? Self.zoomSteps.first!
+            target = previous
+        }
+        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    public enum ZoomDirection {
+        case closer
+        case farther
+    }
+
+    /// Zooms to the given scale around the viewport center.
     public func zoomToScale(_ target: CGFloat) {
-        let center = CGPoint(x: bounds.midX, y: bounds.midY)
-        zoom(scale: target, around: center)
+        zoom(scale: target, around: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    /// Actual size (F-CAN-2: ⌘0).
+    public func zoomToActualSize() {
+        zoomToScale(1)
     }
 
     /// Zooms so the whole scene fits the viewport with padding
-    /// (F-CAN-2: ⌘9).
+    /// (F-CAN-2: ⌘9, also ⌘*).
     public func zoomToFit(padding: CGFloat = 40) {
         guard let scene, !scene.nodes.isEmpty, bounds.width > 1, bounds.height > 1 else { return }
         let content = scene.bounds.insetBy(dx: -padding, dy: -padding)
@@ -123,27 +171,37 @@ public final class CanvasView: NSView {
         needsDisplay = true
     }
 
-    private func clampCameraScale() {
-        camera.scale = min(max(camera.scale, 0.1), 4)
+    /// Zooms so the selection fills the viewport (F-CAN-2: ⌥⌘0).
+    public func zoomToSelection(padding: CGFloat = 40) {
+        guard !selection.isEmpty, bounds.width > 1, bounds.height > 1 else {
+            zoomToFit(padding: padding)
+            return
+        }
+        var content: CGRect = .null
+        for id in selection {
+            if let node = scene?.nodes[id] {
+                content = content.union(node.frame)
+            }
+        }
+        guard !content.isNull else { return }
+        content = content.insetBy(dx: -padding, dy: -padding)
+        let scale = min(
+            bounds.width / content.width, bounds.height / content.height, 4)
+        camera.scale = min(max(scale, 0.1), 4)
+        camera.origin = CGPoint(
+            x: content.midX - bounds.midX / camera.scale,
+            y: content.midY - bounds.midY / camera.scale)
+        needsDisplay = true
     }
 
-    private func clampCameraIntoContent() {
-        guard let scene, !scene.nodes.isEmpty, bounds.width > 1 else { return }
-        let content = scene.bounds
-        let visible = camera.visibleRect(viewportSize: bounds.size)
-        camera.origin.x = min(
-            max(camera.origin.x, content.minX - visible.width * 0.75),
-            content.maxX - visible.width * 0.25)
-        camera.origin.y = min(
-            max(camera.origin.y, content.minY - visible.height * 0.75),
-            content.maxY - visible.height * 0.25)
+    private func clampCameraScale() {
+        camera.scale = min(max(camera.scale, 0.1), 4)
     }
 
     // MARK: hit-testing
 
     public override func layout() {
         super.layout()
-        layer?.frame = NSRect(origin: .zero, size: bounds.size)
         needsDisplay = true
     }
 
@@ -171,7 +229,14 @@ public final class CanvasView: NSView {
             }
             return
         }
-        panByScreen(dx: event.scrollingDeltaX, dy: event.scrollingDeltaY)
+        var dx = event.scrollingDeltaX
+        var dy = event.scrollingDeltaY
+        if !event.hasPreciseScrollingDeltas {
+            let lineHeight: CGFloat = 12
+            dx *= lineHeight
+            dy *= lineHeight
+        }
+        panByScreen(dx: dx, dy: dy)
     }
 
     public override func magnify(with event: NSEvent) {
@@ -180,16 +245,19 @@ public final class CanvasView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
-        let step: CGFloat = 1.25
-        switch event.charactersIgnoringModifiers {
-        case "+" where event.modifierFlags.contains(.command):
-            zoomToScale(camera.scale * step)
-        case "-" where event.modifierFlags.contains(.command):
-            zoomToScale(camera.scale / step)
-        case "0" where event.modifierFlags.contains(.command):
-            zoomToScale(1)
-        case "9" where event.modifierFlags.contains(.command):
+        let characters = event.charactersIgnoringModifiers ?? ""
+        let hasCommand = event.modifierFlags.contains(.command)
+        switch (characters, hasCommand, event.modifierFlags.contains(.option)) {
+        case ("+", true, false), ("=", true, false):
+            zoomStep(.closer)
+        case ("-", true, false):
+            zoomStep(.farther)
+        case ("0", true, false):
+            zoomToActualSize()
+        case ("9", true, false), ("*", true, false):
             zoomToFit()
+        case ("0", true, true):
+            zoomToSelection()
         default:
             super.keyDown(with: event)
         }
@@ -253,5 +321,30 @@ public final class CanvasView: NSView {
             selection = hits
         }
         onSelectionChange?(selection)
+    }
+}
+
+/// First-responder actions the View menu targets, so the zoom commands
+/// work even before the canvas has been clicked (§14.1: reachable from
+/// menus).
+extension CanvasView {
+    @objc public func zoomInAction(_ sender: Any?) {
+        zoomStep(.closer)
+    }
+
+    @objc public func zoomOutAction(_ sender: Any?) {
+        zoomStep(.farther)
+    }
+
+    @objc public func actualSizeAction(_ sender: Any?) {
+        zoomToActualSize()
+    }
+
+    @objc public func zoomToFitAction(_ sender: Any?) {
+        zoomToFit()
+    }
+
+    @objc public func zoomToSelectionAction(_ sender: Any?) {
+        zoomToSelection()
     }
 }

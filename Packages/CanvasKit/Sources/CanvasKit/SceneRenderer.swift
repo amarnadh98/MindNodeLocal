@@ -1,16 +1,22 @@
+import AppKit
 import CoreGraphics
-import Foundation
+import MapCore
 import MapRender
 
 /// Renders a whole `CanvasScene` into any flipped (y-down) `CGContext`
-/// through a camera: branches first (tapered per §7.4), then nodes.
-/// The same path backs the on-screen canvas, export and Quick Look.
+/// through a camera: branches first (tapered per §7.4), then nodes, then
+/// selection rings. The same path backs the on-screen canvas, export and
+/// Quick Look.
 public enum SceneRenderer {
+    /// Draws the scene into a flipped context. Nodes and branches outside
+    /// the visible model-space rect are skipped, so draw cost follows the
+    /// viewport, not the map size.
     public static func draw(
         scene: CanvasScene,
         camera: Camera,
         selection: Set<String> = [],
         selectionColor: CGColor,
+        measurer: TextMeasurer = SceneRenderer.sharedMeasurer,
         in context: CGContext,
         viewport: CGSize
     ) {
@@ -21,7 +27,17 @@ public enum SceneRenderer {
         context.scaleBy(x: camera.scale, y: camera.scale)
         context.translateBy(x: -camera.origin.x, y: -camera.origin.y)
 
+        let visible = camera.visibleRect(viewportSize: viewport)
         for branch in scene.branches {
+            let bounds = CGRect(
+                x: min(branch.from.x, branch.to.x),
+                y: min(branch.from.y, branch.to.y),
+                width: abs(branch.to.x - branch.from.x),
+                height: abs(branch.to.y - branch.from.y)
+            ).insetBy(
+                dx: -max(branch.startWidth, branch.endWidth),
+                dy: -max(branch.startWidth, branch.endWidth))
+            guard visible.intersects(bounds) else { continue }
             let path =
                 branch.tapered
                 ? MapRender.BranchPath.tapered(
@@ -35,8 +51,9 @@ public enum SceneRenderer {
         }
 
         for node in scene.nodes.values {
+            guard visible.intersects(node.frame) else { continue }
             NodeRenderer.draw(
-                style: node.style, title: node.title, measurer: sharedMeasurer,
+                style: node.style, title: node.title, measurer: measurer,
                 in: context, frame: node.frame)
         }
 

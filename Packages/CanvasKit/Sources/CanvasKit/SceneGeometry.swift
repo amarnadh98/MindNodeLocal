@@ -74,7 +74,8 @@ public enum SceneGeometry {
 
             let frames = TreeLayout.layout(
                 root: layoutRoot, structure: structure, spacing: spacing)
-            let offsetY = cursorY - (frames[rootID]?.minY ?? 0)
+            let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
+            let offsetY = cursorY - treeMinY
             let rootLevel1Index = levelOneIndices(model: model, rootID: rootID)
 
             for (id, frame) in frames {
@@ -246,7 +247,8 @@ public enum SceneGeometry {
                 let childStyle = childScene.style
                 let to = NodeRenderer.incomingAnchor(
                     style: childStyle, frame: childScene.frame, direction: direction)
-                let widths = PaperTheme.branchWidths(level: parentInfo.level)
+                let widths = taperedWidths(
+                    parentLevel: parentInfo.level, childLevel: childScene.level)
                 result.append(
                     SceneBranch(
                         parentID: id,
@@ -265,5 +267,15 @@ public enum SceneGeometry {
         }
         walk(rootID, parentInfo: (level: 0, index: 0))
         return result
+    }
+
+    /// Continuous taper from the root to the leaves (§7.2): a branch's
+    /// start width is its parent node's width `w(level)`, and it tapers to
+    /// `w(level + 1)` — no thickness jump at intermediate nodes.
+    static func taperedWidths(parentLevel: Int, childLevel: Int) -> (start: CGFloat, end: CGFloat) {
+        func levelWidth(_ level: Int) -> CGFloat {
+            max(2, 6 - CGFloat(level))
+        }
+        return (start: levelWidth(parentLevel), end: levelWidth(childLevel))
     }
 }

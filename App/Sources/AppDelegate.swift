@@ -1,4 +1,5 @@
 import AppKit
+import CanvasKit
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -45,6 +46,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Copy", #selector(NSText.copy(_:)), "c"),
                     item("Paste", #selector(NSText.paste(_:)), "v"),
                     item("Select All", #selector(NSText.selectAll(_:)), "a"),
+                ]))
+        mainMenu.addItem(
+            menu(
+                "View",
+                [
+                    item("Zoom In", #selector(CanvasView.zoomInAction(_:)), "+"),
+                    item("Zoom Out", #selector(CanvasView.zoomOutAction(_:)), "-"),
+                    item("Actual Size", #selector(CanvasView.actualSizeAction(_:)), "0"),
+                    item("Zoom to Fit", #selector(CanvasView.zoomToFitAction(_:)), "9"),
+                    item("Zoom to Selection", #selector(CanvasView.zoomToSelectionAction(_:)), "0", option: true),
                 ]))
         mainMenu.addItem(
             menu(
@@ -106,9 +117,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menuItem
     }
 
-    private func item(_ title: String, _ action: Selector, _ key: String) -> NSMenuItem {
+    private func item(
+        _ title: String, _ action: Selector, _ key: String, option: Bool = false
+    ) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: key)
         menuItem.target = nil
+        if option {
+            menuItem.keyEquivalentModifierMask = [.command, .option]
+        }
         return menuItem
     }
 }

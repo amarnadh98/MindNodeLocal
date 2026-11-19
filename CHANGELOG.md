@@ -28,6 +28,16 @@
 - Repair: unreachable cycles are now broken (lowest-ID member promoted to a root, then resync) instead of being left unreachable; repair order is deterministic (creation time, then ID) so the same broken file always repairs identically; duplicate `children` entries are detected, reported, and de-duplicated.
 - CI: new `perf` job runs MapLayout tests in release, enforcing the SPEC §11.8 10 ms budget.
 
+### Fixed (review on PR #5)
+- Canvas actually renders: dropped the custom `CALayer` assignment (a layer-hosting view's delegate-less layer never draws); the view now draws into its standard backing layer.
+- Multi-root stacking by the tree's full extent — balanced subtrees extend above the root, so stacking by the root's own `minY` overlapped trees (regression-tested with a wide-root scenario).
+- Natural-scroll pan direction fixed (camera origin subtracts the delta, like `NSClipView`); mouse-wheel deltas scaled by a line height.
+- `.auto` appearance follows the view's effective appearance and re-renders on system appearance change; the document's explicit light/dark override still wins.
+- Zoom: F-CAN-2 step list (25–400%) with `=` matched as ⌘+, ⌘* fit and ⌥⌘0 zoom-to-selection added, all exposed as View menu items (first-responder actions), so they work before the canvas is clicked.
+- Renderer culls nodes and branches to the visible rect (draw cost now follows the viewport); the measurer is injectable.
+- Branch taper is continuous root-to-leaf (w(level) → w(level+1)) instead of restarting at each node.
+- ADR-0004 records the positional branch-palette decision and the plan to make the index persistent before reorder/insert land.
+
 ### Fixed (review on PR #1)
 - Document creation/opening via `NSDocumentController`: `NSDocumentClass` is now declared in `CFBundleDocumentTypes`, and `MapDocument` no longer overrides `NSDocument.init(contentsOf:ofType:)`, so opened documents keep their `fileURL`, `fileType` and modification date. Tests now go through `NSDocumentController` instead of constructing the document directly.
 - Saves reuse the package wrapper (`fileWrapper(ofType:)` / `read(from: FileWrapper, ofType:)`) and replace only `map.json`/`meta.json`, so foreign and future entries (`assets/`, `study/reviews.jsonl`, `QuickLook/`) survive saves (SPEC §11.1).

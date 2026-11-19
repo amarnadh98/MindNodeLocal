@@ -64,17 +64,6 @@ final class MapDocument: NSDocument {
     override func makeWindowControllers() {
         addWindowController(DocumentWindowController(document: self))
     }
-
-    /// The appearance this document renders with: its explicit override,
-    /// or `.auto` meaning "follow the system".
-    public var effectiveAppearance: ThemeVariant {
-        switch model.appearance {
-        case .dark:
-            return .dark
-        default:
-            return .light
-        }
-    }
 }
 
 private let packageLog = Logger(
