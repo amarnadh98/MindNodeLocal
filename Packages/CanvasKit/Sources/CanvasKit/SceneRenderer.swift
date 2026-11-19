@@ -12,7 +12,10 @@ public enum SceneRenderer {
     /// the visible model-space rect are skipped, so draw cost follows the
     /// viewport, not the map size. While a node is being edited its title
     /// is suppressed (the editing overlay draws the live text instead —
-    /// SPEC §11.4); the node's shape stays visible as an anchor.
+    /// SPEC §11.4); the node's shape stays visible as an anchor. The
+    /// relation overlays (F-REL-1/2/3) draw through the same shared
+    /// `RelationRenderer`: boundaries under the branches, braces and
+    /// connections over the nodes.
     public static func draw(
         scene: CanvasScene,
         camera: Camera,
@@ -23,6 +26,8 @@ public enum SceneRenderer {
         /// branches are skipped, ghosted ones draw at their overlay
         /// opacity. Export and the slide PDF writer share it.
         revealOverlay: RevealOverlay? = nil,
+        selectedConnections: Set<String> = [],
+
         measurer: TextMeasurer = SceneRenderer.sharedMeasurer,
         in context: CGContext,
         viewport: CGSize
@@ -35,6 +40,10 @@ public enum SceneRenderer {
         context.translateBy(x: -camera.origin.x, y: -camera.origin.y)
 
         let visible = camera.visibleRect(viewportSize: viewport)
+        for boundary in scene.boundaries where visible.intersects(boundary.bounds) {
+            RelationRenderer.draw(
+                boundary: RelationVisuals.boundaryVisual(boundary), measurer: measurer, in: context)
+        }
         for branch in scene.branches {
             let bounds = CGRect(
                 x: min(branch.from.x, branch.to.x),
@@ -75,6 +84,19 @@ public enum SceneRenderer {
                 style: node.style, title: title, decorations: node.decorations,
                 measurer: measurer, in: context, frame: node.frame)
             context.restoreGState()
+        }
+
+        for summary in scene.summaries where visible.intersects(summary.bounds) {
+            RelationRenderer.draw(
+                summary: RelationVisuals.summaryVisual(summary), in: context)
+        }
+        for connection in scene.connections where visible.intersects(connection.bounds) {
+            RelationRenderer.draw(
+                connection: RelationVisuals.connectionVisual(
+                    connection,
+                    selected: selectedConnections.contains(connection.id),
+                    halo: selectionColor),
+                measurer: measurer, in: context)
         }
 
         for id in selection {

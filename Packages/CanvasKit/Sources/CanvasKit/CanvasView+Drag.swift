@@ -18,19 +18,22 @@ struct PendingDrag {
     let startModel: CGPoint
     let optionDown: Bool
     let commandDown: Bool
+    let shiftDown: Bool
 
     init(
         grabbedID: String,
         startView: CGPoint,
         startModel: CGPoint,
         optionDown: Bool = false,
-        commandDown: Bool = false
+        commandDown: Bool = false,
+        shiftDown: Bool = false
     ) {
         self.grabbedID = grabbedID
         self.startView = startView
         self.startModel = startModel
         self.optionDown = optionDown
         self.commandDown = commandDown
+        self.shiftDown = shiftDown
     }
 }
 
@@ -42,6 +45,9 @@ struct DragModifiers {
     var command = false
     var detachKey = false
     var connectKey = false
+    /// ⇧ held since the grab (F-REL-1: a shift-drag from node to node
+    /// drops as a connection, not a reparent).
+    var shift = false
 }
 
 /// One node drag in progress (F-EDT-5): from the threshold crossing to
@@ -117,11 +123,12 @@ extension CanvasView {
         }
     }
 
-    /// ⌥/⌘ read live through flagsChanged while dragging (F-EDT-5).
+    /// ⌥/⌘/⇧ read live through flagsChanged while dragging (F-EDT-5).
     func handleFlagsChanged(_ modifiers: NSEvent.ModifierFlags) {
         guard let session = activeSession() else { return }
         session.modifiers.option = modifiers.contains(.option)
         session.modifiers.command = modifiers.contains(.command)
+        session.modifiers.shift = modifiers.contains(.shift)
         session.overlay?.needsDisplay = true
     }
 
@@ -166,7 +173,8 @@ extension CanvasView {
             dragged: dragged,
             startModel: pending.startModel,
             modifiers: DragModifiers(
-                option: pending.optionDown, command: pending.commandDown))
+                option: pending.optionDown, command: pending.commandDown,
+                shift: pending.shiftDown))
         drag = .active(session)
         installKeyMonitor(into: session)
         addOverlay(for: session)
@@ -222,18 +230,17 @@ extension CanvasView {
     // MARK: drop resolution
 
     /// The one command this drop performs, per the live modifier state
-    /// (F-EDT-5): ⌥ free-positions via `setOffset`, D detaches into new
-    /// roots, Space drops as a connection, and no modifier reparents.
+    /// (F-EDT-5 + F-REL-1): Space or ⇧ drops as a connection to the
+    /// hovered target, ⌥ free-positions via `setOffset`, D detaches
+    /// into new roots, and no modifier reparents.
     private func dropCommand(
         _ session: DragSession, model: MapModel, scene: CanvasScene
     ) -> MapCommand? {
-        if session.modifiers.connectKey {
-            // TODO(F-REL-1): drop as a connection to the hovered target.
-            // MapCore has no connection-creation command yet —
-            // `setConnections` is a wholesale list replace that delete
-            // inverses use — and the scene does not render connections,
-            // so this branch stays a no-op until both land.
-            return nil
+        if session.modifiers.connectKey || session.modifiers.shift {
+            // F-REL-1: a connection drop — nil when nothing valid is
+            // hovered (the host performs nothing, no phantom undo).
+            return DragCommands.connect(
+                model: model, from: session.grabbedID, target: session.target)
         }
         if session.modifiers.detachKey {
             return DragCommands.detach(model: model, dragged: session.dragged)

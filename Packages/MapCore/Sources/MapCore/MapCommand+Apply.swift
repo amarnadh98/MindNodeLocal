@@ -267,6 +267,72 @@ extension MapCommand {
         case .setSummaries(let summaries):
             model.summaries = summaries
 
+        case .addConnection(let connection):
+            try Self.validateConnection(connection, in: model)
+            var connections = model.connections ?? []
+            if let slot = connections.firstIndex(where: { $0.id == connection.id }) {
+                connections[slot] = connection
+            } else {
+                connections.append(connection)
+            }
+            model.connections = connections
+
+        case .removeConnection(let id):
+            let connections = (model.connections ?? []).filter { $0.id != id }
+            model.connections = connections.isEmpty ? nil : connections
+
+        case .editConnection(let id, let connection):
+            try Self.validateConnection(connection, in: model)
+            guard var connections = model.connections,
+                let slot = connections.firstIndex(where: { $0.id == id })
+            else {
+                throw ArborError.commandFailure("missing connection \(id)")
+            }
+            connections[slot] = connection
+            model.connections = connections
+
+        case .addBoundary(let boundary):
+            for nodeID in boundary.nodes where model.nodes[nodeID] == nil {
+                throw ArborError.commandFailure("missing node \(nodeID)")
+            }
+            var boundaries = model.boundaries ?? []
+            if let slot = boundaries.firstIndex(where: { $0.id == boundary.id }) {
+                boundaries[slot] = boundary
+            } else {
+                boundaries.append(boundary)
+            }
+            model.boundaries = boundaries
+
+        case .removeBoundary(let id):
+            let boundaries = (model.boundaries ?? []).filter { $0.id != id }
+            model.boundaries = boundaries.isEmpty ? nil : boundaries
+
+        case .editBoundary(let id, let boundary):
+            for nodeID in boundary.nodes where model.nodes[nodeID] == nil {
+                throw ArborError.commandFailure("missing node \(nodeID)")
+            }
+            guard var boundaries = model.boundaries,
+                let slot = boundaries.firstIndex(where: { $0.id == id })
+            else {
+                throw ArborError.commandFailure("missing boundary \(id)")
+            }
+            boundaries[slot] = boundary
+            model.boundaries = boundaries
+
+        case .addSummary(let summary):
+            try Self.validateSummary(summary, in: model)
+            var summaries = model.summaries ?? []
+            if let slot = summaries.firstIndex(where: { $0.id == summary.id }) {
+                summaries[slot] = summary
+            } else {
+                summaries.append(summary)
+            }
+            model.summaries = summaries
+
+        case .removeSummary(let id):
+            let summaries = (model.summaries ?? []).filter { $0.id != id }
+            model.summaries = summaries.isEmpty ? nil : summaries
+
         case .recolorBranches(let assignments):
             // All-or-nothing: every id must exist before any index moves.
             for assignment in assignments where model.nodes[assignment.id] == nil {
@@ -460,5 +526,31 @@ extension MapCommand {
         }
         let count = model.roots.count
         return min(max(index ?? count, 0), count)
+    }
+
+    /// A connection's structural preconditions (SPEC §8.2 invariants):
+    /// both endpoints exist, and a node never connects to itself.
+    static func validateConnection(_ connection: Connection, in model: MapModel) throws {
+        guard connection.from != connection.to else {
+            throw ArborError.commandFailure("cannot connect a node to itself")
+        }
+        for endpoint in [connection.from, connection.to] where model.nodes[endpoint] == nil {
+            throw ArborError.commandFailure("missing node \(endpoint)")
+        }
+    }
+
+    /// A summary's structural preconditions (SPEC §8.2): the parent and
+    /// summary node exist, and the range is a run of the parent's
+    /// children.
+    static func validateSummary(_ summary: Summary, in model: MapModel) throws {
+        guard let parent = model.nodes[summary.parent] else {
+            throw ArborError.commandFailure("missing node \(summary.parent)")
+        }
+        guard model.nodes[summary.node] != nil else {
+            throw ArborError.commandFailure("missing node \(summary.node)")
+        }
+        for rangeID in summary.range where !parent.children.contains(rangeID) {
+            throw ArborError.commandFailure("\(rangeID) is not a child of \(summary.parent)")
+        }
     }
 }

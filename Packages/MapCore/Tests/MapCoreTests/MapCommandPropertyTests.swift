@@ -180,7 +180,52 @@ struct CommandPropertyTests {
                         id: "p\(generator.next())", name: "Deck",
                         slides: [Slide(id: "s\(generator.next())", title: "slide")])
                 ]),
-        ].compactMap { $0 }
+        ].compactMap { $0 } + relationCommands(nodeID: nodeID, model: model, generator: &generator)
+    }
+
+    /// The fine-grained relation commands (F-REL-1/2/3): created against
+    /// live ids, plus the edit/remove paths exercised against ids that
+    /// exist in the current model.
+    private func relationCommands(
+        nodeID: String, model: MapModel, generator: inout CommandGenerator
+    ) -> [MapCommand] {
+        var commands: [MapCommand] = []
+        let others = Array(model.nodes.keys).filter { $0 != nodeID }
+        if let other = generator.pick(from: others) {
+            commands.append(
+                .addConnection(
+                    Connection(
+                        id: "gc-\(generator.next())", from: nodeID, to: other,
+                        label: generator.next() % 2 == 0 ? "link" : nil,
+                        control: ModelOffset(x: 8, y: -4))))
+            commands.append(
+                .addBoundary(Boundary(id: "gb-\(generator.next())", nodes: [nodeID, other])))
+            if let summaryParent = model.nodes[nodeID]?.parent,
+                let firstChild = model.nodes[summaryParent]?.children.first
+            {
+                commands.append(
+                    .addSummary(
+                        Summary(
+                            id: "gs-\(generator.next())", parent: summaryParent,
+                            range: [firstChild], node: nodeID)))
+            }
+        }
+        if let connection = generator.pick(from: model.connections ?? []) {
+            commands.append(.editConnection(id: connection.id, connection: connection))
+            commands.append(.removeConnection(id: connection.id))
+        }
+        if let boundary = generator.pick(from: model.boundaries ?? []) {
+            commands.append(.editBoundary(id: boundary.id, boundary: boundary))
+            commands.append(.removeBoundary(id: boundary.id))
+        }
+        if let summary = generator.pick(from: model.summaries ?? []) {
+            commands.append(.removeSummary(id: summary.id))
+        }
+        // Absent ids: remove no-ops must invert to no-ops.
+        commands.append(.removeConnection(id: "missing"))
+        commands.append(.removeBoundary(id: "missing"))
+        commands.append(.removeSummary(id: "missing"))
+        return commands
     }
 
     /// Content commands that need their target to exist in a given
