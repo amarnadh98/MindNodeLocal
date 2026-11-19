@@ -104,11 +104,17 @@ enum MiniZip {
 
     /// Raw DEFLATE via `compression_decode_buffer`. Returns 0 when the
     /// stream is damaged or the destination is too small.
+    /// 256 MB: far above any real map document entry.
+    static let maxEntrySize = 256 << 20
+
     private static func inflate(
         _ data: Data, uncompressedSize: Int, name: String
     ) throws -> Data {
         guard !data.isEmpty else { return Data() }
-        let capacity = max(uncompressedSize, data.count * 8, 256)
+        // The header's size is untrusted input; refuse entries no mind map
+        // needs rather than allocate whatever a crafted archive claims.
+        guard uncompressedSize <= maxEntrySize else { throw ZipError.corruptEntry(name) }
+        let capacity = min(max(uncompressedSize, data.count * 8, 256), maxEntrySize)
         var destination = Data(count: capacity)
         let decodedCount = destination.withUnsafeMutableBytes { destinationBytes in
             data.withUnsafeBytes { sourceBytes in
