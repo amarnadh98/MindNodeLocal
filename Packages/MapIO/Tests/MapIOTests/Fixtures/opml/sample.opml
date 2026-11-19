@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>会议纪要 Meeting Notes</title>
+  </head>
+  <body>
+    <outline text="产品 Vision 🚀" _note="第一行&#10;second line">
+      <outline text="Research" arbor:task-done="false" arbor:task-due="2026-12-01" arbor:task-priority="2">
+        <outline text="中文研究" arbor:tags="高优先, alpha"/>
+        <outline text="Paper &lt;draft&gt;" arbor:folded="true" arbor:structure="mindmap.balanced"/>
+      </outline>
+      <outline text="Ship &amp; deliver" arbor:task-done="true"/>
+    </outline>
+    <outline text="第二个根 Second root">
+      <outline text="Child &quot;quoted&quot;" _note="note with an &amp; entity"/>
+    </outline>
+  </body>
+</opml>

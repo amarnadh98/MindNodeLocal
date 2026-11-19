@@ -23,6 +23,7 @@ let package = Package(
         .testTarget(
             name: "MapIOTests",
             dependencies: ["MapIO"],
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
