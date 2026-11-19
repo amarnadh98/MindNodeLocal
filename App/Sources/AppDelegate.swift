@@ -209,6 +209,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu(
                 "View",
                 [
+                    // F-OUT-1: the three document view modes; the
+                    // window controller swaps the content view.
+                    item(
+                        "Map", #selector(DocumentWindowController.showMapViewAction(_:)), "1"),
+                    item(
+                        "Outline", #selector(DocumentWindowController.showOutlineViewAction(_:)),
+                        "2"),
+                    item(
+                        "Side by Side",
+                        #selector(DocumentWindowController.showSideBySideViewAction(_:)), "3"),
+                    .separator(),
                     item("Zoom In", #selector(CanvasView.zoomInAction(_:)), "+"),
                     item("Zoom In", #selector(CanvasView.zoomInAction(_:)), "=", hidden: true),
                     item("Zoom Out", #selector(CanvasView.zoomOutAction(_:)), "-"),

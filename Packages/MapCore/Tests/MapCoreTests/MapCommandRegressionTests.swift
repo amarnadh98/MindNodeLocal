@@ -208,4 +208,28 @@ struct MapCommandRegressionTests {
         #expect(copy.study?.fsrs == nil)
         #expect(copy.created != fixedDate)
     }
+
+    /// Found by the M4 outline consistency fuzz: undoing a
+    /// delete-node-promote of a ROOT that carried a pinned `side`
+    /// restored it via `addRoot`, whose payload normalization drops a
+    /// stale side — so undo was not exact. The inverse now reinserts
+    /// the snapshot verbatim via `insertSubtrees`.
+    @Test func deletePromoteUndoRestoresARootsPinnedSide() throws {
+        var model = linearModel([])
+        model.nodes["n0"]?.side = .left
+        // A child, so the delete actually promotes something.
+        model.nodes["c1"] = Node(
+            id: "c1", parent: "n0", title: NodeTitle(text: "child"),
+            created: fixedDate, modified: fixedDate)
+        model.nodes["n0"]?.children = ["c1"]
+        let original = model
+
+        let command = MapCommand.deleteNodePromotingChildren(id: "n0")
+        let inverse = try command.inverse(in: model)
+        try command.apply(to: &model)
+        #expect(model.roots == ["c1"])
+
+        try inverse.apply(to: &model)
+        #expect(model == original, "undo must restore the root's pinned side exactly")
+    }
 }

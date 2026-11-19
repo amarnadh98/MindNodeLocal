@@ -12,6 +12,7 @@
 		11EB7B8E68D6C0E42F6B3B59 /* CanvasKit in Frameworks */ = {isa = PBXBuildFile; productRef = C4AC95ED195E72A49F8863CA /* CanvasKit */; };
 		1F762A25C56D0F1BADCE8582 /* InlineEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */; };
 		2910866D0BD3BB018A4C63DB /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = 82578E0D053CC6E252ED5CF3 /* MapLayout */; };
+		2B99A45173FC8E45F668F29F /* OutlineViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */; };
 		40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */; };
 		4196E094F43B370CE7E86DC7 /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = F54E21355F96F5AD144FD37A /* MapLayout */; };
 		4836DF66B7D3FD3CA53996F9 /* ClipboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7437BEC7881E13E8693B1E /* ClipboardTests.swift */; };
@@ -21,14 +22,19 @@
 		51A2013EF49237CD0C59960A /* GoldenScenarioOneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2867B0F244A65F6BDFE063 /* GoldenScenarioOneTests.swift */; };
 		5CC9AE8927483422DA4D41D1 /* MapIO in Frameworks */ = {isa = PBXBuildFile; productRef = 7645714653A5CB518E996BCF /* MapIO */; };
 		5E8D6BC848604A562B0E48BF /* CanvasAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC404C69786196CC5316EA3 /* CanvasAccessibilityTests.swift */; };
+		73B4E32DBE79EB41B8E526AE /* OutlineTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666FB7F71B472E6D9D4CF2F1 /* OutlineTextEditor.swift */; };
+		802E0D69C4A7F81B15FD65F7 /* OutlineDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7778E4EA9A36895828CA61 /* OutlineDataSource.swift */; };
 		822CBFD727517F3BEE2C66FE /* MapDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */; };
+		82A741B2B723A653B09FCBBE /* DocumentWindowController+Outline.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA23015C3164292B217E618C /* DocumentWindowController+Outline.swift */; };
 		8879915EF65A25600F6AABF6 /* MapIO in Frameworks */ = {isa = PBXBuildFile; productRef = FB586DA8E035266B306B34F4 /* MapIO */; };
 		96B11D99DA0409D0D479E844 /* DocumentWindowController+Toolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */; };
 		A23260792DCFF53BBECC26B9 /* DocumentWindowRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6646643F7AA0F23892211F0B /* DocumentWindowRenderingTests.swift */; };
+		B28CF76C31C912679B3E09CB /* OutlineViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B924535A56DE8F007D316 /* OutlineViewTests.swift */; };
 		B8668155FAC515BB501A30DC /* DocumentWindowController+Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BDD25E07D931762D4F0912 /* DocumentWindowController+Accessibility.swift */; };
 		BCE1A74E18AC59895789A289 /* CanvasKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2C2FAABF23A1E50C69E59904 /* CanvasKit */; };
 		C986615B78CA694E4DAA98F8 /* DocumentWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */; };
 		D1790FD36A1B6B934C01B694 /* MapCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2514B20D60A75A24AECF4DC7 /* MapCore */; };
+		DFF5B8563C9C1D8C47C58E88 /* OutlineRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E3A21B1AB1C48E6DACFAFA /* OutlineRowView.swift */; };
 		E5EB39C81DB4C6B18A889A3D /* MapRender in Frameworks */ = {isa = PBXBuildFile; productRef = 2B20624FDD3EEBC7E058EAD2 /* MapRender */; };
 		F39B1DC08A3DF5433F14D703 /* AppIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */; };
 /* End PBXBuildFile section */
@@ -46,13 +52,16 @@
 /* Begin PBXFileReference section */
 		0DC404C69786196CC5316EA3 /* CanvasAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasAccessibilityTests.swift; sourceTree = "<group>"; };
 		0E9B7C130CAE3A129DCC2F11 /* MapCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapCore; path = Packages/MapCore; sourceTree = SOURCE_ROOT; };
+		23E3A21B1AB1C48E6DACFAFA /* OutlineRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineRowView.swift; sourceTree = "<group>"; };
 		2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentity.swift; sourceTree = "<group>"; };
 		3C24FFCEDC9EBD59FFC5B577 /* ViewStateRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStateRestoreTests.swift; sourceTree = "<group>"; };
 		48AB29C79C038696D981150A /* MapRender */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapRender; path = Packages/MapRender; sourceTree = SOURCE_ROOT; };
+		4F7778E4EA9A36895828CA61 /* OutlineDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineDataSource.swift; sourceTree = "<group>"; };
 		4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowController.swift; sourceTree = "<group>"; };
 		61BDD25E07D931762D4F0912 /* DocumentWindowController+Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Accessibility.swift"; sourceTree = "<group>"; };
 		6646643F7AA0F23892211F0B /* DocumentWindowRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowRenderingTests.swift; sourceTree = "<group>"; };
+		666FB7F71B472E6D9D4CF2F1 /* OutlineTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTextEditor.swift; sourceTree = "<group>"; };
 		708B6FDF9A6823031DB30BE4 /* CanvasKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CanvasKit; path = Packages/CanvasKit; sourceTree = SOURCE_ROOT; };
 		763A388A39D618FE613DD3B1 /* MapDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDocument.swift; sourceTree = "<group>"; };
 		7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDocumentTests.swift; sourceTree = "<group>"; };
@@ -60,12 +69,15 @@
 		8AD7AB6F02EB2F451ED5586D /* ArborTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArborTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9D9EE024E00FEF22498CCACB /* DocumentWindowController+Toolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Toolbar.swift"; sourceTree = "<group>"; };
 		9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditingTests.swift; sourceTree = "<group>"; };
+		C33B924535A56DE8F007D316 /* OutlineViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewTests.swift; sourceTree = "<group>"; };
 		CA463BCF16A91FEF44EE1FCC /* MapLayout */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapLayout; path = Packages/MapLayout; sourceTree = SOURCE_ROOT; };
 		CBAC62CC4DC9451138C0087B /* Arbor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Arbor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC2867B0F244A65F6BDFE063 /* GoldenScenarioOneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenScenarioOneTests.swift; sourceTree = "<group>"; };
+		DA23015C3164292B217E618C /* DocumentWindowController+Outline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Outline.swift"; sourceTree = "<group>"; };
 		EE7437BEC7881E13E8693B1E /* ClipboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardTests.swift; sourceTree = "<group>"; };
 		F401197E85E463072F6963CE /* MapIO */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapIO; path = Packages/MapIO; sourceTree = SOURCE_ROOT; };
-		"TEMP_6FC2043D-64AC-4238-8B15-0151570973F1" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewController.swift; sourceTree = "<group>"; };
+		"TEMP_8D620828-AEE2-4D43-BDB1-3F19610D06C0" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +111,7 @@
 		002FD0708099FB748A31C0A2 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				632DC096DCB0D39DF8935E3D /* Outline */,
 				4FCED6CE12F3434BA05BF6C1 /* AppDelegate.swift */,
 				2FF43447ED3940B27EF4BA23 /* AppIdentity.swift */,
 				5804977596AD339B17EBBAA7 /* DocumentWindowController.swift */,
@@ -116,6 +129,18 @@
 				C452473DCFCCD3E9A2523807 /* Tests */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		632DC096DCB0D39DF8935E3D /* Outline */ = {
+			isa = PBXGroup;
+			children = (
+				DA23015C3164292B217E618C /* DocumentWindowController+Outline.swift */,
+				4F7778E4EA9A36895828CA61 /* OutlineDataSource.swift */,
+				23E3A21B1AB1C48E6DACFAFA /* OutlineRowView.swift */,
+				666FB7F71B472E6D9D4CF2F1 /* OutlineTextEditor.swift */,
+				F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */,
+			);
+			path = Outline;
 			sourceTree = "<group>";
 		};
 		A311202756854626E7555D59 /* Packages */ = {
@@ -140,6 +165,7 @@
 				9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */,
 				7C79F637CA5331B82E510C60 /* MapDocumentTests.swift */,
 				823BBFD2BD9A3E950CB48DAE /* MinimapToolbarTests.swift */,
+				C33B924535A56DE8F007D316 /* OutlineViewTests.swift */,
 				3C24FFCEDC9EBD59FFC5B577 /* ViewStateRestoreTests.swift */,
 			);
 			path = Tests;
@@ -163,12 +189,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_477BD6B2-659B-4CA8-9200-86B8E1579AB1" /* t3-b909be0f-f2b3d1aa4c58d730 */ = {
+		"TEMP_EBE4F0C9-94A3-46F2-AC8B-B97FA7522AAF" /* t3-f3eb3dc7-b06942ee6c571e11 */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_6FC2043D-64AC-4238-8B15-0151570973F1" /* Config.xcconfig */,
+				"TEMP_8D620828-AEE2-4D43-BDB1-3F19610D06C0" /* Config.xcconfig */,
 			);
-			path = "t3-b909be0f-f2b3d1aa4c58d730";
+			path = "t3-f3eb3dc7-b06942ee6c571e11";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -277,6 +303,7 @@
 				1F762A25C56D0F1BADCE8582 /* InlineEditingTests.swift in Sources */,
 				822CBFD727517F3BEE2C66FE /* MapDocumentTests.swift in Sources */,
 				4B9E4A21A59F590E9CB6FE38 /* MinimapToolbarTests.swift in Sources */,
+				B28CF76C31C912679B3E09CB /* OutlineViewTests.swift in Sources */,
 				0C83A5B8B764843DCDA9191A /* ViewStateRestoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -288,9 +315,14 @@
 				40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */,
 				F39B1DC08A3DF5433F14D703 /* AppIdentity.swift in Sources */,
 				B8668155FAC515BB501A30DC /* DocumentWindowController+Accessibility.swift in Sources */,
+				82A741B2B723A653B09FCBBE /* DocumentWindowController+Outline.swift in Sources */,
 				96B11D99DA0409D0D479E844 /* DocumentWindowController+Toolbar.swift in Sources */,
 				C986615B78CA694E4DAA98F8 /* DocumentWindowController.swift in Sources */,
 				0ABBAAEAE36B685D722209B1 /* MapDocument.swift in Sources */,
+				802E0D69C4A7F81B15FD65F7 /* OutlineDataSource.swift in Sources */,
+				DFF5B8563C9C1D8C47C58E88 /* OutlineRowView.swift in Sources */,
+				73B4E32DBE79EB41B8E526AE /* OutlineTextEditor.swift in Sources */,
+				2B99A45173FC8E45F668F29F /* OutlineViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,7 +386,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_6FC2043D-64AC-4238-8B15-0151570973F1" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_8D620828-AEE2-4D43-BDB1-3F19610D06C0" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -436,7 +468,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_6FC2043D-64AC-4238-8B15-0151570973F1" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_8D620828-AEE2-4D43-BDB1-3F19610D06C0" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
