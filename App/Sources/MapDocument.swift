@@ -1,6 +1,7 @@
 import AppKit
 import CanvasKit
 import MapCore
+import MapIO
 import MapRender
 import os
 
@@ -25,6 +26,52 @@ final class MapDocument: NSDocument {
         // NSDocument's own change-count integration see the same stacks.
         undoManager = manager
         meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: store.model.docID)
+    }
+
+    /// Foreign formats (`.opml`, `.md`, `.txt`, `.mm`, `.xmind`,
+    /// `.mindnode`) dispatched here by the declared document types
+    /// (double-click, Dock drop, open/Import panel) import as a NEW
+    /// untitled Arbor document: the model is imported, the source file's
+    /// URL is dropped, and saving asks for a fresh `.arbor` location —
+    /// the source file is never overwritten. The native package keeps
+    /// the wrapper-based read below.
+    override func read(from url: URL, ofType typeName: String) throws {
+        if typeName != AppIdentity.documentUTI,
+            let format = DocumentFormats.format(forExtension: url.pathExtension)
+                ?? DocumentFormats.format(forUTType: typeName),
+            format.canImport, format.id != DocumentFormats.arbor.id
+        {
+            let model = try DocumentImporter.importModel(at: url)
+            MainActor.assumeIsolated {
+                adoptImportedModel(model)
+                // A foreign import is an untitled document in editing
+                // state, not a "read" of the source file: drop the URL,
+                // restore the native type, and mark edited. The name set
+                // by AppKit from the source file is ignored until the
+                // first real save gives the document one of its own.
+                fileURL = nil
+                fileType = AppIdentity.documentUTI
+                importedUntitled = true
+                updateChangeCount(.changeDone)
+            }
+            return
+        }
+        try super.read(from: url, ofType: typeName)
+    }
+
+    /// Set for documents that came in through a foreign-format import
+    /// (read override or Import panel): F-EDT-14's root-derived name
+    /// shows until the first save.
+    var importedUntitled = false
+
+    /// Adopts an imported (foreign-format) model: replaces the store,
+    /// refreshes the package meta to the imported document's id, and
+    /// leaves the document untitled and edited (SPEC §5.17: imports
+    /// become a new Arbor document).
+    func adoptImportedModel(_ imported: MapModel) {
+        store.replaceModel(imported)
+        meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: imported.docID)
+        packageWrapper = nil
     }
 
     override func read(from fileWrapper: FileWrapper, ofType typeName: String) throws {
@@ -75,14 +122,62 @@ final class MapDocument: NSDocument {
             root = try ArborPackage.makeFileWrapper(model: model, meta: updated)
         }
         try ArborPackage.updateFileWrapper(root, model: model, meta: updated)
+        // F-INT-3: real saves refresh the Quick Look previews. Autosaves
+        // skip them on purpose — the SPEC §11.8 autosave budget is 2 ms
+        // on the main thread and a render cannot fit there; the previews
+        // refresh on the next explicit save.
+        if !isAutosavingSave {
+            DocumentQuickLook.attachPreviews(to: root, model: model, variant: quickLookVariant)
+        }
         packageWrapper = root
         meta = updated
         return root
     }
 
+    /// The save operation AppKit is currently performing, recorded by
+    /// the `writeSafely` override (NSDocument exposes no direct "is this
+    /// an autosave" query).
+    nonisolated(unsafe) private var currentSaveOperation: NSDocument.SaveOperationType?
+
+    override func writeSafely(
+        to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType
+    ) throws {
+        currentSaveOperation = saveOperation
+        defer { currentSaveOperation = nil }
+        try super.writeSafely(to: url, ofType: typeName, for: saveOperation)
+    }
+
+    /// True while an autosave operation drives the current write.
+    private var isAutosavingSave: Bool {
+        guard let operation = currentSaveOperation else { return false }
+        return operation == .autosaveInPlaceOperation || operation == .autosaveElsewhereOperation
+            || operation == .autosaveAsOperation
+    }
+
+    /// The appearance Quick Look previews render in: the document's
+    /// explicit override, else the frontmost window's effective
+    /// appearance, else light.
+    private var quickLookVariant: ThemeVariant {
+        switch model.appearance {
+        case .dark: return .dark
+        case .light: return .light
+        case .auto, .none:
+            for case let controller as DocumentWindowController in windowControllers {
+                return controller.canvas.effectiveVariant
+            }
+            return .light
+        }
+    }
+
     override static var autosavesInPlace: Bool { true }
 
-    override static var readableTypes: [String] { [AppIdentity.documentUTI] }
+    /// The native package plus every importable foreign format (F-IO):
+    /// the open panel offers them, and the `read(from:ofType:)` override
+    /// imports them as new untitled documents.
+    override static var readableTypes: [String] {
+        [AppIdentity.documentUTI]
+            + DocumentImporter.importableFormats.map(\.utTypeIdentifier)
+    }
 
     override static var writableTypes: [String] { [AppIdentity.documentUTI] }
 
@@ -96,6 +191,12 @@ final class MapDocument: NSDocument {
 
     override var displayName: String? {
         get {
+            // A foreign import is untitled: its name derives from the
+            // root until the first save (which gives fileURL a value and
+            // falls through to the normal rules).
+            if importedUntitled, fileURL == nil {
+                return Self.derivedName(for: store.model) ?? "Untitled"
+            }
             if let storedDisplayName { return storedDisplayName }
             guard fileURL == nil else { return super.displayName }
             return Self.derivedName(for: store.model) ?? super.displayName

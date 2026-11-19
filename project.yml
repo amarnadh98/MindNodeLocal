@@ -37,6 +37,8 @@ targets:
       - package: MapLayout
       - package: MapRender
       - package: CanvasKit
+      - package: CanvasKit
+        product: SceneExport
       - package: MapIO
     info:
       path: App/Resources/Info.plist
@@ -53,6 +55,46 @@ targets:
             LSHandlerRank: Owner
             LSItemContentTypes:
               - com.arbor.map
+            LSTypeIsPackage: true
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          # F-IO (SPEC §5.17): foreign formats open (viewer role) as new
+          # untitled Arbor documents — MapDocument.read imports them and
+          # untitles; the source file is never written back.
+          - CFBundleTypeName: OPML Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.opml.opml
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          - CFBundleTypeName: Plain Text Outline
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.plain-text
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          - CFBundleTypeName: FreeMind / Freeplane Map
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - com.freemind.freemind
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          - CFBundleTypeName: XMind Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.xmind.xmind
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
+          - CFBundleTypeName: MindNode Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - com.mindnode.mindnode
             LSTypeIsPackage: true
             NSDocumentClass: $(PRODUCT_MODULE_NAME).MapDocument
         UTExportedTypeDeclarations:
@@ -86,6 +128,29 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - opml
+          # F-IO import-only third-party formats nobody on the system
+          # declares yet; LSHandlerRank Alternate in the document types.
+          - UTTypeIdentifier: com.freemind.freemind
+            UTTypeDescription: FreeMind / Freeplane Map
+            UTTypeConformsTo:
+              - public.xml
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mm
+          - UTTypeIdentifier: org.xmind.xmind
+            UTTypeDescription: XMind Document
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - xmind
+          - UTTypeIdentifier: com.mindnode.mindnode
+            UTTypeDescription: MindNode Document
+            UTTypeConformsTo:
+              - com.apple.package
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mindnode
     entitlements:
       path: App/Resources/Arbor.entitlements
       properties:
@@ -106,6 +171,8 @@ targets:
       - package: MapLayout
       - package: MapRender
       - package: CanvasKit
+      - package: CanvasKit
+        product: SceneExport
       - package: MapIO
     settings:
       base:

@@ -11,7 +11,10 @@ struct DocumentFormatTests {
     @Test func registryCoversTheImplementedFormats() {
         #expect(
             DocumentFormats.all.map(\.id)
-                == ["arbor", "opml", "markdown", "plainText", "freemind", "xmind", "mindnode"])
+                == [
+                    "arbor", "opml", "markdown", "plainText", "freemind", "xmind", "mindnode",
+                    "pdf", "png", "jpeg", "heic", "svg",
+                ])
         #expect(DocumentFormats.all.map(\.displayName).count == DocumentFormats.all.count)
     }
 

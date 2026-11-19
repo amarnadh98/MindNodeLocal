@@ -1,7 +1,10 @@
 import AppKit
 import CanvasKit
+import MapIO
+import UniformTypeIdentifiers
 
 @main
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMenu()
@@ -19,6 +22,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    /// Dock drops and Finder double-clicks of foreign formats
+    /// (`.opml`, `.md`, `.txt`, `.mm`, `.xmind`, `.mindnode`): each opens
+    /// as a NEW untitled Arbor document (never overwriting the source);
+    /// an importer failure becomes a sheet on the key window with the
+    /// importer's own message. Declared as handled here so AppKit's
+    /// default document-controller routing (which would hand the file to
+    /// `MapDocument.read` without the untitling bookkeeping below) is
+    /// replaced by the explicit import path.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            do {
+                _ = try DocumentImporter.openForeignDocument(at: url)
+            } catch {
+                DocumentImporter.presentImportError(error, for: NSApp.keyWindow)
+            }
+        }
+    }
+
+    /// File ▸ Import… (F-IO): pick foreign files, open each as a new
+    /// untitled Arbor document.
+    @objc func importAction(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = DocumentImporter.importableFormats.compactMap { format in
+            UTType(format.utTypeIdentifier)
+        }
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        for url in panel.urls {
+            do {
+                _ = try DocumentImporter.openForeignDocument(at: url)
+            } catch {
+                DocumentImporter.presentImportError(error, for: panel.sheetParent ?? NSApp.keyWindow)
+            }
+        }
+    }
+
     private func buildMenu() -> NSMenu {
         let mainMenu = NSMenu()
         mainMenu.addItem(appMenuItem())
@@ -28,6 +68,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 [
                     item("New", #selector(NSDocumentController.newDocument(_:)), "n"),
                     item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"),
+                    // F-IO: foreign files import as new untitled documents.
+                    item("Import…", #selector(AppDelegate.importAction(_:)), ""),
+                    .separator(),
+                    // F-IO export UI: ⌥⌘E (SPEC §5.17).
+                    item(
+                        "Export…", #selector(DocumentWindowController.exportAction(_:)), "e",
+                        modifiers: [.command, .option]),
                     .separator(),
                     item("Save", #selector(NSDocument.save(_:)), "s"),
                     item("Save As…", #selector(NSDocument.saveAs(_:)), "S"),
