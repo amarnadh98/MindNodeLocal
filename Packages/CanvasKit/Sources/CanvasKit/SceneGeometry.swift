@@ -59,11 +59,13 @@ final class BuildCaches {
         let level1Index: Int
     }
 
+    let theme: Theme
     private let variant: ThemeVariant
     private var styles: [StyleKey: ResolvedNodeStyle] = [:]
     private var branchColors: [Int: CGColor] = [:]
 
-    init(variant: ThemeVariant) {
+    init(theme: Theme, variant: ThemeVariant) {
+        self.theme = theme
         self.variant = variant
     }
 
@@ -72,7 +74,7 @@ final class BuildCaches {
         if let cached = styles[key] {
             return cached
         }
-        let resolved = PaperTheme.resolvedStyle(level: level, level1Index: level1Index, variant: variant)
+        let resolved = theme.resolvedStyle(level: level, level1Index: level1Index, variant: variant)
         styles[key] = resolved
         return resolved
     }
@@ -81,7 +83,7 @@ final class BuildCaches {
         if let cached = branchColors[level1Index] {
             return cached
         }
-        let resolved = PaperTheme.branchColor(level1Index: level1Index, variant: variant)
+        let resolved = theme.branchColor(level1Index: level1Index, variant: variant)
         branchColors[level1Index] = resolved
         return resolved
     }
@@ -89,9 +91,11 @@ final class BuildCaches {
 
 /// Builds a `CanvasScene` from a `MapModel`: measures every visible node
 /// once through the shared `TextMeasurer`, lays out each root's tree with
-/// `TreeLayout` (stacking multiple roots), resolves Paper-theme styles
-/// per level and branch index, and derives branch connectors with §7.2's
-/// tapered widths. Folded subtrees are skipped (F-LAY-14).
+/// `TreeLayout` (stacking multiple roots), resolves the document's theme
+/// (F-STY-3: theme → level style → branch color from the level-1
+/// ancestor's stored palette index) per level and branch, and derives
+/// branch connectors with the theme's branch widths. Folded subtrees are
+/// skipped (F-LAY-14).
 public enum SceneGeometry {
     /// Gap between the stacked root trees of a multi-root document.
     public static let rootStackGap: CGFloat = 120
@@ -103,10 +107,13 @@ public enum SceneGeometry {
         spacing: LayoutSpacing = .default,
         editingTitle: (id: String, title: NodeTitle)? = nil
     ) -> CanvasScene {
+        // F-STY-3/F-STY-4: styles resolve from the document's theme
+        // selection (default Paper) at the current appearance variant.
+        let theme = BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
         var cursorY: CGFloat = 0
-        let caches = BuildCaches(variant: variant)
+        let caches = BuildCaches(theme: theme, variant: variant)
 
         for rootID in model.roots {
             guard model.nodes[rootID] != nil else { continue }
@@ -128,7 +135,7 @@ public enum SceneGeometry {
             let offsets = accumulatedOffsets(model: model, rootID: rootID)
             let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
             let offsetY = cursorY - treeMinY
-            let rootLevel1Index = levelOneIndices(model: model, rootID: rootID)
+            let rootLevel1Index = levelOneIndices(model: model, rootID: rootID, theme: theme)
 
             var bottom = (frames[rootID]?.maxY ?? 0)
             for (id, frame) in frames {
@@ -142,7 +149,8 @@ public enum SceneGeometry {
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
-                    style: caches.style(level: info.depth, level1Index: level1Index),
+                    style: caches.theme.applyingOverrides(
+                        node.style, to: caches.style(level: info.depth, level1Index: level1Index)),
                     title: title ?? node.title,
                     level: info.depth,
                     level1Index: level1Index,
@@ -163,8 +171,7 @@ public enum SceneGeometry {
         return CanvasScene(
             nodes: nodes,
             branches: branches,
-            canvasColor: variant == .light
-                ? PaperTheme.canvasLight : PaperTheme.canvasDark)
+            canvasColor: theme.canvasColor(for: variant))
     }
 
     /// The structure of a root's tree: the root's own override, else the
@@ -262,10 +269,15 @@ public enum SceneGeometry {
         let level1AncestorID: String
     }
 
-    static func levelOneIndices(model: MapModel, rootID: String) -> [String: Int] {
+    /// The palette index each of `rootID`'s children colors its branch
+    /// with (ADR-0009): the stored persistent index, falling back to
+    /// the child's position when none is stored; the theme's
+    /// rainbow-branches toggle (F-STY-8) collapses it to 0 when off.
+    static func levelOneIndices(model: MapModel, rootID: String, theme: Theme) -> [String: Int] {
         var indices: [String: Int] = [:]
-        for (index, childID) in (model.nodes[rootID]?.children ?? []).enumerated() {
-            indices[childID] = index
+        for (position, childID) in (model.nodes[rootID]?.children ?? []).enumerated() {
+            let stored = model.nodes[childID]?.paletteIndex ?? position
+            indices[childID] = theme.effectivePaletteIndex(stored)
         }
         return indices
     }
@@ -295,7 +307,8 @@ public enum SceneGeometry {
         func walk(_ id: String, parentInfo: (level: Int, index: Int)) {
             guard let node = model.nodes[id] else { return }
             let children = node.folded ? [] : node.children
-            let parentStyle = caches.style(level: parentInfo.level, level1Index: parentInfo.index)
+            let parentStyle = caches.theme.applyingOverrides(
+                node.style, to: caches.style(level: parentInfo.level, level1Index: parentInfo.index))
             for childID in children {
                 guard let childScene = nodes[childID] else { continue }
                 let direction: BranchDirection
@@ -313,7 +326,7 @@ public enum SceneGeometry {
                 let to = NodeRenderer.incomingAnchor(
                     style: childStyle, frame: childScene.frame, direction: direction)
                 let widths = taperedWidths(
-                    parentLevel: parentInfo.level, childLevel: childScene.level)
+                    theme: caches.theme, parentLevel: parentInfo.level, childLevel: childScene.level)
                 result.append(
                     SceneBranch(
                         parentID: id,
@@ -325,7 +338,7 @@ public enum SceneGeometry {
                         startWidth: widths.start,
                         endWidth: widths.end,
                         color: caches.branchColor(level1Index: childScene.level1Index),
-                        tapered: true))
+                        tapered: caches.theme.branch.lineStyle == .tapered))
                 walk(childID, parentInfo: (level: parentInfo.level + 1, index: childScene.level1Index))
             }
         }
@@ -335,11 +348,11 @@ public enum SceneGeometry {
 
     /// Continuous taper from the root to the leaves (§7.2): a branch's
     /// start width is its parent node's width `w(level)`, and it tapers to
-    /// `w(level + 1)` — no thickness jump at intermediate nodes.
-    static func taperedWidths(parentLevel: Int, childLevel: Int) -> (start: CGFloat, end: CGFloat) {
-        func levelWidth(_ level: Int) -> CGFloat {
-            max(2, 6 - CGFloat(level))
-        }
-        return (start: levelWidth(parentLevel), end: levelWidth(childLevel))
+    /// `w(level + 1)` — no thickness jump at intermediate nodes. The width
+    /// fall-off is theme data (Paper: 6 pt at the root down to 2 pt).
+    static func taperedWidths(
+        theme: Theme, parentLevel: Int, childLevel: Int
+    ) -> (start: CGFloat, end: CGFloat) {
+        (start: theme.branchWidth(level: parentLevel), end: theme.branchWidth(level: childLevel))
     }
 }

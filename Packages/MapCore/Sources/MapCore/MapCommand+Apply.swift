@@ -21,6 +21,7 @@ extension MapCommand {
             var inserted = node
             inserted.parent = parentID
             inserted.children = []
+            inserted.paletteIndex = model.createdPaletteIndex(for: inserted, parent: parentID)
             model.nodes[node.id] = inserted
             let insertion = Self.clampIndex(index, parent: parentID, model: model)
             model.nodes[parentID]?.children.insert(node.id, at: insertion)
@@ -35,6 +36,7 @@ extension MapCommand {
             var inserted = node
             inserted.parent = anchor.parent
             inserted.children = []
+            inserted.paletteIndex = model.createdPaletteIndex(for: inserted, parent: anchor.parent)
             model.nodes[node.id] = inserted
             if let parentID = anchor.parent {
                 let slot = slotOf(id: anchorID, parent: parentID, model: model)
@@ -54,6 +56,7 @@ extension MapCommand {
             var inserted = node
             inserted.parent = anchor.parent
             inserted.children = [anchorID]
+            inserted.paletteIndex = model.createdPaletteIndex(for: inserted, parent: anchor.parent)
             model.nodes[node.id] = inserted
             if let parentID = anchor.parent {
                 let slot = slotOf(id: anchorID, parent: parentID, model: model)
@@ -254,6 +257,18 @@ extension MapCommand {
 
         case .setSummaries(let summaries):
             model.summaries = summaries
+
+        case .recolorBranches(let assignments):
+            // All-or-nothing: every id must exist before any index moves.
+            for assignment in assignments where model.nodes[assignment.id] == nil {
+                throw ArborError.commandFailure("missing node \(assignment.id)")
+            }
+            for assignment in assignments {
+                model.nodes[assignment.id]?.paletteIndex = assignment.index
+            }
+
+        case .setTheme(let id):
+            model.theme = id.map { ThemeSelection(id: $0, overrides: model.theme?.overrides) }
         }
     }
 

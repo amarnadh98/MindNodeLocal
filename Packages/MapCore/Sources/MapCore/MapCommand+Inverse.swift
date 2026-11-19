@@ -140,6 +140,19 @@ extension MapCommand {
 
         case .setSummaries:
             return .setSummaries(model.summaries)
+
+        case .recolorBranches(let assignments):
+            // Exact snapshot of the pre-state's indices (nil included).
+            let snapshot = try assignments.map { assignment -> PaletteIndexAssignment in
+                guard let node = model.nodes[assignment.id] else {
+                    throw ArborError.commandFailure("missing node \(assignment.id)")
+                }
+                return PaletteIndexAssignment(id: assignment.id, index: node.paletteIndex)
+            }
+            return .recolorBranches(assignments: snapshot)
+
+        case .setTheme:
+            return .setTheme(id: model.theme?.id)
         }
     }
 
@@ -156,8 +169,10 @@ extension MapCommand {
     }
 
     /// Inverse of `deleteNodePromotingChildren`: re-insert the node at its
-    /// old slot with no children, move each promoted child back under it in
-    /// the original order, and restore the secondary objects that the delete
+    /// old slot with no children (through `insertSubtrees`, the wholesale
+    /// path that never assigns a fresh palette index — the restore is a
+    /// snapshot, not a creation), move each promoted child back under it in
+    /// the original order, and restore the secondary objects the delete
     /// purged.
     private func deletePromotingInverse(id: String, model: MapModel) throws -> MapCommand {
         guard let node = model.nodes[id] else {
@@ -169,10 +184,16 @@ extension MapCommand {
         var restoreCommands: [MapCommand] = []
         if let parentID = node.parent {
             let slot = slotOf(id: id, parent: parentID, model: model)
-            restoreCommands.append(.addChild(parent: parentID, index: slot, node: restore))
+            restoreCommands.append(
+                .insertSubtrees(
+                    mapping: [id: restore],
+                    anchors: [InsertionAnchor(id: id, parent: parentID, index: slot)]))
         } else {
             let rootIndex = model.roots.firstIndex(of: id) ?? model.roots.count
-            restoreCommands.append(.addRoot(index: rootIndex, node: restore))
+            restoreCommands.append(
+                .insertSubtrees(
+                    mapping: [id: restore],
+                    anchors: [InsertionAnchor(id: id, parent: nil, index: rootIndex)]))
         }
         for (position, childID) in childrenOrder.enumerated() {
             restoreCommands.append(.moveNode(id: childID, parent: id, index: position))

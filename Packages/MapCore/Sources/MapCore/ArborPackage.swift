@@ -147,6 +147,10 @@ public enum ArborPackage {
 /// app version (`version > ArborFormat.formatVersion`) is refused with
 /// `ArborError.unsupportedFormatVersion`; the document then opens read-only
 /// with a banner (F-DOC-4, wired up when the format actually evolves).
+///
+/// Every step is deterministic and total: the same input model always
+/// produces the same output (fixture-tested for every version ever
+/// shipped), and a step never drops data.
 public enum Migrations {
     public static func migrate(_ model: MapModel, from version: Int) throws -> MapModel {
         guard (1...ArborFormat.formatVersion).contains(version) else {
@@ -161,6 +165,32 @@ public enum Migrations {
     }
 
     private static func step(_ model: MapModel, from version: Int) -> MapModel {
-        model
+        switch version {
+        case 1:
+            return v1ToV2(model)
+        default:
+            return model
+        }
+    }
+
+    /// v1 → v2: `Node.paletteIndex` (ADR-0009) stores the branch palette
+    /// index persistently. Every level-1 node — a root's direct child —
+    /// gets today's positional index, so v1 files keep rendering with
+    /// exactly the colors they had under positional coloring; new and
+    /// reordered branches then hold their color (the reason for the
+    /// field). Deeper nodes stay `nil`; they inherit their level-1
+    /// ancestor's index at render time.
+    static func v1ToV2(_ model: MapModel) -> MapModel {
+        var migrated = model
+        for rootID in model.roots {
+            guard let children = model.nodes[rootID]?.children else { continue }
+            for (position, childID) in children.enumerated() where migrated.nodes[childID] != nil {
+                if migrated.nodes[childID]?.paletteIndex == nil {
+                    migrated.nodes[childID]?.paletteIndex = position
+                }
+            }
+        }
+        migrated.formatVersion = 2
+        return migrated
     }
 }

@@ -1,5 +1,18 @@
 import Foundation
 
+/// One level-1 node's persistent palette index assignment (ADR-0009).
+/// `index: nil` clears the stored index, returning the node to
+/// positional fallback.
+public struct PaletteIndexAssignment: Sendable, Equatable, Hashable {
+    public let id: String
+    public let index: Int?
+
+    public init(id: String, index: Int?) {
+        self.id = id
+        self.index = index
+    }
+}
+
 /// Where an inserted subtree top attaches: under `parent` at `index`, or as
 /// a root at `index` when `parent` is nil.
 public struct InsertionAnchor: Sendable, Equatable, Hashable {
@@ -75,6 +88,15 @@ public indirect enum MapCommand: Sendable, Equatable {
     case setBoundaries(_ boundaries: [Boundary]?)
     /// Replaces the whole summary list (see `setConnections`).
     case setSummaries(_ summaries: [Summary]?)
+    /// Assigns persistent branch palette indices (F-STY-8 "Recolor
+    /// Branches", ADR-0009). Each assignment sets `paletteIndex` — `nil`
+    /// clears it back to positional fallback. Exact inverse: the inverse
+    /// snapshots the pre-state's values.
+    case recolorBranches(assignments: [PaletteIndexAssignment])
+    /// Sets the document's theme id (F-STY-3/F-STY-4), preserving any
+    /// stored theme overrides. `nil` clears the selection back to the
+    /// default theme.
+    case setTheme(id: String?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -90,6 +112,8 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setFolded: "Fold Node"
         case .setOffset: "Move Node"
         case .setConnections, .setBoundaries, .setSummaries: "Delete Node"
+        case .recolorBranches: "Recolor Branches"
+        case .setTheme: "Set Theme"
         }
     }
 
@@ -143,5 +167,21 @@ public indirect enum MapCommand: Sendable, Equatable {
         let rootIndex = model.roots.firstIndex(of: id) ?? model.roots.count
         return .insertSubtrees(
             mapping: mapping, anchors: [InsertionAnchor(id: rootCopy, parent: nil, index: rootIndex + 1)])
+    }
+
+    /// Builds the F-STY-8 "Recolor Branches" action for one root: each
+    /// level-1 child takes the next child's persistent palette index
+    /// (the last wraps to the first), a pure rotation of the stored
+    /// values. Nodes without a stored index contribute `nil`, their
+    /// positional fallback. The inverse (a snapshot of the pre-state)
+    /// is exact.
+    public static func recolorBranches(rootID: String, in model: MapModel) -> MapCommand {
+        let children = model.nodes[rootID]?.children ?? []
+        let values = children.map { model.nodes[$0]?.paletteIndex }
+        let assignments = children.enumerated().map { position, childID in
+            let rotated = children.isEmpty ? nil : values[(position + 1) % children.count]
+            return PaletteIndexAssignment(id: childID, index: rotated)
+        }
+        return .recolorBranches(assignments: assignments)
     }
 }

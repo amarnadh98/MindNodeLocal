@@ -1,0 +1,111 @@
+{
+  "docID" : "migration-sample",
+  "formatVersion" : 2,
+  "nodes" : {
+    "branch-a" : {
+      "children" : [],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "branch-a",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "paletteIndex" : 0,
+      "parent" : "root",
+      "title" : {
+        "runs" : [],
+        "text" : "Branch A"
+      }
+    },
+    "branch-b" : {
+      "children" : [
+        "leaf-b"
+      ],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "branch-b",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "paletteIndex" : 1,
+      "parent" : "root",
+      "title" : {
+        "runs" : [],
+        "text" : "Branch B"
+      }
+    },
+    "branch-c" : {
+      "children" : [],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "branch-c",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "paletteIndex" : 2,
+      "parent" : "root",
+      "title" : {
+        "runs" : [],
+        "text" : "Branch C"
+      }
+    },
+    "leaf-b" : {
+      "children" : [],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "leaf-b",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "parent" : "branch-b",
+      "title" : {
+        "runs" : [],
+        "text" : "Beta leaf"
+      }
+    },
+    "root" : {
+      "children" : [
+        "branch-a",
+        "branch-b",
+        "branch-c"
+      ],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "root",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "title" : {
+        "runs" : [],
+        "text" : "Central Idea"
+      }
+    },
+    "second-branch" : {
+      "children" : [],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "second-branch",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "paletteIndex" : 0,
+      "parent" : "second-root",
+      "title" : {
+        "runs" : [],
+        "text" : "Second branch"
+      }
+    },
+    "second-root" : {
+      "children" : [
+        "second-branch"
+      ],
+      "created" : "2026-11-01T10:00:00.000Z",
+      "folded" : false,
+      "id" : "second-root",
+      "modified" : "2026-11-01T10:00:00.000Z",
+      "modifiedBy" : "user",
+      "title" : {
+        "runs" : [],
+        "text" : "Second root"
+      }
+    }
+  },
+  "roots" : [
+    "root",
+    "second-root"
+  ]
+}
