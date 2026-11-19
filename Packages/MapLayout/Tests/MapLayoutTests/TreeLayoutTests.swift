@@ -293,8 +293,10 @@ let goldenOrgDown = [
         let tree = bigTree(nodeCount: count)
         _ = TreeLayout.layout(root: tree, structure: .mindmapBalanced)
 
+        // Best of 10: shared CI runners jitter by a few ms between
+        // samples, and the budget is about the layout, not the host.
         var best: Double?
-        for _ in 0..<3 {
+        for _ in 0..<10 {
             let start = DispatchTime.now()
             let frames = TreeLayout.layout(root: tree, structure: .mindmapBalanced)
             let elapsed =
@@ -305,7 +307,7 @@ let goldenOrgDown = [
         }
         let elapsed = best ?? 0
         print(
-            "layout of \(count) nodes (balanced, best of 3): \(String(format: "%.1f", elapsed * 1000)) ms"
+            "layout of \(count) nodes (balanced, best of 10): \(String(format: "%.1f", elapsed * 1000)) ms"
         )
         #expect(elapsed < 1.0, "layout budget blown for \(count) nodes")
         #if !DEBUG
