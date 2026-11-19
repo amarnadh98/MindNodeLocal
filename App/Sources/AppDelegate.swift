@@ -342,7 +342,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(helpMenuItem())
         return mainMenu
     }
+}
 
+// Menu-building helpers, split out to keep the class body small.
+extension AppDelegate {
     /// Edit ▸ Find (F-FOC-3, SPEC §6.1): NSTextFinder-style items whose
     /// actions live on the document window controller and validate
     /// against the find session (DocumentWindowController+FocusFind).
