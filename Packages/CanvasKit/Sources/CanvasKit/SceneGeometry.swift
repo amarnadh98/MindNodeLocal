@@ -16,7 +16,7 @@ public struct SceneNode {
     public let level1Index: Int
     /// The node's width mode/value, so the editing overlay can wrap at the
     /// width the measurer used (F-EDT-8).
-    public let width: NodeWidth?
+    public var width: NodeWidth? = nil
 }
 
 /// One branch connector: parent outgoing anchor to child incoming anchor.
