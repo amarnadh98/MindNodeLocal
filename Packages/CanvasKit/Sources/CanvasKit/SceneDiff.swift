@@ -107,12 +107,13 @@ public enum SceneDiffer {
             branchMorphs: morphs)
     }
 
-    /// Same title, style, level and level-1 index — i.e. re-rastering
-    /// the layer would produce identical pixels.
+    /// Same title, style, level, level-1 index and decorations — i.e.
+    /// re-rastering the layer would produce identical pixels.
     static func sameContent(_ oldNode: SceneNode, _ newNode: SceneNode) -> Bool {
         oldNode.title == newNode.title
             && oldNode.level == newNode.level
             && oldNode.level1Index == newNode.level1Index
+            && oldNode.decorations == newNode.decorations
             && sameStyle(oldNode.style, newNode.style)
     }
 

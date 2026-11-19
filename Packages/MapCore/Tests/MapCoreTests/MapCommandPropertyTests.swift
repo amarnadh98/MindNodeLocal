@@ -95,6 +95,8 @@ struct CommandPropertyTests {
         var commands = unconditionalCommands(nodeID: nodeID, model: model, generator: &generator)
         commands.append(
             contentsOf: conditionalCommands(nodeID: nodeID, node: node, model: model, generator: &generator))
+        commands.append(
+            contentsOf: contentCommands(nodeID: nodeID, node: node, model: model, generator: &generator))
         return commands.filter { command in
             (try? command.inverse(in: model)) != nil
         }
@@ -144,6 +146,24 @@ struct CommandPropertyTests {
                     : nil),
             .setNote(id: nodeID, note: generator.next() % 2 == 0 ? "note \(generator.next())" : nil),
             .setTitle(generator.next() % 2 == 0 ? "title \(generator.next())" : nil),
+            // M3 content commands (links/tasks/tags): exercised the
+            // same way — apply∘inverse identity over fuzzed trees.
+            .setLink(
+                id: nodeID,
+                link: generator.next() % 2 == 0 ? "https://example.com/\(generator.next() % 100)" : nil),
+            .setTaskValue(
+                id: nodeID,
+                task: generator.next() % 3 == 0
+                    ? nil
+                    : NodeTask(
+                        done: generator.next() % 2 == 0,
+                        due: generator.next() % 2 == 0 ? "2026-12-01" : nil,
+                        priority: Int(generator.next() % 3) + 1)),
+            .setNodeTags(
+                id: nodeID,
+                tags: generator.next() % 3 == 0
+                    ? nil
+                    : (0..<Int(generator.next() % 3)).map { "t\($0)" }),
             (try? MapCommand.duplicate(id: nodeID, in: model)),
             // M6 (F-PRE-2/3): a wholesale presentation-list replace; the
             // inverse restores the pre-state list exactly.
@@ -161,6 +181,42 @@ struct CommandPropertyTests {
                         slides: [Slide(id: "s\(generator.next())", title: "slide")])
                 ]),
         ].compactMap { $0 }
+    }
+
+    /// Content commands that need their target to exist in a given
+    /// state (a task for `setTaskDone`, a document tag for
+    /// `toggleTag`) — always valid over the fuzzed fixtures, which
+    /// seed at least one task and one tag definition.
+    private func contentCommands(
+        nodeID: String, node: Node, model: MapModel, generator: inout CommandGenerator
+    ) -> [MapCommand] {
+        var commands: [MapCommand] = []
+        let tagID = model.tags?.first?.id ?? "t0"
+        commands.append(.setTask(ids: [nodeID], isTask: generator.next() % 2 == 0))
+        if node.task != nil {
+            commands.append(.setTaskDone(ids: [nodeID], done: generator.next() % 2 == 0))
+            commands.append(
+                .setTaskDetails(
+                    id: nodeID,
+                    due: generator.next() % 2 == 0 ? "2027-01-15" : nil,
+                    priority: generator.next() % 2 == 0 ? Int(generator.next() % 3) + 1 : nil,
+                    repeat: generator.next() % 2 == 0 ? "weekly" : nil))
+        }
+        commands.append(.toggleTag(ids: [nodeID], tagID: tagID, assigned: generator.next() % 2 == 0))
+        let second = generator.pick(from: Array(model.nodes.keys)) ?? nodeID
+        if second != nodeID {
+            commands.append(.toggleTag(ids: [nodeID, second], tagID: tagID, assigned: true))
+        }
+        if let tag = model.tags?.first {
+            commands.append(
+                .setTags(
+                    (model.tags ?? []).map { $0.id == tag.id ? Tag(id: $0.id, name: "renamed", color: "#E5484D") : $0 })
+            )
+            if let delete = try? MapCommand.deleteTag(id: tag.id, in: model) {
+                commands.append(delete)
+            }
+        }
+        return commands
     }
 
     private func conditionalCommands(
@@ -245,6 +301,21 @@ func randomModel(seed: UInt64) -> MapModel {
                 id: "sm-0", parent: rootID,
                 range: [rootChildren[0], rootChildren[1]], node: ids[3 % ids.count])
         ]
+    }
+
+    // M3 fixtures: a couple of task nodes, a couple of tag definitions
+    // and assignments, so the content commands have real targets.
+    model.tags = [
+        Tag(id: "t0", name: "exam", color: "#E5484D"),
+        Tag(id: "t1", name: "later", color: "#46A758"),
+    ]
+    for (index, id) in ids.enumerated() {
+        if index % 7 == 1 {
+            model.nodes[id]?.task = NodeTask(done: index % 14 == 1)
+        }
+        if index % 5 == 2 {
+            model.nodes[id]?.tags = [index % 2 == 0 ? "t0" : "t1"]
+        }
     }
     return model
 }

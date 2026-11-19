@@ -83,10 +83,13 @@ public struct ResolvedNodeStyle {
 /// underline shape sits at the frame's *bottom* edge (`maxY`).
 public enum NodeRenderer {
     /// Draws the node: shape (shadow layer by shadow layer), border, then
-    /// the title optically centered (SPEC §7.5).
+    /// the title optically centered (SPEC §7.5) with its decorations —
+    /// the leading task mark, trailing note/link badges and tag pills —
+    /// when `decorations` carries any (SPEC §7). One renderer for the
+    /// canvas, export and Quick Look (SPEC §11).
     public static func draw(
-        style: ResolvedNodeStyle, title: NodeTitle, measurer: TextMeasurer,
-        in context: CGContext, frame: CGRect
+        style: ResolvedNodeStyle, title: NodeTitle, decorations: NodeDecorations? = nil,
+        measurer: TextMeasurer, in context: CGContext, frame: CGRect
     ) {
         context.saveGState()
 
@@ -126,8 +129,25 @@ public enum NodeRenderer {
             context.strokePath()
         }
 
-        drawTitle(style: style, title: title, measurer: measurer, in: context, frame: frame)
+        drawTitle(style: style, title: title, decorations: decorations, measurer: measurer, in: context, frame: frame)
+        if let decorations, !decorations.isEmpty {
+            let layout = decorationLayout(style: style, decorations: decorations, frame: frame)
+            drawDecorations(
+                style: style, layout: layout, decorations: decorations,
+                measurer: measurer, in: context)
+        }
         context.restoreGState()
+    }
+
+    /// The decoration layout of a node frame: title row, leading mark,
+    /// trailing badges and the pill row, in node coordinates. The
+    /// editing overlay and hit-testing share it, so a click lands where
+    /// the renderer drew.
+    public static func decorationLayout(
+        style: ResolvedNodeStyle, decorations: NodeDecorations?, frame: CGRect
+    ) -> NodeDecorationLayout {
+        NodeDecorationLayout.layout(
+            style: style, decorations: decorations, contentRect: contentRect(style: style, frame: frame))
     }
 
     /// Text is optically centered in the padded content rect, laid out with
@@ -135,25 +155,38 @@ public enum NodeRenderer {
     /// exactly to the measurement always fits its lines. `CTFrameDraw`
     /// renders y-up, so the context is flipped locally around the text
     /// rect to keep glyphs upright in the flipped convention.
+    ///
+    /// Decorations reshape the rect: the title centers inside the
+    /// decoration layout's `titleRow` (shrunk by the leading/trailing
+    /// columns and the pill row), and a completed task draws at the
+    /// theme-controlled 50% opacity with a strikethrough (F-TSK-1).
     private static func drawTitle(
-        style: ResolvedNodeStyle, title: NodeTitle, measurer: TextMeasurer,
-        in context: CGContext, frame: CGRect
+        style: ResolvedNodeStyle, title: NodeTitle, decorations: NodeDecorations?,
+        measurer: TextMeasurer, in context: CGContext, frame: CGRect
     ) {
         guard !title.text.isEmpty else { return }
-        let contentRect = Self.contentRect(style: style, frame: frame)
-        guard contentRect.width > 1, contentRect.height > 1 else { return }
+        let titleRow = NodeDecorationLayout.layout(
+            style: style, decorations: decorations,
+            contentRect: contentRect(style: style, frame: frame)
+        ).titleRow
+        guard titleRow.width > 1, titleRow.height > 1 else { return }
 
         let textSize = measurer.nodeTitleSize(
-            title, font: style.font, maxWidth: contentRect.width)
+            title, font: style.font, maxWidth: titleRow.width)
         guard textSize.width > 0, textSize.height > 0 else { return }
         let textRect = CGRect(
-            x: contentRect.minX + max(0, (contentRect.width - textSize.width) / 2),
-            y: contentRect.minY + max(0, (contentRect.height - textSize.height) / 2),
-            width: contentRect.width,
+            x: titleRow.minX + max(0, (titleRow.width - textSize.width) / 2),
+            y: titleRow.minY + max(0, (titleRow.height - textSize.height) / 2),
+            width: titleRow.width,
             height: textSize.height + 2)
 
+        let isDone = decorations?.task?.isDoneCheckbox ?? false
+        let textColor =
+            isDone
+            ? style.textColor.copy(alpha: NodeDecorationMetrics.doneOpacity) ?? style.textColor
+            : style.textColor
         let attributed = measurer.attributed(
-            title, font: style.font, color: style.textColor, lineHeight: 1.25)
+            title, font: style.font, color: textColor, lineHeight: 1.25)
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
 
         context.saveGState()
@@ -166,6 +199,9 @@ public enum NodeRenderer {
             framesetter, CFRange(location: 0, length: 0), localPath, nil)
         context.textMatrix = CGAffineTransform.identity
         CTFrameDraw(textFrame, context)
+        if isDone {
+            drawStrikethrough(textFrame: textFrame, in: context)
+        }
         context.restoreGState()
     }
 

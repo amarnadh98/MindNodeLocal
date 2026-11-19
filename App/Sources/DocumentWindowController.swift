@@ -149,6 +149,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             self?.ai.acceptGhost(ghostID)
         }
         setupAccessibility()
+        // M3: notes/links/tasks/tags closures (DocumentWindowController+Content).
+        setupContent()
         // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
         installChrome()
     }
@@ -173,6 +175,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// computed on a background actor — a documented follow-up. Until
     /// then the host falls back to a full rebuild.
     private static let incrementalDirtyLimit = 2_000
+
+    /// M3: the open note popover session (one `setNote` on close);
+    /// and the cross-document `x-arbor://` link seam (F-REL-5,
+    /// deferred — stored here because extensions can't hold state).
+    var notePopoverHolder: NotePopoverHolder?
+    var onOpenExternalDocument: ((String, String?) -> Void)?
 
     /// The document is only wired up after `addWindowController` returns,
     /// and the window reaches its real content size once shown — so the
@@ -289,6 +297,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             cache: cache,
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
+            showsTagPills: showsTagPills,
             editingTitle: editingDraftTitle)
         canvas.scene = scene
         // F-CAN-6: the minimap mirrors the rebuilt scene (its cached
@@ -535,30 +544,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 /// mutation goes through the document's `MapStore`, and the scene
 /// rebuild + selection repair run through `modelDidChange`.
 extension DocumentWindowController {
-    private var store: MapStore? {
+    /// The document's editing gateway. Internal: the M3 content surface
+    /// (DocumentWindowController+Content.swift) performs its commands
+    /// through the same one-undo-step path as every other action.
+    var store: MapStore? {
         (document as? MapDocument)?.store
     }
 
     /// The selection, sorted for deterministic command order.
     private var selectedIDs: [String] {
         canvas.selection.sorted()
-    }
-
-    /// Performs `command`; on success the canvas selects `replacement`
-    /// in the rebuilt scene. A throwing command is a no-op (the store
-    /// leaves the model untouched).
-    private func perform(_ command: MapCommand, selecting replacement: (MapModel) -> Set<String>) {
-        guard let store else { return }
-        do {
-            try store.perform(command)
-        } catch {
-            return
-        }
-        canvas.setSelection(replacement(store.model))
-    }
-
-    private func performKeepingSelection(_ command: MapCommand) {
-        perform(command) { [canvas] _ in canvas.selection }
     }
 
     /// One grouped command from `commands`, or nil when empty.
@@ -615,7 +610,16 @@ extension DocumentWindowController {
         editingDraftTitle = nil
         guard let store else { return }
         if store.model.nodes[id]?.title != title {
-            try? store.perform(.editText(id: id, title: title))
+            // F-EDT-10 smart typing: `#tag` tokens become document tags
+            // and strip from the title — ONE grouped command, so the
+            // whole create-and-assign is one undo step.
+            let parsed = SmartTyping.parseTags(in: title)
+            if parsed.tags.isEmpty {
+                try? store.perform(.editText(id: id, title: title))
+            } else {
+                try? store.perform(
+                    .smartTagCommit(id: id, title: parsed.title, names: parsed.tags, in: store.model))
+            }
         }
         // One undo step per edit session (F-DOC-2): close the typing
         // session so a second session on this node registers separately.
@@ -966,9 +970,13 @@ extension DocumentWindowController {
             return
         }
         // F-FOC: ⎋ first serves the open overlays — the quick-open
-        // palette, then the find bar, then Zen, then Focus mode; only
-        // when none of them is active does it deselect.
+        // palette, then the find bar, then Zen, then Focus mode; then
+        // the M3 highlight modes (F-TAG-2/F-TSK-5); only when none of
+        // them is active does it deselect.
         if focusFind.handleEscape() {
+            return
+        }
+        if canvas.exitHighlightIfActive() {
             return
         }
         canvas.setSelection([])

@@ -118,7 +118,7 @@ public indirect enum MapCommand: Sendable, Equatable {
     case setStudy(name: String, id: String, study: NodeStudy?)
     /// Sets the external link of a node (SPEC §8.2 `node.link`) — an
     /// `x-arbor://…` deep link (Concept Index "Link these", F-LIB-4) or
-    /// a web/file URL. `nil` clears it.
+    /// a web/file URL (F-CNT-4). `nil` clears it.
     case setLink(id: String, link: String?)
     /// Replaces the document's AI policy object (SPEC §12, F-AI-1). The
     /// exact inverse snapshots the pre-state. `nil` clears the policy.
@@ -126,6 +126,28 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// Sets the document's explicit title (F-EDT-14, F-AI-4 suggest
     /// title). `nil` clears it, returning to the root-derived name.
     case setTitle(_ title: String?)
+    /// Turns every node in `ids` into a task (or not) — F-TSK-1's
+    /// ⇧⌘T, one undo step for the whole multi-selection.
+    case setTask(ids: [String], isTask: Bool)
+    /// Marks every task in `ids` done/open (F-TSK-1's ⌃⌘T). Nodes
+    /// without a task are untouched.
+    case setTaskDone(ids: [String], done: Bool)
+    /// Replaces `id`'s task due date / priority / repeat rule
+    /// (F-TSK-3). Requires the node to be a task.
+    case setTaskDetails(id: String, due: String?, priority: Int?, repeat: String?)
+    /// Replaces `id`'s whole task value — the snapshot primitive the
+    /// other task commands' inverses are built from.
+    case setTaskValue(id: String, task: NodeTask?)
+    /// Replaces the document's tag definitions wholesale (F-TAG-1
+    /// create/rename/recolor, and one half of delete). Like
+    /// `setConnections`, the exact inverse is the pre-state snapshot.
+    case setTags(_ tags: [Tag]?)
+    /// Assigns (or removes) `tagID` on every node in `ids` (F-TAG-1)
+    /// — one undo step for the whole multi-selection.
+    case toggleTag(ids: [String], tagID: String, assigned: Bool)
+    /// Replaces `id`'s tag assignment list — the snapshot primitive
+    /// `toggleTag`'s inverse is built from.
+    case setNodeTags(id: String, tags: [String]?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -149,6 +171,11 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setLink: "Set Link"
         case .setAIPolicy: "AI Policy"
         case .setTitle: "Rename Document"
+        case .setTask: "Toggle Task"
+        case .setTaskDone: "Complete Task"
+        case .setTaskDetails, .setTaskValue: "Task Details"
+        case .setTags: "Edit Tags"
+        case .toggleTag, .setNodeTags: "Tag"
         }
     }
 

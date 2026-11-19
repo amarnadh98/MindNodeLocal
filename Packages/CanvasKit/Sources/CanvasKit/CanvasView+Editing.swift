@@ -86,3 +86,28 @@ extension CanvasView {
         return characters
     }
 }
+
+// MARK: clipboard forwarding (F-EDT-9)
+
+/// The map-level clipboard lives up the responder chain — the window
+/// controller writes and reads the pasteboard. `NSResponder`'s own
+/// implementations of these actions are no-ops that would swallow
+/// the message, so the canvas explicitly forwards. While a node is
+/// being edited the overlay `NSTextView` is first responder and
+/// handles the standard selectors itself; the map never sees them,
+/// so the editing session can never lose its keys to the clipboard.
+/// (AppKit's `-copy:` & co. aren't exposed to Swift, hence plain
+/// `@objc` declarations rather than overrides.)
+extension CanvasView {
+    @objc public func copy(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(copy(_:)), with: sender)
+    }
+
+    @objc public func cut(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(cut(_:)), with: sender)
+    }
+
+    @objc public func paste(_ sender: Any?) {
+        nextResponder?.tryToPerform(#selector(paste(_:)), with: sender)
+    }
+}

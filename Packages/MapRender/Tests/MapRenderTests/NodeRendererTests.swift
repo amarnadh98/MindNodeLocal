@@ -7,7 +7,7 @@ import Testing
 
 /// Renders into a flipped (top-left origin, y-down) bitmap context — the
 /// canvas convention `NodeRenderer` documents.
-private func flippedBitmap(width: Int, height: Int) throws -> CGContext {
+func flippedBitmap(width: Int, height: Int) throws -> CGContext {
     let space = CGColorSpace(name: CGColorSpace.sRGB)
     let context = try #require(
         CGContext(
@@ -36,7 +36,7 @@ private func pixel(_ context: CGContext, x: Int, y: Int) -> PixelSample? {
         blue: buffer[offset + 2], alpha: buffer[offset + 3])
 }
 
-private func countPixels(
+func countPixels(
     _ context: CGContext, matching predicate: (UInt8, UInt8, UInt8, UInt8) -> Bool
 ) -> Int {
     guard let data = context.data else { return 0 }

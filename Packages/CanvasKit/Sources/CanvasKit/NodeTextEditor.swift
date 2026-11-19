@@ -281,18 +281,20 @@ public final class NodeTextEditor {
         }
 
         // Reproduce NodeRenderer.drawTitle's placement: the measured text
-        // block, centered inside the padded content rect. Auto-width
-        // nodes hug their text, so the centering offsets are 0 and the
-        // block sits at the content rect's top-left.
+        // block, centered inside the decoration layout's title row (the
+        // leading column and pill row are excluded — the overlay never
+        // covers the checkbox or pills). Auto-width nodes hug their text,
+        // so the centering offsets are 0 and the block sits at the row's
+        // top-left.
         let draft = currentTitle() ?? node.title
         let measured = SceneRenderer.sharedMeasurer.nodeTitleSize(
             draft, font: node.style.font, maxWidth: wrapWidth)
-        let contentWidth = frame.width - 2 * node.style.paddingWidth
-        let contentHeight = frame.height - 2 * node.style.paddingHeight
+        let titleRow = NodeRenderer.decorationLayout(
+            style: node.style, decorations: node.decorations, frame: frame
+        ).titleRow
         let blockOrigin = CGPoint(
-            x: frame.minX + node.style.paddingWidth + max(0, (contentWidth - measured.width) / 2),
-            y: frame.minY + node.style.paddingHeight + max(0, (contentHeight - measured.height) / 2)
-        )
+            x: titleRow.minX + max(0, (titleRow.width - measured.width) / 2),
+            y: titleRow.minY + max(0, (titleRow.height - measured.height) / 2))
 
         // Growth room: the full wrap width, so typing never wraps early.
         // Point sizes scale with the camera (no view transform), so text

@@ -163,6 +163,37 @@ struct CanvasPerformanceTests {
             "perf keystroke (5k, best of 10): \(format(keystroke))"
                 + " — incremental update + grid delta + layer diff apply at 100% zoom")
 
+        // --- Decorated keystroke (M3): a quarter of the nodes are
+        // tasks, so every rebuild also runs the TaskProgress pass and
+        // decoration-aware measurement (the same §11.8 budget).
+        var decorated = model
+        for index in 0..<5_000 where index % 4 == 0 {
+            decorated.nodes["n\(index)"]?.task = NodeTask(done: index % 8 == 0)
+        }
+        var decoratedBest: Double?
+        for _ in 0..<10 {
+            decorated.nodes["n600"]?.title = NodeTitle(
+                text: "Node 600 retitled \(Int.random(in: 0..<1000))")
+            let start = DispatchTime.now()
+            let rebuilt = SceneGeometry.build(
+                model: decorated, variant: .light, measurer: measurer)
+            let rebuiltGrid = grid(for: rebuilt)
+            var context = ApplyContext(
+                scene: rebuilt, grid: rebuiltGrid,
+                camera: workingCamera, viewport: viewport)
+            context.backingScale = 1
+            context.animated = false
+            context.reduceMotion = false
+            context.selectionColor = accent
+            tree.apply(context)
+            let elapsedSeconds = elapsed(since: start)
+            decoratedBest = min(decoratedBest ?? elapsedSeconds, elapsedSeconds)
+        }
+        let decoratedKeystroke = try #require(decoratedBest)
+        print(
+            "perf keystroke (5k, tasks on 25% of nodes, best of 10): \(format(decoratedKeystroke))"
+                + " — rebuild + grid + layer diff apply with decorations")
+
         #if !DEBUG
             // §11.8's 8 ms keystroke→relayout→paint budget, now enforced:
             // the incremental path (§11.3's `Layout.update(dirty:)`,
@@ -177,6 +208,16 @@ struct CanvasPerformanceTests {
                 #expect(
                     keystroke < 0.008,
                     "SPEC §11.8 keystroke→relayout→paint budget (8 ms): \(format(keystroke))"
+                )
+                // The decorated stress map (25% of 5k nodes are tasks)
+                // additionally pays the O(n) TaskProgress pass and the
+                // per-node decoration layout on every full rebuild;
+                // incremental relayout (§11.3) is what brings it to the
+                // 8 ms target. The guard pins today's ~15 ms plus
+                // headroom.
+                #expect(
+                    decoratedKeystroke < 0.020,
+                    "decorated keystroke regression guard (SPEC §11.8 target is 8 ms): \(format(decoratedKeystroke))"
                 )
                 #expect(
                     coldOpen < 0.300,

@@ -311,6 +311,14 @@ extension DocumentWindowController {
                 ((UserDefaults.standard.object(forKey: Self.minimapDefaultsKey) as? Bool) ?? true)
                 ? .on : .off
             return true
+        case #selector(showTagPillsAction(_:)):
+            menuItem.state =
+                ((UserDefaults.standard.object(forKey: Self.showsTagPillsDefaultsKey) as? Bool) ?? true)
+                ? .on : .off
+            return true
+        case #selector(highlightTasksAction(_:)):
+            menuItem.state = canvas.highlight == .tasks ? .on : .off
+            return true
         case #selector(zoomStepAction(_:)):
             menuItem.state =
                 menuItem.tag == Self.zoomPercent(of: canvas.camera.scale) ? .on : .off
@@ -351,6 +359,27 @@ extension DocumentWindowController {
             // F-STD-5: recall's own validation (active-state checkmark,
             // needs a branch with descendants).
             return validateRecallMenuItem(menuItem)
+        case #selector(completeTaskAction(_:)):
+            return !canvas.isEditing
+                && canvas.selection.contains { id in
+                    (contentStore?.model.nodes[id]?.task ?? nil) != nil
+                }
+        // M3 content: the note/link/tag actions need a selected node
+        // (and no editing session — the keys belong to the overlay).
+        case #selector(noteAction(_:)), #selector(linkAction(_:)),
+            #selector(tagsAction(_:)), #selector(tagHighlightAction(_:)),
+            #selector(toggleTaskAction(_:)):
+            return !canvas.isEditing && !canvas.selection.isEmpty
+        case #selector(openLinkAction(_:)):
+            return !canvas.isEditing
+                && canvas.selection.contains { id in
+                    (contentStore?.model.nodes[id]?.link ?? nil) != nil
+                }
+        case #selector(taskDetailsAction(_:)):
+            return !canvas.isEditing
+                && canvas.selection.contains { id in
+                    (contentStore?.model.nodes[id]?.task ?? nil) != nil
+                }
         default:
             return validateFocusFindMenuItem(menuItem) ?? validateDocumentSafetyMenuItem(menuItem)
                 ?? true

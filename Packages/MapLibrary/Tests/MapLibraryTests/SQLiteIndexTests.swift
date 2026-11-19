@@ -138,7 +138,7 @@ struct FixtureFactory {
             title: "Physics",
             children: [("Topic A", nil), ("Topic B", nil)])
         let sourceNodeID = sourceModel.roots.first!
-        sourceModel.nodes[sourceNodeID]?.link = ArborLink.url(
+        sourceModel.nodes[sourceNodeID]?.link = MapLibrary.ArborLink.url(
             docID: targetModel.docID, nodeID: targetNodeID)
         _ = try fixture.write(sourceModel, name: "Physics")
 
@@ -159,13 +159,15 @@ struct FixtureFactory {
         #expect(links.first?.sourceDocumentTitle == "Physics")
         #expect(links.first?.sourceNodeTitle == "Physics")
 
-        // Parse round trip: format is case-insensitive.
-        let parsed = ArborLink.parse(
-            ArborLink.url(docID: "ABC-123", nodeID: "DEF-456").uppercased()
+        // Parse round trip: format is case-insensitive. (Qualified:
+        // MapCore gained its own validated-link `ArborLink` in M3, and
+        // this target imports both modules.)
+        let parsed = MapLibrary.ArborLink.parse(
+            MapLibrary.ArborLink.url(docID: "ABC-123", nodeID: "DEF-456").uppercased()
                 .replacingOccurrences(of: "X-ARBOR", with: "x-arbor"))
         #expect(parsed?.docID == "abc-123" && parsed?.nodeID == "def-456")
-        #expect(ArborLink.parse("https://example.com") == nil)
-        #expect(ArborLink.parse("x-arbor://onlydoc") == nil)
+        #expect(MapLibrary.ArborLink.parse("https://example.com") == nil)
+        #expect(MapLibrary.ArborLink.parse("x-arbor://onlydoc") == nil)
     }
 
     @Test func conceptGroupsNormalizeAcrossMaps() async throws {
@@ -234,7 +236,7 @@ struct FixtureFactory {
 
         var linked = FixtureFactory.model(title: "Source", children: [("From", nil)])
         let target = FixtureFactory.model(title: "Target", children: [("To", nil)])
-        linked.nodes[linked.roots[0]]?.link = ArborLink.url(
+        linked.nodes[linked.roots[0]]?.link = MapLibrary.ArborLink.url(
             docID: target.docID, nodeID: target.roots[0])
         let sourceURL = try fixture.write(linked, name: "Source", modified: Date(timeIntervalSinceReferenceDate: 100))
         let targetURL = try fixture.write(target, name: "Target", modified: Date(timeIntervalSinceReferenceDate: 200))

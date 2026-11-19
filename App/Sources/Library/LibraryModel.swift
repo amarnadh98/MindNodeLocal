@@ -276,7 +276,9 @@ final class LibraryModel: ObservableObject {
     /// reported back as deferred.
     func linkConcepts(in group: ConceptGroup) {
         guard let target = group.occurrences.first else { return }
-        let link = ArborLink.url(docID: target.docID, nodeID: target.nodeID)
+        // Qualified: MapCore gained its own validated-link `ArborLink`
+        // in M3, and this file imports both modules.
+        let link = MapLibrary.ArborLink.url(docID: target.docID, nodeID: target.nodeID)
         let openDocuments = NSDocumentController.shared.documents.compactMap { $0 as? MapDocument }
         var linkedTitles: [String] = []
         var deferredTitles: [String] = []
