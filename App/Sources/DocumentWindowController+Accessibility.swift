@@ -8,8 +8,8 @@ import CanvasKit
 /// undo step. The view never mutates the model; it only forwards node
 /// ids (SPEC §11.3).
 ///
-/// "Add Sibling" maps to the sibling-above action: the below variant
-/// enters edit mode on a single selection (F-EDT-2's ⏎ rule), while the
+/// "Add Sibling" creates below, like ⏎ on an editing node; it bypasses
+/// ⏎'s enter-edit rule for a selected node (F-EDT-2), since the
 /// accessibility action always creates.
 @MainActor
 extension DocumentWindowController {
@@ -26,7 +26,7 @@ extension DocumentWindowController {
         hooks.onAddSibling = { [weak self] id in
             guard let self else { return }
             self.canvas.setSelection([id])
-            self.addSiblingAboveAction(nil)
+            self.addSiblingBelow()
         }
         hooks.onToggleFold = { [weak self] id in
             guard let self else { return }

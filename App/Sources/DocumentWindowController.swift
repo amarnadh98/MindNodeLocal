@@ -500,6 +500,13 @@ extension DocumentWindowController {
         addCommand { .addSibling(anchor: $0, before: false, node: $1) }
     }
 
+    /// Always creates a sibling below the selection, without ⏎'s
+    /// enter-edit rule — for callers with no keyboard context, such as
+    /// VoiceOver's Add Sibling action.
+    func addSiblingBelow() {
+        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
+    }
+
     @objc func addSiblingAboveAction(_ sender: Any?) {
         if canvas.isEditing {
             canvas.commitEditing(next: .siblingAbove)
