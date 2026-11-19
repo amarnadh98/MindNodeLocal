@@ -64,14 +64,23 @@ struct Band {
     var value: CGFloat
 }
 
-/// A subtree placed in its own root-anchored coordinate frame.
+/// A subtree placed in its own root-anchored coordinate frame: the
+/// subtree's contour bands and extents, plus every member's frame relative
+/// to the subtree root at `(0, 0)`, index-aligned with `ids`. Relative
+/// frames are what makes incremental layout possible — a clean subtree's
+/// `Placed` is reusable under any ancestor position.
 struct Placed {
     var ids: [String]
+    var frames: [CGRect]
     var top: [Band]
     var bottom: [Band]
     var extentMaxX: CGFloat
     var minY: CGFloat
     var maxY: CGFloat
+    /// `BalancedLayout.predictedHeight`'s value for this subtree (sizes and
+    /// gaps only — contour interleave is ignored), cached with the
+    /// placement so the balanced partition never re-walks clean subtrees.
+    var predictedHeight: CGFloat
 
     var height: CGFloat { maxY - minY }
 }

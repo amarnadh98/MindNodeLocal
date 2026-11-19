@@ -23,13 +23,19 @@ public final class CanvasView: NSView {
 
     public var scene: CanvasScene? {
         didSet {
-            rebuildGrid()
+            // Spatial-grid sync first (the apply below culls through it):
+            // a scene that follows a previous one updates only the cells
+            // of added/removed/moved nodes — the diff the layer tree will
+            // apply anyway (§11.8's keystroke path); the first scene (and a
+            // nil one) rebuilds the grid outright.
+            let diff = syncGrid(previous: layerTree.scene)
             accessibility.needsRebuild = true
             // The editing node's frame may have moved (or vanished) in
             // the rebuilt scene; the overlay follows or tears down.
             nodeTextEditor.reconcileWithScene()
             applyScene(
-                animated: oldValue != nil && !isEditing && !nextApplyIsInstant)
+                animated: oldValue != nil && !isEditing && !nextApplyIsInstant,
+                precomputedDiff: diff)
             nextApplyIsInstant = false
             updateRubberBandLayer()
             needsDisplay = true
@@ -281,19 +287,6 @@ public final class CanvasView: NSView {
                 camera: camera, viewport: bounds.size, backingScale: backingScale)
         }
         needsDisplay = true
-    }
-
-    private func rebuildGrid() {
-        grid = SpatialGrid()
-        guard let scene else { return }
-        for node in scene.nodes.values {
-            grid.insert(id: node.id, frame: node.frame)
-        }
-    }
-
-    /// The scene node under a view point, if any.
-    public func nodeID(at viewPoint: CGPoint) -> String? {
-        grid.id(at: camera.modelPoint(for: viewPoint))
     }
 
     // MARK: clipboard forwarding (F-EDT-9)

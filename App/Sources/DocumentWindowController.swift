@@ -81,7 +81,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
         canvas.onEditingDraftChange = { [weak self] id, title in
             self?.editingDraftTitle = (id, title)
-            self?.updateScene(preserveCamera: true)
+            self?.updateDraftScene()
         }
         canvas.onCreateFloatingNode = { [weak self] point in
             self?.createFloatingNode(at: point)
@@ -102,6 +102,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// with it so the node grows while typing (F-EDT-8). Cleared on
     /// commit (the draft becomes the model's title).
     var editingDraftTitle: (id: String, title: NodeTitle)?
+
+    /// Per-document scene build caches for the incremental path (SPEC
+    /// §11.3): measured sizes and per-root layout state, filled by every
+    /// full build and reused by `modelDidChange`'s small-change path.
+    /// Variant-tagged: an appearance flip replaces it wholesale.
+    private var sceneCache: SceneBuildCache?
+
+    /// Above this many dirty ids the incremental path stops paying off;
+    /// §11.5 additionally wants such large relayouts (> 2k dirty nodes)
+    /// computed on a background actor — a documented follow-up. Until
+    /// then the host falls back to a full rebuild.
+    private static let incrementalDirtyLimit = 2_000
 
     /// The document is only wired up after `addWindowController` returns,
     /// and the window reaches its real content size once shown — so the
@@ -177,14 +189,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// appearance. The document's explicit override wins; `auto` follows
     /// the system (and re-renders when it changes). An open editing
     /// session's live draft overrides the editing node's title so the
-    /// node grows while typing (F-EDT-8).
+    /// node grows while typing (F-EDT-8). The full build also fills the
+    /// per-document scene cache for the incremental path.
     func updateScene(preserveCamera: Bool) {
         guard let mapDocument = document as? MapDocument else { return }
         let model = mapDocument.store.model
         let previousCamera = canvas.camera
+        let variant = currentVariant()
+        let cache: SceneBuildCache
+        if let existing = sceneCache, existing.variant == variant {
+            cache = existing
+        } else {
+            cache = SceneBuildCache(variant: variant)
+            sceneCache = cache
+        }
         let scene = SceneGeometry.build(
             model: model,
-            variant: currentVariant(),
+            cache: cache,
+            variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
             editingTitle: editingDraftTitle)
         canvas.scene = scene
@@ -200,11 +222,67 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// After any store change (perform, undo, redo): rebuild the scene
-    /// keeping the camera, drop selection ids that fell out of it, and
-    /// keep the window title on the auto-derived display name (F-EDT-14).
-    func modelDidChange() {
-        updateScene(preserveCamera: true)
+    /// Live typing growth (F-EDT-8): the draft title re-measures one node
+    /// and relayouts through the incremental path — the §11.8 keystroke
+    /// budget. Falls back to a full rebuild when no matching cache exists
+    /// (first scene, appearance flip).
+    private func updateDraftScene() {
+        guard let mapDocument = document as? MapDocument,
+            let cache = sceneCacheForCurrentVariant(),
+            let id = editingDraftTitle?.id
+        else {
+            updateScene(preserveCamera: true)
+            return
+        }
+        let model = mapDocument.store.model
+        let scene = SceneGeometry.update(
+            model: model,
+            cache: cache,
+            variant: currentVariant(),
+            measurer: SceneRenderer.sharedMeasurer,
+            dirty: [id],
+            editingTitle: editingDraftTitle)
+        canvas.scene = scene
+        canvas.dragModel = model
+    }
+
+    /// The document's scene cache when it matches the current variant
+    /// (light/dark), else nil — the caller falls back to a full rebuild.
+    private func sceneCacheForCurrentVariant() -> SceneBuildCache? {
+        guard let cache = sceneCache, cache.variant == currentVariant() else { return nil }
+        return cache
+    }
+
+    /// After any store change (perform, undo, redo): rebuild the scene —
+    /// through the incremental path when the change set is small (SPEC
+    /// §11.3's `Layout.update(dirty:)`), in full otherwise — keeping the
+    /// camera, dropping selection ids that fell out of the scene, and
+    /// keeping the window title on the auto-derived display name
+    /// (F-EDT-14).
+    func modelDidChange(origin: MapStore.ChangeOrigin) {
+        guard let mapDocument = document as? MapDocument else { return }
+        let model = mapDocument.store.model
+        let command: MapCommand
+        switch origin {
+        case .perform(let performed), .undo(let performed), .redo(let performed):
+            command = performed
+        }
+        let dirty = SceneGeometry.dirtyIDs(for: command, in: model)
+        if let dirty, let cache = sceneCacheForCurrentVariant(),
+            dirty.count <= Self.incrementalDirtyLimit
+        {
+            let scene = SceneGeometry.update(
+                model: model,
+                cache: cache,
+                variant: currentVariant(),
+                measurer: SceneRenderer.sharedMeasurer,
+                dirty: dirty,
+                editingTitle: editingDraftTitle)
+            canvas.scene = scene
+            canvas.dragModel = model
+        } else {
+            updateScene(preserveCamera: true)
+        }
         canvas.pruneSelection()
         window?.title = document?.displayName ?? window?.title ?? ""
     }
