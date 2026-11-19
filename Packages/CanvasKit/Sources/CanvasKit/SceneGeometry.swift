@@ -223,6 +223,9 @@ public enum SceneGeometry {
         case .editText(let id, _),
             .setSide(let id, _),
             .setFolded(let id, _),
+            // A note can change the node's decorations (note badge), so
+            // its own size is re-measured.
+            .setNote(let id, _),
             .reorderSibling(let id, _),
             .detach(let id),
             .deleteNodePromotingChildren(let id):

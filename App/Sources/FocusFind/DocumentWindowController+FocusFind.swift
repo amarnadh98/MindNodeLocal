@@ -8,7 +8,7 @@ import MapCore
 /// file so the hooks inside `DocumentWindowController` stay one-liners
 /// (the shared file only owns the property and four call sites).
 @MainActor
-extension DocumentWindowController: NSMenuItemValidation {
+extension DocumentWindowController {
     // MARK: Find (F-FOC-3)
 
     /// ⌘F — the find bar; Edit ▸ Find ▸ Find…
@@ -64,10 +64,11 @@ extension DocumentWindowController: NSMenuItemValidation {
     // MARK: menu validation
 
     /// §14.1 (reachable *and honestly enabled*): the F-FOC items
-    /// validate against the coordinator's state; everything else stays
-    /// at AppKit's default (enabled). `@objc` so both the menu
-    /// machinery and the command palette's enable check can find it.
-    @objc func validateMenuItem(_ item: NSMenuItem) -> Bool {
+    /// validate against the coordinator's state. Chained from the
+    /// controller's single `validateMenuItem`
+    /// (DocumentWindowController+Toolbar); nil when the item is not an
+    /// F-FOC item.
+    func validateFocusFindMenuItem(_ item: NSMenuItem) -> Bool? {
         switch item.action {
         case #selector(findAction), #selector(findReplaceAction):
             return document != nil && window != nil
@@ -80,7 +81,7 @@ extension DocumentWindowController: NSMenuItemValidation {
         case #selector(quickOpenAction), #selector(commandPaletteAction):
             return document != nil && window != nil
         default:
-            return true
+            return nil
         }
     }
 

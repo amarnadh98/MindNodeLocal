@@ -300,7 +300,7 @@ extension DocumentWindowController {
         case #selector(toggleFoldAction(_:)):
             return canvas.isEditing || foldSelectionState() != nil
         default:
-            return true
+            return validateFocusFindMenuItem(menuItem) ?? true
         }
     }
 }
