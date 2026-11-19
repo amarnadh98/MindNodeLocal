@@ -1,6 +1,6 @@
 # ADR-0004: Branch palette colors are positional
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0009 (persistent index implemented, 2026-11-19)
 - **Date:** 2026-11-19
 
 ## Context
@@ -22,3 +22,9 @@ Rationale:
 - Until the persistent field lands, reordering level-1 siblings recolors the branches after the moved one. The editing slice (F-EDT-5, F-EDT-6) must not ship reorder of level-1 siblings without resolving this.
 - Inserting a new first level-1 branch shifts every subsequent branch's color — visible, but harmless in the current read-only canvas.
 - This ADR is the tracking record; the follow-up work item is "persistent palette index with `Recolor Branches`".
+
+## Resolution (2026-11-19)
+ADR-0009 implemented the persistent index (`Node.paletteIndex`, formatVersion 2,
+migration v1→v2 back-filling today's positional values, `recolorBranches`
+command) before the editing slice shipped reorder, so this decision's window
+closed as planned.

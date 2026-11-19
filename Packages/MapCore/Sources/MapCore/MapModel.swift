@@ -291,4 +291,28 @@ public struct MapModel: Codable, Sendable, Hashable {
     public static func emptyDocument(docID: String = UUID().uuidString) -> MapModel {
         MapModel(docID: docID)
     }
+
+    /// The smallest palette index (≥ 0) not used by `parentID`'s existing
+    /// children (ADR-0009): the index a **new** level-1 node takes, so a
+    /// fresh branch always gets an unused color instead of stealing a
+    /// sibling's. Deterministic and pure.
+    public func nextPaletteIndex(forChildOf parentID: String) -> Int {
+        let used = Set((nodes[parentID]?.children ?? []).compactMap { nodes[$0]?.paletteIndex })
+        var candidate = 0
+        while used.contains(candidate) {
+            candidate += 1
+        }
+        return candidate
+    }
+
+    /// The palette index a creation command gives a fresh `node` under
+    /// `parent` (ADR-0009): a payload that already carries an index
+    /// (duplication, paste) keeps it; a new level-1 node — any child of
+    /// a root — takes the next unused index; everything else stays nil.
+    public func createdPaletteIndex(for node: Node, parent: String?) -> Int? {
+        guard node.paletteIndex == nil, let parent, roots.contains(parent) else {
+            return node.paletteIndex
+        }
+        return nextPaletteIndex(forChildOf: parent)
+    }
 }

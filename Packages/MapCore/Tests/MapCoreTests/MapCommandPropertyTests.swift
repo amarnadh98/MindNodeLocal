@@ -122,6 +122,13 @@ struct CommandPropertyTests {
             .setSide(id: nodeID, side: generator.next() % 2 == 0 ? .left : .right),
             .setFolded(id: nodeID, folded: generator.next() % 2 == 0),
             .setOffset(id: nodeID, offset: ModelOffset(x: 10, y: -5)),
+            .setTheme(id: generator.next() % 2 == 0 ? "ocean" : nil),
+            .recolorBranches(
+                assignments: [
+                    PaletteIndexAssignment(
+                        id: nodeID,
+                        index: generator.next() % 2 == 0 ? Int(generator.next() % 8) : nil)
+                ]),
             (try? MapCommand.duplicate(id: nodeID, in: model)),
         ].compactMap { $0 }
     }

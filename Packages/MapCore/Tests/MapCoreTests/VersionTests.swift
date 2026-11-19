@@ -2,6 +2,6 @@ import Testing
 
 @testable import MapCore
 
-@Test func formatVersionIsOne() {
-    #expect(ArborFormat.formatVersion == 1)
+@Test func formatVersionIsTwo() {
+    #expect(ArborFormat.formatVersion == 2)
 }

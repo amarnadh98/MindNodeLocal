@@ -312,6 +312,11 @@ public struct Node: Codable, Sendable, Hashable {
     public var offset: ModelOffset?
     public var folded: Bool
     public var width: NodeWidth?
+    /// The persistent branch palette index (ADR-0009, formatVersion 2).
+    /// Set on level-1 nodes (a root's direct children); descendants
+    /// inherit their level-1 ancestor's index at render time (F-STY-3).
+    /// `nil` falls back to the node's position among its siblings.
+    public var paletteIndex: Int?
     public var style: NodeStylePatch?
     public var markers: [String]?
     public var image: NodeImage?
@@ -340,6 +345,7 @@ public struct Node: Codable, Sendable, Hashable {
         offset: ModelOffset? = nil,
         folded: Bool = false,
         width: NodeWidth? = nil,
+        paletteIndex: Int? = nil,
         style: NodeStylePatch? = nil,
         markers: [String]? = nil,
         image: NodeImage? = nil,
@@ -367,6 +373,7 @@ public struct Node: Codable, Sendable, Hashable {
         self.offset = offset
         self.folded = folded
         self.width = width
+        self.paletteIndex = paletteIndex
         self.style = style
         self.markers = markers
         self.image = image
