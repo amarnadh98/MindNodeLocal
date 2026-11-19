@@ -67,6 +67,7 @@ struct SettingsView: View {
     @State private var selectedTab: SettingsTab = .general
     /// Settings ▸ AI (F-AI-1): the AI slice's own pane, hosted as a tab.
     @StateObject private var aiModel = AISettingsModel()
+    @StateObject private var integrationsModel = IntegrationsModel()
     @State private var automaticUpdateChecks = AppUpdater.shared.automaticallyChecks
     /// F-STY-6/5: the themes the pickers offer (built-ins + user
     /// themes), re-read when the tab appears so an import shows up.
@@ -104,12 +105,15 @@ struct SettingsView: View {
         defaultThemeID = ThemeCatalog.defaultThemeID
     }
 
-    /// The AI tab hosts the AI slice's pane (its own grouped Form);
-    /// every other tab is a grouped Form of rows.
+    /// The AI and Integrations tabs host their slices' panes (each its
+    /// own grouped Form); every other tab is a grouped Form of rows.
     @ViewBuilder
     private func tabContent(_ tab: SettingsTab) -> some View {
         if tab == .ai {
             AISettingsView().environmentObject(aiModel)
+        } else if tab == .integrations {
+            // F-INT-4/6: the MCP toggle, client config and Services inbox.
+            IntegrationsView(model: integrationsModel)
         } else {
             Form { rows(for: tab) }
                 .formStyle(.grouped)
@@ -154,7 +158,9 @@ struct SettingsView: View {
         case .ai:
             EmptyView()  // Hosted by `tabContent(_:)`.
         case .integrations:
-            unavailable("Reminders, MCP, URL scheme, Services", note: "Planned in a later milestone.")
+            // Hosted by `tabContent` (IntegrationsView); Reminders sync
+            // is still to come.
+            unavailable("Reminders", note: "Planned in a later milestone.")
         case .updates:
             // SPEC §12/§13 (ADR-0021): off by default; Sparkle reads the
             // same defaults key.

@@ -138,7 +138,7 @@ public struct LocalDocumentSpace: DocumentSpace {
     }
 }
 
-/// The helper's `ToolBackend` (F-INT-4, ADR-0012): when the app is
+/// The helper's `ToolBackend` (F-INT-4, ADR-0030): when the app is
 /// running, forward the call over the Unix socket so edits hit the live
 /// document's `MapStore`; otherwise run it against files directly.
 /// The edit policy file gates both paths, so read-only mode holds no

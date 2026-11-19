@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// The request/response pair that crosses the helper ↔ app Unix socket
-/// (F-INT-4, ADR-0012): one JSON line each way. The helper is a socket
+/// (F-INT-4, ADR-0030): one JSON line each way. The helper is a socket
 /// *client*; the running app listens. No TCP anywhere (SPEC §12).
 public struct SocketToolRequest: Sendable, Equatable, Codable {
     public let tool: String

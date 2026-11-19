@@ -2,7 +2,7 @@ import Foundation
 import MapAutomation
 import MapCore
 
-/// `arbor-mcp` (F-INT-4, ADR-0012): the bundled stdio MCP helper. Claude
+/// `arbor-mcp` (F-INT-4, ADR-0030): the bundled stdio MCP helper. Claude
 /// Desktop / Claude Code launches it; it answers newline-delimited
 /// JSON-RPC 2.0 on stdin/stdout.
 ///

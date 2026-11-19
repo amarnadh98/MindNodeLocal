@@ -1,7 +1,7 @@
 import Foundation
 
 /// Shared filesystem locations for the automation surfaces (F-INT-4,
-/// ADR-0012). The sandboxed app and the unsandboxed helper must agree on
+/// ADR-0030). The sandboxed app and the unsandboxed helper must agree on
 /// these paths, so they are computed the same way from the app's bundle
 /// identifier:
 ///

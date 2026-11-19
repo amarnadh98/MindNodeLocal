@@ -3,7 +3,7 @@ import Testing
 
 @testable import MapAutomation
 
-/// F-INT-4, ADR-0012: the helper ↔ app Unix-domain socket — a round trip
+/// F-INT-4, ADR-0030: the helper ↔ app Unix-domain socket — a round trip
 /// against a fake app endpoint, plus the refused-connection path (app
 /// closed) that the helper falls back from.
 struct UnixSocketTests {
