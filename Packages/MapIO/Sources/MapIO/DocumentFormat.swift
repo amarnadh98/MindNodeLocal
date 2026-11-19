@@ -91,9 +91,49 @@ public enum DocumentFormats {
         extensions: ["mindnode"],
         capability: .importOnly)
 
-    /// Registry order: native first, then P0 exchange formats, then P1.
+    // The export-only graphic formats the M5 export sheet offers
+    // (SPEC §5.17). Their bytes come from the SceneExport module, not
+    // `DocumentIO` — the registry entry carries the panel metadata.
+    public static let pdf = DocumentFormat(
+        id: "pdf",
+        displayName: "PDF",
+        utTypeIdentifier: "com.adobe.pdf",
+        extensions: ["pdf"],
+        capability: .exportOnly)
+
+    public static let png = DocumentFormat(
+        id: "png",
+        displayName: "PNG Image",
+        utTypeIdentifier: "public.png",
+        extensions: ["png"],
+        capability: .exportOnly)
+
+    public static let jpeg = DocumentFormat(
+        id: "jpeg",
+        displayName: "JPEG Image",
+        utTypeIdentifier: "public.jpeg",
+        extensions: ["jpg", "jpeg"],
+        capability: .exportOnly)
+
+    public static let heic = DocumentFormat(
+        id: "heic",
+        displayName: "HEIC Image",
+        utTypeIdentifier: "public.heic",
+        extensions: ["heic"],
+        capability: .exportOnly)
+
+    public static let svg = DocumentFormat(
+        id: "svg",
+        displayName: "SVG",
+        utTypeIdentifier: "public.svg-image",
+        extensions: ["svg"],
+        capability: .exportOnly)
+
+    /// Registry order: native first, then P0 exchange formats, then P1,
+    /// then the graphic export targets.
     public static let all: [DocumentFormat] = [
         arbor, opml, markdown, plainText, freemind, xmind, mindnode,
+        pdf, png, jpeg, heic, svg,
     ]
 
     public static func format(id: String) -> DocumentFormat? {
