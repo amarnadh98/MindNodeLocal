@@ -58,6 +58,38 @@ struct NodeTextEditorTests {
         #expect(back.runs.first?.font == nil)
     }
 
+    @Test func semiboldBaseFontIsNotABookmarkBoldRun() {
+        // The Paper theme's root is 20 pt semibold, and AppKit reports
+        // the bold mask for semibold system fonts — a plain-typed root
+        // title must not persist a phantom `bold` run (it would export
+        // as **bold** Markdown and mark a style override in map.json).
+        let semibold = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        let plain = NSMutableAttributedString(
+            string: "Golden", attributes: [.font: semibold])
+
+        let back = NodeTitleText.title(
+            from: plain, baseFont: semibold, baseColor: .labelColor)
+
+        #expect(back.runs.isEmpty)
+    }
+
+    @Test func explicitBoldRecordsAgainstASemiboldBaseFont() {
+        // ⌘B on the semibold root still records: the run font is heavier
+        // than the base, which is what "explicit" means.
+        let semibold = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        let styled = NSMutableAttributedString(
+            string: "Golden", attributes: [.font: semibold])
+        styled.addAttribute(
+            .font, value: NSFont.systemFont(ofSize: 20, weight: .bold), range: NSRange(0..<6))
+
+        let back = NodeTitleText.title(
+            from: styled, baseFont: semibold, baseColor: .labelColor)
+
+        #expect(back.runs.count == 1)
+        #expect(back.runs.first?.bold == true)
+        #expect(back.runs.first?.range == [0, 6])
+    }
+
     @Test func extractionCoalescesAdjacentIdenticalRuns() {
         let title = NodeTitle(
             text: "abcdef",

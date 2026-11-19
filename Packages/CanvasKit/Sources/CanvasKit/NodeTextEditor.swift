@@ -685,10 +685,15 @@ public enum NodeTitleText {
         let font = attributes[.font] as? NSFont ?? baseFont
         var run = Run(range: [range.location, range.length])
 
-        let traits = manager.traits(of: font)
-        if traits.contains(.boldFontMask) {
+        // An explicit bold is RELATIVE to the node's base font: a
+        // semibold theme font (the Paper root) carries the bold mask
+        // without the user overriding anything, so compare weights —
+        // only a font heavier than the base records the run. (⌘B on a
+        // semibold base yields bold, weight 9 > 8, and still records.)
+        if manager.weight(of: font) > manager.weight(of: baseFont) {
             run.bold = true
         }
+        let traits = manager.traits(of: font)
         if traits.contains(.italicFontMask) {
             run.italic = true
         }
