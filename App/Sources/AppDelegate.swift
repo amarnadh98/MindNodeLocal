@@ -279,6 +279,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ]))
         mainMenu.addItem(
             menu(
+                "AI",
+                [
+                    // F-AI-2: ⌘. expands the selected node; pressed
+                    // again while ghosts are showing it regenerates.
+                    // The whole menu hides when AI is off (F-AI-1) —
+                    // AIController.validateMenuItem drives item
+                    // visibility, the submenu title hides via the
+                    // delegate below.
+                    item(
+                        "Expand Node", #selector(DocumentWindowController.aiExpandAction(_:)),
+                        "."),
+                    item(
+                        "Generate Map From…",
+                        #selector(DocumentWindowController.generateMapAction(_:)), ""),
+                    .separator(),
+                    // F-AI-4 (P2) helpers: each is one undo step,
+                    // author "ai".
+                    item(
+                        "Summarize Branch to Note",
+                        #selector(DocumentWindowController.aiSummarizeBranchAction(_:)), ""),
+                    item(
+                        "Rewrite Titles Concisely",
+                        #selector(DocumentWindowController.aiRewriteTitlesAction(_:)), ""),
+                    item(
+                        "Suggest Document Title",
+                        #selector(DocumentWindowController.aiSuggestTitleAction(_:)), ""),
+                    .separator(),
+                    // SPEC §12: the per-document cloud opt-out, one
+                    // undoable command.
+                    item(
+                        "Never Send to Cloud AI",
+                        #selector(DocumentWindowController.aiToggleNeverSendToCloudAction(_:)), ""),
+                ]))
+        mainMenu.addItem(
+            menu(
                 "Format",
                 [
                     // F-EDT-7: rich-text titles. The actions live on the
@@ -455,6 +490,10 @@ extension AppDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "Quit \(appName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        // Settings ▸ AI (F-AI-1): ⌘,.
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
         appMenuItem.title = appName
         appMenuItem.submenu = appMenu
         return appMenuItem
@@ -468,6 +507,14 @@ extension AppDelegate {
         helpItem.title = "Help"
         helpItem.submenu = helpMenu
         return helpItem
+    }
+
+    // MARK: Settings ▸ AI (F-AI-1)
+
+    /// ⌘, opens Settings ▸ AI. The app had no settings window before
+    /// this milestone; AI is its first pane.
+    @objc func showSettings(_ sender: Any?) {
+        AISettingsPresenter.present()
     }
 
     private func menu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {

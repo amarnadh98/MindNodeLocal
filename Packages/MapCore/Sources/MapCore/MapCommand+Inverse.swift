@@ -173,6 +173,12 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             return .setLink(id: id, link: node.link)
+        case .setAIPolicy:
+            return .setAIPolicy(policy: model.ai)
+
+
+        case .setTitle:
+            return .setTitle(model.title)
         }
     }
 

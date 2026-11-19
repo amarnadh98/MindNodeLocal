@@ -62,6 +62,10 @@ public final class MapStore {
     /// The session of the most recent undo registration, when it is an
     /// open coalesced `editText` session.
     private var lastSession: EditSession?
+    /// Who authored the most recent change (F-AI-5): `.user`, or `.ai`
+    /// for AI mutations. The host copies this into the document
+    /// metadata on save.
+    public private(set) var lastAuthor: AuthorKind = .user
 
     public init(model: MapModel, undoManager: UndoManager = UndoManager()) {
         self.model = model
@@ -76,15 +80,25 @@ public final class MapStore {
         undoManager.removeAllActions()
     }
 
-    /// Applies `command` as one undoable step. The inverse is computed
-    /// against the pre-state **before** applying; a throwing command
-    /// leaves the model and the undo stacks untouched.
+    /// Applies `command` as one undoable step (author = user). The
+    /// inverse is computed against the pre-state **before** applying; a
+    /// throwing command leaves the model and the undo stacks untouched.
     public func perform(_ command: MapCommand) throws {
+        try perform(command, author: .user)
+    }
+
+    /// Applies `command` as one undoable step stamped with `author`
+    /// (F-AI-5): an AI mutation is ONE undo group — a grouped command
+    /// performed with `.ai` — and every node it touched records
+    /// `modifiedBy = .ai`, surfaced in the document metadata as
+    /// `lastModifiedBy: "ai"`.
+    public func perform(_ command: MapCommand, author: AuthorKind) throws {
         let inverse = try command.inverse(in: model)
         var working = model
         try command.apply(to: &working)
-        stampTouchedNodes(previous: model, in: &working)
+        stampTouchedNodes(previous: model, in: &working, author: author)
         model = working
+        lastAuthor = author
 
         if let lastForward, MapCommand.continuesEdit(previousForward: lastForward, nextForward: command) {
             // Typing continues the session: the registered inverse
@@ -176,7 +190,7 @@ public final class MapStore {
         } catch {
             return false
         }
-        stampTouchedNodes(previous: model, in: &working)
+        stampTouchedNodes(previous: model, in: &working, author: .user)
         model = working
         return true
     }
@@ -184,13 +198,15 @@ public final class MapStore {
     /// Records authorship (`MapCommand` docs: commands never stamp, the
     /// applying layer does): every node that differs from the
     /// pre-command state — created, re-parented or edited — gets
-    /// `modified` = now, `modifiedBy` = .user. Journal-only fields; undo
-    /// does not rewind them (see class docs).
-    private func stampTouchedNodes(previous: MapModel, in working: inout MapModel) {
+    /// `modified` = now, `modifiedBy` = `author`. Journal-only fields;
+    /// undo does not rewind them (see class docs).
+    private func stampTouchedNodes(
+        previous: MapModel, in working: inout MapModel, author: AuthorKind
+    ) {
         let now = Date()
         for (id, node) in working.nodes where previous.nodes[id] != node {
             working.nodes[id]?.modified = now
-            working.nodes[id]?.modifiedBy = .user
+            working.nodes[id]?.modifiedBy = author
         }
     }
 

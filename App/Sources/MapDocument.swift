@@ -137,7 +137,11 @@ final class MapDocument: NSDocument {
             appVersion: AppIdentity.appVersion,
             created: current.created,
             modified: Date(),
-            docID: model.docID
+            docID: model.docID,
+            // F-AI-5: who made the most recent change — .ai for AI
+            // mutations (the store stamps it), surfaced in the package
+            // metadata as lastModifiedBy.
+            lastModifiedBy: store.lastAuthor
         )
         let root: FileWrapper
         if let packageWrapper {

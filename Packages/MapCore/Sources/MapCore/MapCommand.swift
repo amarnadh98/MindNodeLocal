@@ -120,6 +120,12 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// `x-arbor://…` deep link (Concept Index "Link these", F-LIB-4) or
     /// a web/file URL. `nil` clears it.
     case setLink(id: String, link: String?)
+    /// Replaces the document's AI policy object (SPEC §12, F-AI-1). The
+    /// exact inverse snapshots the pre-state. `nil` clears the policy.
+    case setAIPolicy(policy: DocumentAIPolicy?)
+    /// Sets the document's explicit title (F-EDT-14, F-AI-4 suggest
+    /// title). `nil` clears it, returning to the root-derived name.
+    case setTitle(_ title: String?)
 
     /// A short, user-facing name for the undo menu (F-DOC-2: "Undo Add
     /// Node"). Localized when the UI layer lands.
@@ -141,6 +147,8 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setPresentations: "Edit Slides"
         case .setStudy(let name, _, _): name
         case .setLink: "Set Link"
+        case .setAIPolicy: "AI Policy"
+        case .setTitle: "Rename Document"
         }
     }
 

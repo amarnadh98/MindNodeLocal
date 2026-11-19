@@ -42,6 +42,9 @@ extension CanvasView {
             layerTree.root.frame = CGRect(origin: .zero, size: bounds.size)
             backing.addSublayer(layerTree.root)
         }
+        if ghostOverlay.container.superlayer == nil {
+            layerTree.root.addSublayer(ghostOverlay.container)
+        }
     }
 
     /// Applies the current scene to the layer tree (diffing against

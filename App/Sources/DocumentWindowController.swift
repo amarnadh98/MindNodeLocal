@@ -133,6 +133,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // F-FOC wiring: the coordinator reaches back through this weak
         // reference (see FocusFindCoordinator).
         focusFind.controller = self
+        // F-AI-2: clicking a ghost suggestion accepts exactly that one.
+        ai.host = self
+        canvas.onGhostAccept = { [weak self] ghostID in
+            self?.ai.acceptGhost(ghostID)
+        }
         setupAccessibility()
         // §4.1/§7.1 chrome: the customizable toolbar and the minimap.
         installChrome()
@@ -219,6 +224,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         return root.id
     }
 
+    /// F-AI-2/F-AI-3/F-AI-4: the per-window AI assistant. Owned here,
+    /// handed a weak `host` back in init; all provider consent and
+    /// privacy gating lives in it (see App/Sources/AI/).
+    let ai = AIController()
+
     /// The theme variant for the current model and system appearance.
     /// (Internal since M6: the presentation coordinator resolves the
     /// same variant for its derived scenes.)
@@ -232,6 +242,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .auto, .none:
             return canvas.effectiveVariant
         }
+    }
+
+    /// The AI ghost probe rebuild needs the same variant the canvas
+    /// shows (AIController).
+    var effectiveThemeVariant: ThemeVariant {
+        currentVariant()
     }
 
     /// Rebuilds the scene from the store's model at the view's effective
@@ -314,6 +330,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     func modelDidChange(origin: MapStore.ChangeOrigin) {
         guard let mapDocument = document as? MapDocument else { return }
         let model = mapDocument.store.model
+        // F-AI-2: the expansion target may have been deleted or folded
+        // away — drop the ghosts instead of accepting into a void.
+        ai.modelDidChange()
         let command: MapCommand
         switch origin {
         case .perform(let performed), .undo(let performed), .redo(let performed),
@@ -655,6 +674,12 @@ extension DocumentWindowController {
             canvas.commitEditing(next: .child)
             return
         }
+        // F-AI-2: ⇥ with ghosts presented accepts ALL suggestions —
+        // one grouped command, one undo step, author .ai.
+        if ai.presentingGhosts {
+            ai.acceptAll()
+            return
+        }
         addCommand { .addChild(parent: $0, index: nil, node: $1) }
     }
 
@@ -904,6 +929,12 @@ extension DocumentWindowController {
             canvas.commitEditing(next: .none)
             return
         }
+        // F-AI-2: ⎋ with ghosts presented dismisses them first —
+        // without touching the document (no undo step, not even dirty).
+        if ai.presentingGhosts {
+            ai.dismissGhosts()
+            return
+        }
         // F-FOC: ⎋ first serves the open overlays — the quick-open
         // palette, then the find bar, then Zen, then Focus mode; only
         // when none of them is active does it deselect.
@@ -913,6 +944,48 @@ extension DocumentWindowController {
         canvas.setSelection([])
     }
 
+    // MARK: AI (F-AI-1…F-AI-5) — actions the AI menu targets
+
+    /// ⌘. — expand the selected node with AI; with ghosts presented,
+    /// regenerates them (F-AI-2).
+    @objc func aiExpandAction(_ sender: Any?) {
+        guard !canvas.isEditing else { return }
+        ai.expandAction()
+    }
+
+    /// F-AI-3: the "Generate Map From…" sheet.
+    @objc func generateMapAction(_ sender: Any?) {
+        guard ai.menuAvailable else { return }
+        GenerateMapSheetPresenter.present(on: ai)
+    }
+
+    /// F-AI-4 (P2): summarize the selected branch into its note.
+    @objc func aiSummarizeBranchAction(_ sender: Any?) {
+        guard !canvas.isEditing, !canvas.selection.isEmpty else { return }
+        Task { await ai.summarizeBranchAction() }
+    }
+
+    /// F-AI-4 (P2): rewrite the selected subtree's titles concisely.
+    @objc func aiRewriteTitlesAction(_ sender: Any?) {
+        guard !canvas.isEditing, !canvas.selection.isEmpty else { return }
+        Task { await ai.rewriteTitlesAction() }
+    }
+
+    /// F-AI-4 (P2): suggest a title for the document.
+    @objc func aiSuggestTitleAction(_ sender: Any?) {
+        guard !canvas.isEditing else { return }
+        Task { await ai.suggestTitleAction() }
+    }
+
+    /// SPEC §12: the per-document "Never send to cloud AI" flag — one
+    /// undoable `setAIPolicy` command, mirrored by the menu's state.
+    @objc func aiToggleNeverSendToCloudAction(_ sender: Any?) {
+        ai.toggleNeverSendToCloud()
+        documentToolbar?.validateVisibleItems()
+    }
+}
+
+extension DocumentWindowController {
     // MARK: drag drop (F-EDT-5)
 
     /// A finished canvas drag hands over exactly one command: performed
