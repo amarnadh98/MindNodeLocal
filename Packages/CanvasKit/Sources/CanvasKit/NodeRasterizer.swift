@@ -21,6 +21,16 @@ final class NodeVisualLayer: CALayer {
         magnificationFilter = .linear
     }
 
+    /// Core Animation copies a layer this way for its presentation
+    /// layer whenever an animation runs; without it a relayout
+    /// animation traps.
+    override init(layer: Any) {
+        let source = layer as? NodeVisualLayer
+        nodeID = source?.nodeID ?? ""
+        rasterKey = source?.rasterKey
+        super.init(layer: layer)
+    }
+
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("NodeVisualLayer is created directly, never decoded")
@@ -41,6 +51,15 @@ final class BranchVisualLayer: CAShapeLayer {
         super.init()
         lineJoin = .round
         opacity = 1
+    }
+
+    /// The presentation-layer copy Core Animation makes for every
+    /// running animation (see `NodeVisualLayer.init(layer:)`).
+    override init(layer: Any) {
+        let source = layer as? BranchVisualLayer
+        key = source?.key ?? BranchKey(parentID: "", childID: "")
+        branch = source?.branch
+        super.init(layer: layer)
     }
 
     @available(*, unavailable)
