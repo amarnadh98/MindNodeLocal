@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.servicesProvider = ServicesResponder.shared
         // F-INT-4: the local MCP socket endpoint (ADR-0030), read-only
         // by default; the helper falls back to files when it is down.
-        AutomationRuntime.start()
+        startIntegrations()
         // F-ONB-1: once per user, before any document opens.
         welcomeCoordinator.showIfNeeded()
     }
@@ -798,6 +798,13 @@ extension AppDelegate {
     static func main() {
         NSApplication.shared.delegate = shared
         _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+    }
+
+    /// F-INT-4 (the local MCP endpoint) and F-INT-2 (indexing each map for
+    /// Spotlight as it is saved).
+    func startIntegrations() {
+        AutomationRuntime.start()
+        SpotlightIndexer.start()
     }
 
     /// The hosted test runner opens its own documents; an extra untitled

@@ -201,4 +201,27 @@ struct AutomationTests {
         #expect(document.model.nodes["a"]?.modifiedBy == .mcp)
         #expect(document.store.undoManager.canUndo == true)
     }
+
+    /// An MCP edit of an OPEN map must be saved. The undo registration
+    /// alone leaves the document looking unedited, so autosave and quit
+    /// skipped it and the edit was lost.
+    @Test func mcpEditOfAnOpenMapMarksItEdited() async throws {
+        let (document, _) = try openShownDocument()
+        defer { document.close() }
+        #expect(!document.isDocumentEdited)
+
+        try await AppDocumentSpace().applyCommands(
+            [.setNote(id: "a", note: "edited over MCP")], reference: "auto-doc", author: .mcp)
+
+        #expect(document.model.nodes["a"]?.note == "edited over MCP")
+        #expect(document.isDocumentEdited)
+    }
+
+    @Test func addRouteOnAnOpenMapMarksItEdited() throws {
+        let (document, _) = try openShownDocument()
+        defer { document.close() }
+        #expect(!document.isDocumentEdited)
+        try AutomationRouter.shared.addNode(doc: "auto-doc", parent: "root", text: "from a link")
+        #expect(document.isDocumentEdited)
+    }
 }

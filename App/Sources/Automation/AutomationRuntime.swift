@@ -109,6 +109,10 @@ final class AppDocumentSpace: DocumentSpace {
         if let open = AppMapDirectory.openDocument(matching: reference) {
             let single = commands.count == 1 ? commands[0] : MapCommand.group(name: "MCP Edit", commands: commands)
             try open.store.perform(single, author: author)
+            // The edit has to reach disk: mark the document edited so the
+            // next autosave (or quit) saves it. The undo registration alone
+            // does not, and an MCP edit was otherwise lost on close.
+            open.updateChangeCount(.changeDone)
             return
         }
         // Closed: coordinated read → commands → one atomic write.

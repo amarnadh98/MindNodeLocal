@@ -91,6 +91,7 @@ final class ServicesResponder: NSObject {
     private func appendToInbox(_ text: String, in document: MapDocument) throws {
         let command = try Self.inboxCommand(text: text, in: document.model)
         try document.store.perform(command)
+        document.updateChangeCount(.changeDone)
         document.showWindows()
     }
 
