@@ -612,6 +612,9 @@ extension DocumentWindowController {
     func handleEditingCommit(id: String, title: NodeTitle, next: NodeTextEditor.PostCommitAction) {
         editingDraftTitle = nil
         guard let store else { return }
+        // A node made and left empty just goes away — no stray blank boxes
+        // to tidy up. (Clearing an existing node's text keeps the node.)
+        if title.text.isEmpty, dropBlankNewNode(id) { return }
         if store.model.nodes[id]?.title != title {
             // F-EDT-10 smart typing: one grouped command carries the
             // whole parse — `#tag` tokens, the task prefixes, `$$math$$`,
@@ -642,6 +645,43 @@ extension DocumentWindowController {
         case .insertParent:
             createAfterCommit(anchor: id) { .insertParent(anchor: $0, node: $1) }
         }
+    }
+
+    /// True when `id` was an empty, contentless leaf before this editing
+    /// session (the stored title is still empty) and is not the map's
+    /// only root. Deletes it, selects what the delete leaves selected,
+    /// and reports whether it did.
+    private func dropBlankNewNode(_ id: String) -> Bool {
+        guard let store, let node = store.model.nodes[id], Self.isBlankLeaf(node),
+            node.parent != nil || store.model.roots.count > 1
+        else { return false }
+        store.closeEditSession()
+        let replacement = MapStore.selectionAfterDelete(
+            model: store.model, deletedIDs: [id], selection: [id])
+        // Best: undo the creation itself, so ⌘Z never resurrects a blank
+        // box and the undo stack stays clean. Only when the newest undo
+        // step is exactly that creation (one node fewer, this one gone);
+        // otherwise redo it and fall back to an ordinary delete.
+        let manager = store.undoManager
+        let nodeCount = store.model.nodes.count
+        if manager.canUndo {
+            manager.undo()
+            if store.model.nodes[id] == nil, store.model.nodes.count == nodeCount - 1 {
+                canvas.setSelection(replacement)
+                return true
+            }
+            if manager.canRedo { manager.redo() }
+        }
+        perform(.deleteSubtrees(ids: [id])) { _ in replacement }
+        return true
+    }
+
+    /// No text, children or content of any kind.
+    static func isBlankLeaf(_ node: Node) -> Bool {
+        node.title.text.isEmpty && node.children.isEmpty && (node.note ?? "").isEmpty
+            && node.task == nil && (node.tags ?? []).isEmpty && (node.markers ?? []).isEmpty
+            && node.image == nil && (node.attachments ?? []).isEmpty && node.link == nil
+            && node.source == nil && node.math != true
     }
 
     /// The create half of commit-and-create (F-EDT-1): one add command
