@@ -55,6 +55,9 @@ extension CanvasView {
             !isEditing, !connectionLabelEditor.isEditing
         else { return false }
         spacePan.armed = true
+        // The Node Well buttons hide while pan mode owns the canvas
+        // (CanvasView+Hover.swift).
+        updateAddHandles()
         window?.invalidateCursorRects(for: self)
         NSCursor.openHand.set()
         return true
@@ -77,6 +80,9 @@ extension CanvasView {
             window?.invalidateCursorRects(for: self)
             NSCursor.arrow.set()
         }
+        // Pan mode gave the canvas back: the Node Well buttons can
+        // show again under the pointer (CanvasView+Hover.swift).
+        updateAddHandles()
         if isTap, let prefill = replaceEditText(for: event) {
             beginEditingSelection(prefill: prefill)
         }
@@ -127,6 +133,8 @@ extension CanvasView {
             window?.invalidateCursorRects(for: self)
             NSCursor.arrow.set()
         }
+        // The drag gate in `addHandlesAllowed` just lifted.
+        updateAddHandles()
         return true
     }
 }
@@ -160,6 +168,8 @@ extension CanvasView {
             spacePan.dragging = false
             spacePan.sawMouseDown = false
             window?.invalidateCursorRects(for: self)
+            // The pan gates lifted: re-resolve the Node Well buttons.
+            updateAddHandles()
         }
         return super.resignFirstResponder()
     }

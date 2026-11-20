@@ -80,6 +80,9 @@ extension CanvasView {
         // F-FOC: rings follow the new frames and dimming re-applies
         // (freshly realized layers start at full opacity).
         overlays.sceneDidApply(self)
+        // The Node Well buttons follow the relayout too: their anchors
+        // are the nodes' new edge midpoints (CanvasView+Hover.swift).
+        updateAddHandles()
     }
 
     /// The ids kept at full opacity in highlight mode (F-TAG-2/F-TSK-5);
@@ -128,16 +131,19 @@ extension CanvasView {
     }
 
     /// Selection rings follow every selection mutation (they live in
-    /// the layer tree, not in the view's drawing).
+    /// the layer tree, not in the view's drawing). The Node Well
+    /// buttons ride along (CanvasView+Hover.swift) — same gates.
     func syncSelectionRings() {
-        layerTree.addHandlesEnabled = addHandlesAllowed
         layerTree.updateSelection(selection, color: selectionColor, camera: camera)
+        updateAddHandles()
     }
 
-    /// The Node Well "+" buttons only show while the canvas is idle: not
-    /// editing a title, dragging, or waiting on a ⌘L connection target.
+    /// The Node Well "+" buttons only show while the canvas is idle:
+    /// not editing a title, dragging, waiting on a ⌘L connection
+    /// target, or Space-panning (ADR-0033).
     var addHandlesAllowed: Bool {
         !isEditing && drag == nil && pendingConnectionSource == nil
+            && !spacePan.armed && !spacePan.dragging
     }
 
     /// The Node Well "+" buttons showing right now (host/test inspection).
