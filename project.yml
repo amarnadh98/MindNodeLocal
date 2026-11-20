@@ -24,6 +24,8 @@ packages:
     path: Packages/MapLibrary
   MapAI:
     path: Packages/MapAI
+  MapAutomation:
+    path: Packages/MapAutomation
   # SPEC §13 in-app updates; runtime dependency 1 of 8 (SPEC §11.1,
   # ADR-0021). Linked into the app target only.
   Sparkle:
@@ -65,6 +67,7 @@ targets:
       - package: MapIO
       - package: MapLibrary
       - package: MapAI
+      - package: MapAutomation
       - package: Sparkle
       - package: CanvasKit
         product: SystemIntegration
@@ -78,6 +81,12 @@ targets:
         embed: true
       - target: SpotlightImporter
         embed: true
+      # F-INT-4: the bundled MCP helper (ADR-0030), embedded into
+      # Contents/MacOS so the copied Claude config's absolute path works.
+      - target: arbor-mcp
+        embed: true
+        copy:
+          destination: executables
     info:
       path: App/Resources/Info.plist
       properties:
@@ -224,6 +233,29 @@ targets:
         SUEnableInstallerLauncherService: true
         # SPEC §12: Sparkle never sends a system profile (no telemetry).
         SUEnableSystemProfiling: false
+        # F-INT-5: the x-arbor URL scheme (open/new/add/study).
+        CFBundleURLTypes:
+          - CFBundleURLName: com.example.arbor.map
+            CFBundleURLSchemes:
+              - x-arbor
+        # F-INT-6: the Services menu. NSPortName matches the running
+        # application's name, which is where NSApp.servicesProvider
+        # registers the responder.
+        NSServices:
+          - NSMenuItem:
+              default: New Arbor Map from Selection
+            NSMessage: newMapFromSelection
+            NSPortName: Arbor
+            NSSendTypes:
+              - NSStringPboardType
+            NSRequiredContext: {}
+          - NSMenuItem:
+              default: Add Selection to Arbor Inbox
+            NSMessage: addSelectionToInbox
+            NSPortName: Arbor
+            NSSendTypes:
+              - NSStringPboardType
+            NSRequiredContext: {}
     entitlements:
       path: App/Resources/Arbor.entitlements
       properties:
@@ -238,6 +270,30 @@ targets:
         com.apple.security.temporary-exception.mach-lookup.global-name:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
+  # F-INT-4 (ADR-0030): the stdio MCP helper. NOT sandboxed by design:
+  # launched by the user's MCP client, it reads/writes the user's map
+  # files directly (with file coordination) when the app is closed, and
+  # connects to the app's Unix socket when it is running.
+  arbor-mcp:
+    type: tool
+    platform: macOS
+    sources:
+      - Tools/arbor-mcp/Sources
+    dependencies:
+      - package: MapCore
+      - package: MapIO
+      - package: MapStudy
+      - package: MapAutomation
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.arbor.mcp
+        # Config.xcconfig's PRODUCT_NAME would otherwise name the helper
+        # executable "Arbor", colliding with the app binary in the
+        # bundle's Contents/MacOS.
+        PRODUCT_NAME: arbor-mcp
+        PRODUCT_MODULE_NAME: arbor_mcp
+        ENABLE_HARDENED_RUNTIME: YES
   ArborTests:
     type: bundle.unit-test
     platform: macOS
@@ -261,6 +317,7 @@ targets:
       - package: MapIO
       - package: MapLibrary
       - package: MapAI
+      - package: MapAutomation
     settings:
       base:
         PRODUCT_NAME: ArborTests
@@ -389,3 +446,7 @@ schemes:
     test:
       targets:
         - ArborTests
+  arbor-mcp:
+    build:
+      targets:
+        arbor-mcp: all

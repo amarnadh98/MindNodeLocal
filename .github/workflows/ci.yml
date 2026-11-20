@@ -26,6 +26,7 @@ jobs:
           - MapStudy
           - MapAI
           - MapLibrary
+          - MapAutomation
           - CanvasKit
           - ArborUI
     steps:
@@ -45,6 +46,7 @@ jobs:
           swift format lint --strict --configuration .swift-format -r Packages
           swift format lint --strict --configuration .swift-format -r App
           swift format lint --strict --configuration .swift-format -r Extensions
+          swift format lint --strict --configuration .swift-format -r Tools
       - name: Install SwiftLint
         run: brew install swiftlint
       - name: SwiftLint

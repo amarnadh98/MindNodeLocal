@@ -25,8 +25,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         libraryCoordinator = LibraryCoordinator()
         // F-QEN-1: the global hotkey and the menu-bar extra.
         QuickEntryCoordinator.shared.start()
+        // F-INT-6: the Services menu responder (Info.plist NSServices).
+        NSApp.servicesProvider = ServicesResponder.shared
+        // F-INT-4: the local MCP socket endpoint (ADR-0030), read-only
+        // by default; the helper falls back to files when it is down.
+        AutomationRuntime.start()
         // F-ONB-1: once per user, before any document opens.
         welcomeCoordinator.showIfNeeded()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AutomationRuntime.stop()
     }
 
     /// Window ▸ Library (⇧⌘L, SPEC §4). AppKit calls delegate actions on
@@ -54,9 +63,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// importer's own message. Declared as handled here so AppKit's
     /// default document-controller routing (which would hand the file to
     /// `MapDocument.read` without the untitling bookkeeping below) is
-    /// replaced by the explicit import path.
+    /// replaced by the explicit import path. F-INT-5: `x-arbor://` links
+    /// (open/new/add/study) route to automation; malformed links surface
+    /// a readable alert, never a crash.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
+            if !url.isFileURL {
+                AutomationRouter.shared.open(url)
+                continue
+            }
             // F-STY-5: .arbortheme files install into the themes
             // folder instead of opening as documents.
             if url.pathExtension.lowercased() == ThemeCatalog.themeFileExtension {
@@ -721,6 +736,8 @@ extension AppDelegate {
         let services = NSMenuItem()
         services.title = "Services"
         services.submenu = NSMenu(title: "Services")
+        // AppKit fills the menu it is told about (F-INT-6).
+        NSApp.servicesMenu = services.submenu
         appMenu.addItem(services)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide \(appName)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
