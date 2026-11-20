@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import CoreGraphics
 import Foundation
 import MapCore
@@ -513,5 +514,28 @@ private final class EditingHarness {
                 model: self.store.model, variant: .light, measurer: SceneRenderer.sharedMeasurer,
                 editingTitle: (id, draft))
         }
+    }
+}
+
+/// The overlay editor must show the face the node was laid out with, or
+/// the text changes typeface the moment editing starts.
+@MainActor
+struct EditorFontTests {
+    @Test func theRoundedFamilyTokenGivesTheRoundedFaceInTheEditorAndTheLabelEditor() {
+        for weight: CGFloat in [0, 0.23, 0.3] {
+            let spec = FontSpec(size: 18, weight: weight, family: FontSpec.roundedFamily)
+            #expect(NodeTextEditor.nsFont(for: spec).fontName.contains("Rounded"), "weight \(weight)")
+            #expect(ConnectionLabelEditor.nsFont(for: spec).fontName.contains("Rounded"), "weight \(weight)")
+            // Same face as the one the measurer uses.
+            #expect(
+                NodeTextEditor.nsFont(for: spec).fontName
+                    == (CTFontCopyPostScriptName(spec.ctFont) as String))
+        }
+    }
+
+    @Test func thePlainSystemFontIsUnchanged() {
+        let font = NodeTextEditor.nsFont(for: FontSpec(size: 16, weight: 0.23))
+        #expect(!font.fontName.contains("Rounded"))
+        #expect(font.pointSize == 16)
     }
 }

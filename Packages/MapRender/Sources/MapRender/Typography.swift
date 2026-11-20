@@ -28,7 +28,10 @@ public struct FontSpec: Sendable, Hashable {
         self.monospace = monospace
     }
 
-    var ctFont: CTFont {
+    /// The Core Text font the measurer and renderer use for this spec.
+    /// Toll-free bridged to `NSFont`, so an overlay editor can show the
+    /// exact face the node was laid out with.
+    public var ctFont: CTFont {
         if monospace {
             return CTFontCreateWithName("Menlo-Regular" as CFString, size, nil)
         }

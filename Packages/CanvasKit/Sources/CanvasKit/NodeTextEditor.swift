@@ -392,6 +392,10 @@ public final class NodeTextEditor {
         if spec.monospace {
             return NSFont(name: "Menlo-Regular", size: spec.size) ?? NSFont.systemFont(ofSize: spec.size)
         }
+        if spec.family == FontSpec.roundedFamily {
+            // The same Core Text font the measurer laid the node out with.
+            return unsafeBitCast(spec.ctFont, to: NSFont.self)
+        }
         if let family = spec.family {
             return NSFont(name: family, size: spec.size) ?? NSFont.systemFont(ofSize: spec.size)
         }

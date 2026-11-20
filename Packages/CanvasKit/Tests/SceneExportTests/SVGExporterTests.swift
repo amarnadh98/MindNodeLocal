@@ -1,5 +1,6 @@
 import Foundation
 import MapCore
+import MapRender
 import Testing
 
 @testable import SceneExport
@@ -85,4 +86,10 @@ struct SVGExporterTests {
     }
 }
 
-private final class WellFormednessChecker: NSObject, XMLParserDelegate {}
+private final class WellFormednessChecker: NSObject, XMLParserDelegate {
+    @Test func theRoundedFamilyTokenBecomesARealCSSFontStack() {
+        let stack = SVGSupport.fontFamily(FontSpec(size: 18, family: FontSpec.roundedFamily))
+        #expect(stack.contains("ui-rounded"))
+        #expect(!stack.contains("system-rounded"), "the internal token must never reach the SVG")
+    }
+}

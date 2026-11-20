@@ -80,6 +80,9 @@ public final class ConnectionLabelEditor {
         if font.monospace {
             return NSFont.monospacedSystemFont(ofSize: font.size, weight: weight)
         }
+        if font.family == FontSpec.roundedFamily {
+            return unsafeBitCast(font.ctFont, to: NSFont.self)
+        }
         if let family = font.family, let named = NSFont(name: family, size: font.size) {
             return named
         }
