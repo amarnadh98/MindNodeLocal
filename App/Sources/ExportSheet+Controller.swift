@@ -25,7 +25,8 @@ extension DocumentWindowController {
         let scene =
             canvas.scene
             ?? ExportCoordinator.scene(
-                for: mapDocument.model, variant: exportVariant)
+                for: mapDocument.model, variant: exportVariant,
+                theme: ThemeCatalog.shared.theme(for: mapDocument.model))
         let variant = exportVariant
         let selection = canvas.selection
         let model = mapDocument.model
@@ -40,7 +41,8 @@ extension DocumentWindowController {
                 renderPreview: { updated in
                     ExportPreview.render(
                         choice: updated, model: model, scene: scene, selection: selection,
-                        variant: variant, documentTitle: documentTitle)
+                        variant: variant, documentTitle: documentTitle,
+                        theme: ThemeCatalog.shared.theme(for: model))
                 },
                 onExport: { chosen in
                     if let sheet = window.attachedSheet {
@@ -84,7 +86,8 @@ extension DocumentWindowController {
                 model: mapDocument.model,
                 scene: canvas.scene
                     ?? ExportCoordinator.scene(
-                        for: mapDocument.model, variant: exportVariant),
+                        for: mapDocument.model, variant: exportVariant,
+                        theme: ThemeCatalog.shared.theme(for: mapDocument.model)),
                 selection: canvas.selection,
                 variant: exportVariant,
                 documentTitle: mapDocument.displayName ?? "Untitled")

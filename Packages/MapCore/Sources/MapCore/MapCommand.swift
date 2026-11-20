@@ -123,6 +123,10 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// stored theme overrides. `nil` clears the selection back to the
     /// default theme.
     case setTheme(id: String?)
+    /// Sets the document's appearance override (F-STY-6): auto follows
+    /// the system, light/dark pin the variant the document renders and
+    /// exports in. The exact inverse snapshots the pre-state.
+    case setAppearance(mode: AppearanceMode)
     /// Replaces the whole presentation list (M6, F-PRE-2/3). Every
     /// slide-authoring action (add/reorder/duplicate/rename/delete
     /// slide, notes, build orders, presentation create/rename/delete)
@@ -194,6 +198,7 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .removeSummary: "Delete Summary"
         case .recolorBranches: "Recolor Branches"
         case .setTheme: "Set Theme"
+        case .setAppearance: "Set Appearance"
         case .setPresentations: "Edit Slides"
         case .setStudy(let name, _, _): name
         case .setLink: "Set Link"

@@ -12,5 +12,8 @@ extension DocumentWindowController {
     func performDragDrop(_ command: MapCommand?, selection: Set<String>) {
         guard let command else { return }
         perform(command) { _ in selection }
+        // F-ONB-4: the first reparent is the moment the free-placement
+        // tip earns its keep.
+        showDragTipOnce()
     }
 }

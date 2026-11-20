@@ -178,6 +178,41 @@ struct PaletteIndexTests {
     @Test func setThemeDisplayNameFeedsTheUndoMenu() {
         #expect(MapCommand.setTheme(id: "ocean").displayName == "Set Theme")
         #expect(MapCommand.recolorBranches(assignments: []).displayName == "Recolor Branches")
+        #expect(MapCommand.setAppearance(mode: .dark).displayName == "Set Appearance")
+    }
+
+    /// F-STY-6: the per-document appearance override is one undoable
+    /// command with an exact inverse; `auto` and a missing value are the
+    /// same state, normalized so undo restores either.
+    @Test func setAppearanceAppliesAndInvertsExactly() throws {
+        var model = paletteModel()
+        let change = MapCommand.setAppearance(mode: .dark)
+        let undo = try change.inverse(in: model)
+        try change.apply(to: &model)
+        #expect(model.appearance == .dark)
+        try undo.apply(to: &model)
+        // A missing value and `auto` are the same state; undo
+        // normalizes to `auto`.
+        #expect(model.appearance == .auto)
+
+        // Light → dark → light, with the inverse snapshotted before.
+        var pinned = paletteModel()
+        pinned.appearance = .light
+        let back = try MapCommand.setAppearance(mode: .dark).inverse(in: pinned)
+        try MapCommand.setAppearance(mode: .dark).apply(to: &pinned)
+        try back.apply(to: &pinned)
+        #expect(pinned.appearance == .light)
+
+        var auto = paletteModel()
+        try MapCommand.setAppearance(mode: .dark).apply(to: &auto)
+        let autoUndo = try MapCommand.setAppearance(mode: .dark).inverse(in: paletteModel())
+        try autoUndo.apply(to: &auto)
+        #expect(auto.appearance == .auto)
+
+        // The override persists through the package round trip.
+        var saved = paletteModel()
+        try MapCommand.setAppearance(mode: .dark).apply(to: &saved)
+        #expect(try MapDocumentCoder.roundTrip(saved).appearance == .dark)
     }
 
     @Test func paletteIndexRoundTripsThroughMapJSON() throws {

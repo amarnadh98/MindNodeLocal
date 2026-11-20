@@ -12,6 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// observed from the first document on.
     private var libraryCoordinator: LibraryCoordinator?
 
+    /// F-ONB-1: the first-launch welcome (Help ▸ Welcome to Arbor
+    /// reopens it through the AppDelegate+Help extension).
+    let welcomeCoordinator = WelcomeCoordinator()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // SPEC §12 / ADR-0021: before anything can construct the
         // updater, register automatic checks OFF for first launch.
@@ -20,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         libraryCoordinator = LibraryCoordinator()
         // F-QEN-1: the global hotkey and the menu-bar extra.
         QuickEntryCoordinator.shared.start()
+        // F-ONB-1: once per user, before any document opens.
+        welcomeCoordinator.showIfNeeded()
     }
 
     /// Window ▸ Library (⇧⌘L, SPEC §4). AppKit calls delegate actions on
@@ -50,6 +56,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// replaced by the explicit import path.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
+            // F-STY-5: .arbortheme files install into the themes
+            // folder instead of opening as documents.
+            if url.pathExtension.lowercased() == ThemeCatalog.themeFileExtension {
+                installTheme(at: url)
+                continue
+            }
             do {
                 _ = try DocumentImporter.openForeignDocument(at: url)
             } catch {
@@ -353,6 +365,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
                     item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
                     .separator(),
+                    // F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays
+                    // File ▸ Export…, SPEC §5.17).
+                    item(
+                        "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
+                        "E", modifiers: [.command, .shift]),
                 ] + contentFormatItems()))
         mainMenu.addItem(
             menu(
@@ -420,6 +437,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Show Tag Pills", #selector(DocumentWindowController.showTagPillsAction(_:)),
                         ""),
+                    // F-STY-6: the per-document appearance override. The
+                    // radios validate against the model (checkmark) and
+                    // perform ONE `setAppearance` command.
+                    appearanceMenuItem(),
                 ]))
         mainMenu.addItem(studyMenuItem())
         mainMenu.addItem(
@@ -622,16 +643,6 @@ extension AppDelegate {
         appMenuItem.title = appName
         appMenuItem.submenu = appMenu
         return appMenuItem
-    }
-
-    private func helpMenuItem() -> NSMenuItem {
-        let helpItem = NSMenuItem()
-        let helpMenu = NSMenu(title: "Help")
-        helpMenu.addItem(
-            withTitle: "\(AppIdentity.appName) Help", action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "")
-        helpItem.title = "Help"
-        helpItem.submenu = helpMenu
-        return helpItem
     }
 
     private func menu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {

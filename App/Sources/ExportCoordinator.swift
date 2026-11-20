@@ -52,23 +52,28 @@ enum ExportCoordinator {
     }
 
     /// The scene the graphic formats render from, built from scratch
-    /// when the caller has none (tests, Quick Look).
+    /// when the caller has none (tests, Quick Look). `theme` overrides
+    /// the model's theme id — the MainActor callers resolve user themes
+    /// through the catalog first (F-STY-5).
     static func scene(
-        for model: MapModel, variant: ThemeVariant, measurer: TextMeasurer = SceneRenderer.sharedMeasurer
+        for model: MapModel, variant: ThemeVariant, measurer: TextMeasurer = SceneRenderer.sharedMeasurer,
+        theme: MapRender.Theme? = nil
     ) -> CanvasScene {
-        SceneGeometry.build(model: model, variant: variant, measurer: measurer)
+        SceneGeometry.build(model: model, variant: variant, measurer: measurer, theme: theme)
     }
 
     /// The exported bytes for `choice`, plus the format metadata the
     /// save panel needs. `selection` seeds the PDF "selection subtree"
-    /// content option.
+    /// content option. `theme` resolves user themes when the caller
+    /// has no live scene.
     static func exportData(
         choice: ExportChoice,
         model: MapModel,
         scene: CanvasScene?,
         selection: Set<String>,
         variant: ThemeVariant,
-        documentTitle: String
+        documentTitle: String,
+        theme: MapRender.Theme? = nil
     ) throws -> Data {
         guard let format = format(for: choice) else {
             throw DocumentIOError.notImplemented("unknown export format \(choice.formatID)")
@@ -92,7 +97,7 @@ enum ExportCoordinator {
             return Data(FreeMindIO.exportDocument(model).utf8)
         case DocumentFormats.pdf.id:
             return try PDFExporter.export(
-                scene: scene ?? Self.scene(for: model, variant: variant),
+                scene: scene ?? Self.scene(for: model, variant: variant, theme: theme),
                 model: model,
                 options: pdfOptions(choice, selection: selection, title: documentTitle))
         case DocumentFormats.png.id,
@@ -103,7 +108,7 @@ enum ExportCoordinator {
                 transparentBackground: choice.imageTransparent)
             options.margin = 24
             return try ImageExporter.export(
-                scene: scene ?? Self.scene(for: model, variant: variant),
+                scene: scene ?? Self.scene(for: model, variant: variant, theme: theme),
                 model: model, options: options
             ).data
         case DocumentFormats.svg.id:
@@ -112,7 +117,7 @@ enum ExportCoordinator {
             options.margin = 24
             return Data(
                 SVGExporter.export(
-                    scene: scene ?? Self.scene(for: model, variant: variant),
+                    scene: scene ?? Self.scene(for: model, variant: variant, theme: theme),
                     model: model, options: options
                 ).utf8)
         default:
@@ -198,14 +203,16 @@ enum ExportPreview {
 
     /// Renders a small preview: rasters get a 256 px PNG thumbnail; PDF
     /// and SVG get their rasterized/thumbnail PNG; text formats show the
-    /// exported bytes.
+    /// exported bytes. `theme` resolves user themes when no live scene
+    /// exists.
     static func render(
         choice: ExportChoice,
         model: MapModel,
         scene: CanvasScene?,
         selection: Set<String>,
         variant: ThemeVariant,
-        documentTitle: String
+        documentTitle: String,
+        theme: MapRender.Theme? = nil
     ) -> ExportPreview {
         // Thumbnails mirror the live document: whatever the format, a
         // small PNG of the map (or the outline's first lines) reads
@@ -227,7 +234,7 @@ enum ExportPreview {
             }
         }
         do {
-            let mapScene = scene ?? ExportCoordinator.scene(for: model, variant: variant)
+            let mapScene = scene ?? ExportCoordinator.scene(for: model, variant: variant, theme: theme)
             var options = ImageExportOptions(format: .png, targetLongEdgePixels: 256)
             options.margin = 24
             let result = try ImageExporter.export(scene: mapScene, model: model, options: options)

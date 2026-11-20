@@ -43,21 +43,37 @@ struct LibraryView: View {
         }
     }
 
+    /// F-ONB-3's Library empty state: designed, not defaulted — the
+    /// two doors out of an empty library (new map / template) plus the
+    /// watch-folder suggestion.
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "map")
                 .font(.system(size: 42))
                 .foregroundStyle(.secondary)
             if model.section == .recents && model.folderPaths.isEmpty {
-                Text("No recent maps yet. Add a folder or create a map from a template.")
+                Text("No recent maps yet.")
+                    .font(.title3)
+                Text("Start a new map, or add a folder to watch the maps you already keep there.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
-                if let suggestion = model.suggestedFolder {
-                    Button("Watch \(suggestion.lastPathComponent)") {
-                        Task { await model.addWatchedFolder(at: suggestion) }
+                HStack {
+                    Button("New Map") { model.newMap() }
+                        .buttonStyle(.borderedProminent)
+                    Button("New from Template…") { model.section = .templates }
+                    if let suggestion = model.suggestedFolder {
+                        Button("Watch \(suggestion.lastPathComponent)") {
+                            Task { await model.addWatchedFolder(at: suggestion) }
+                        }
                     }
                 }
             } else {
-                Text("Nothing here").foregroundStyle(.secondary)
+                Text("Nothing here")
+                    .font(.title3)
+                Text("Maps in this section will appear as you create and save them.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button("New Map") { model.newMap() }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

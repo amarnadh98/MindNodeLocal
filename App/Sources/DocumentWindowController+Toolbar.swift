@@ -382,6 +382,7 @@ extension DocumentWindowController {
                 }
         default:
             return validateRelationMenuItem(menuItem) ?? validateFocusFindMenuItem(menuItem)
+                ?? validateThemesMenuItem(menuItem)
                 ?? validateDocumentSafetyMenuItem(menuItem) ?? true
         }
     }

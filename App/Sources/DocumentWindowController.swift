@@ -224,6 +224,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             }
             canvas.setSelection([rootID])
             canvas.beginEditing(nodeID: rootID, placeholder: "Central Idea")
+            // F-ONB-4: the keyboard-first tip rides the brand-new
+            // document's first frame.
+            showTipOnce(TipCenter.keyboardFirstTip)
         }
         // The camera may not have changed (a restored state that equals
         // the default never fired `onCameraChange`), so seed the minimap
@@ -301,7 +304,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             variant: variant,
             measurer: SceneRenderer.sharedMeasurer,
             showsTagPills: showsTagPills,
-            editingTitle: editingDraftTitle)
+            editingTitle: editingDraftTitle,
+            theme: ThemeCatalog.shared.theme(for: model))
         canvas.scene = scene
         // F-CAN-6: the minimap mirrors the rebuilt scene (its cached
         // image re-renders here, on scene change only).
@@ -334,7 +338,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             variant: currentVariant(),
             measurer: SceneRenderer.sharedMeasurer,
             dirty: [id],
-            editingTitle: editingDraftTitle)
+            editingTitle: editingDraftTitle,
+            theme: ThemeCatalog.shared.theme(for: model))
         canvas.scene = scene
         canvas.dragModel = model
     }
@@ -374,7 +379,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 variant: currentVariant(),
                 measurer: SceneRenderer.sharedMeasurer,
                 dirty: dirty,
-                editingTitle: editingDraftTitle)
+                editingTitle: editingDraftTitle,
+                theme: ThemeCatalog.shared.theme(for: model))
             canvas.scene = scene
             canvas.dragModel = model
         } else {
@@ -399,6 +405,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         window?.title = document?.displayName ?? window?.title ?? ""
         // M6 (F-PRE-2): authored slide changes rebuild the sidebar.
         refreshSlidesSidebar()
+        // F-ONB-4: a map crossing the fold-tip threshold gets (at most)
+        // the session's one tip.
+        showMapGrewTipIfNeeded(nodeCount: model.nodes.count)
     }
 
     // MARK: view state (F-CAN-8, ADR-0005)
@@ -555,12 +564,12 @@ extension DocumentWindowController {
     }
 
     /// The selection, sorted for deterministic command order.
-    private var selectedIDs: [String] {
+    var selectedIDs: [String] {
         canvas.selection.sorted()
     }
 
     /// One grouped command from `commands`, or nil when empty.
-    private func grouped(_ name: String, _ commands: [MapCommand]) -> MapCommand? {
+    func grouped(_ name: String, _ commands: [MapCommand]) -> MapCommand? {
         switch commands.count {
         case 0:
             nil
@@ -664,7 +673,8 @@ extension DocumentWindowController {
         var probe = store.model
         try? MapCommand.addRoot(index: nil, node: node).apply(to: &probe)
         let probeScene = SceneGeometry.build(
-            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer)
+            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: probe))
         let autoFrame = probeScene.nodes[node.id]?.frame ?? .zero
         let offset = ModelOffset(
             x: modelPoint.x - autoFrame.midX,
@@ -878,49 +888,6 @@ extension DocumentWindowController {
             commands.append(outdent ? .promote(id: id) : .demote(id: id))
         }
         if let command = grouped("Move Node", commands) {
-            performKeepingSelection(command)
-        }
-    }
-
-    // MARK: fold (F-LAY-14)
-
-    @objc func toggleFoldAction(_ sender: Any?) {
-        guard !canvas.isEditing, let store else { return }
-        var commands: [MapCommand] = []
-        for id in selectedIDs {
-            // A leaf has nothing to fold.
-            guard let node = store.model.nodes[id], !node.children.isEmpty else { continue }
-            commands.append(.setFolded(id: id, folded: !node.folded))
-        }
-        if let command = grouped("Fold Node", commands) {
-            performKeepingSelection(command)
-        }
-    }
-
-    /// ⌥⌘.: the selection folds/unfolds together with its siblings — one
-    /// grouped command, one undo step.
-    @objc func foldWithSiblingsAction(_ sender: Any?) {
-        guard !canvas.isEditing, let store else { return }
-        if let command = Folding.toggleWithSiblingsCommand(selection: selectedIDs, in: store.model) {
-            performKeepingSelection(command)
-        }
-    }
-
-    /// ⌃⌥.: unfolds each selected node one level; never folds.
-    @objc func unfoldOneLevelAction(_ sender: Any?) {
-        guard !canvas.isEditing, let store else { return }
-        if let command = Folding.unfoldOneLevelCommand(selection: selectedIDs, in: store.model) {
-            performKeepingSelection(command)
-        }
-    }
-
-    /// ⌃1–⌃5 / ⌃0 (Show Levels, §6.1): one grouped command that folds
-    /// everything below the menu item's level; 0 shows all. No-op states
-    /// emit no command, so no phantom undo step registers.
-    @objc func showLevelsAction(_ sender: Any?) {
-        guard !canvas.isEditing, let store else { return }
-        let levels = (sender as? NSMenuItem)?.tag ?? 0
-        if let command = Folding.showLevelsCommand(levels: levels, in: store.model) {
             performKeepingSelection(command)
         }
     }

@@ -240,7 +240,7 @@ public struct ThemeScheme: Codable, Sendable, Hashable {
 /// How branches are drawn (SPEC §7.4). `tapered` is Paper's default;
 /// `taper` is the width fall-off from `startWidth` at the root down to
 /// `endWidth` at the leaves.
-public enum BranchLineStyle: String, Codable, Sendable {
+public enum BranchLineStyle: String, Codable, Sendable, CaseIterable {
     case curved
     case tapered
     case straight

@@ -225,7 +225,8 @@ final class AIController {
             probe.nodes[parentID]?.children.append(suggestion.id)
         }
         let scene = SceneGeometry.build(
-            model: probe, variant: host.effectiveThemeVariant, measurer: SceneRenderer.sharedMeasurer)
+            model: probe, variant: host.effectiveThemeVariant, measurer: SceneRenderer.sharedMeasurer,
+            theme: ThemeCatalog.shared.theme(for: probe))
         let items = suggestions.compactMap { suggestion -> GhostPresentation.Item? in
             guard let node = scene.nodes[suggestion.id] else { return nil }
             return GhostPresentation.Item(id: suggestion.id, node: node)

@@ -224,15 +224,26 @@ struct SlidesSidebarView: View {
         }
     }
 
+    /// F-ONB-3's Slides empty state: designed — the symbol, the one
+    /// sentence of guidance, and the door that fixes it.
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: "rectangle.stack.badge.play")
-                .font(.system(size: 28))
+                .font(.system(size: 32))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("No presentations yet")
+                .font(.headline)
+            Text("Capture the map as slides, then present it with one key per step.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Button("New Presentation", action: actions.newDeck)
+                .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No presentations yet. New Presentation button.")
     }
 
     private func slideList(_ deck: Presentation) -> some View {
@@ -270,8 +281,16 @@ struct SlidesSidebarView: View {
         .frame(minHeight: 120)
         .overlay {
             if deck.slides.isEmpty {
-                Text("Add a slide with the button above.")
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 6) {
+                    Image(systemName: "slide")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text("No slides yet — Add Slide captures the map as it looks now.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
             }
         }
     }
