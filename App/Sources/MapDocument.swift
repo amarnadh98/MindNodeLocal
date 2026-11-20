@@ -236,6 +236,19 @@ final class MapDocument: NSDocument {
 
     override static var autosavesInPlace: Bool { true }
 
+    /// False inside the hosted test runner. Tests leave documents dirty
+    /// and remove their temp folders. A timed autosave that fires late
+    /// then fails and AppKit shows its error as a modal alert. That modal
+    /// blocks the test host from exiting (CI hung for hours after the
+    /// tests had passed). Explicit `autosave(withImplicitCancellability:)`
+    /// calls still run.
+    nonisolated static let schedulesAutosaving = NSClassFromString("XCTestCase") == nil
+
+    override func scheduleAutosaving() {
+        guard Self.schedulesAutosaving else { return }
+        super.scheduleAutosaving()
+    }
+
     /// The native package plus every importable foreign format (F-IO):
     /// the open panel offers them, and the `read(from:ofType:)` override
     /// imports them as new untitled documents.
