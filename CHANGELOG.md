@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+### Fixed (app)
+- Blank-node drop no longer loses text (ADR-0034): a node created and left empty is now dropped by ONE deterministic delete command instead of `UndoManager.undo()`. With the app's real event undo grouping, a ⏎ commit-and-create pressed the just-typed `editText` and the post-commit add into ONE undo group, so the old drop's `undo()` also reverted the typed text of the node above — reported from real use as "click anywhere and the box I typed into goes blank". ⌘Z after the drop now restores the blank box like any delete step; no other node's text ever changes. Covered by hosted tests that keep `groupsByEvent` on, drive real key events (⏎ = keyCode 36) and reproduce the loss on the pre-fix code.
+- New siblings and inserted parents inherit the anchor's pinned side (ADR-0034, F-LAY-1): ⏎ after typing in a right-side box creates the next box on the RIGHT (⌥⏎/⌥⇥, the toolbar and VoiceOver sibling/parent actions too), instead of on the left where the balanced layout's unpinned alternation put it. A new child keeps no pin; the Node Well still pins root children by the clicked side.
+- No stray empty boxes survive any creation path (F-EDT-1 audit): a blank ⌥⇥ inserted parent is now dropped on its first empty commit, promoting the typed anchor back into its exact slot (Escape and click-away alike); ⎋ on a node just created and still empty drops it, and a session ended by focus loss (window switch) cleans up the same way. ⇧⏎ new roots and double-click floating roots that are never typed into are removed again unless they are the map's only root.
+
 ### Added
 - Product & technical specification (SPEC.md), research notes, ADR-0001.
 - M0 foundation: 9 SPM packages under `Packages/` (Swift 6 strict concurrency, macOS 26 minimum).

@@ -214,6 +214,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// commit (the draft becomes the model's title).
     var editingDraftTitle: (id: String, title: NodeTitle)?
 
+    /// The node the most recent create step left as a freshly inserted
+    /// parent (⌥⇥ / Insert Parent), still awaiting its first commit. It
+    /// owns the anchor as its child, so the blank-leaf rule can't see
+    /// it as blank; this record lets `handleEditingCommit` tidy it up
+    /// anyway — an editing session that ends empty deletes it,
+    /// promoting the anchor back into its slot (F-EDT-1's
+    /// no-stray-box audit). Consumed by that node's first commit.
+    var freshInsertedParentID: String?
+
     /// Per-document scene build caches for the incremental path (SPEC
     /// §11.3): measured sizes and per-root layout state, filled by every
     /// full build and reused by `modelDidChange`'s small-change path.
@@ -590,10 +599,22 @@ extension DocumentWindowController {
 
     /// Builds one grouped add command over the selection, selects the
     /// fresh nodes afterwards and — when exactly one was created, the
-    /// keyboard case — opens the new node in the editor (F-EDT-1).
-    private func addCommand(_ make: (String, Node) -> MapCommand) {
+    /// keyboard case — opens the new node in the editor (F-EDT-1),
+    /// returning it. `inheritingSide`: a sibling or inserted parent
+    /// copies the anchor's pinned side (F-LAY-1), so it lands on the
+    /// same side of the balanced map; a child keeps no pin.
+    @discardableResult
+    func addCommand(
+        inheritingSide: Bool = false, _ make: (String, Node) -> MapCommand
+    ) -> String? {
         let anchors = selectedIDs
-        let nodes = anchors.map { _ in Node(id: UUID().uuidString) }
+        let nodes = anchors.map { anchor in
+            var node = Node(id: UUID().uuidString)
+            if inheritingSide {
+                node.side = store?.model.nodes[anchor]?.side
+            }
+            return node
+        }
         var commands: [MapCommand] = []
         for (anchor, node) in zip(anchors, nodes) {
             commands.append(make(anchor, node))
@@ -603,206 +624,10 @@ extension DocumentWindowController {
             perform(command) { _ in created }
             if created.count == 1, let newID = created.first {
                 canvas.beginEditing(nodeID: newID)
+                return newID
             }
         }
-    }
-
-    // MARK: inline editing (SPEC §11.4, F-EDT-1/2)
-
-    /// One editing commit: ONE `editText` command through the store
-    /// (F-DOC-2), the session closed so the next edit of the same node is
-    /// its own undo step, then the post-commit create (if any) with the
-    /// new node selected and in edit mode. Internal: the hosted tests
-    /// drive the real commit path (the M3 smart-typing suites).
-    func handleEditingCommit(id: String, title: NodeTitle, next: NodeTextEditor.PostCommitAction) {
-        editingDraftTitle = nil
-        guard let store else { return }
-        // A node made and left empty just goes away — no stray blank boxes
-        // to tidy up. (Clearing an existing node's text keeps the node.)
-        if title.text.isEmpty, dropBlankNewNode(id) { return }
-        if store.model.nodes[id]?.title != title {
-            // F-EDT-10 smart typing: one grouped command carries the
-            // whole parse — `#tag` tokens, the task prefixes, `$$math$$`,
-            // ``` code fences and the `--` note split — so the entire
-            // commit is one undo step.
-            let parse = SmartTyping.parseCommit(in: title)
-            if parse == SmartTyping.CommitParse(title: title) {
-                try? store.perform(.editText(id: id, title: title))
-            } else {
-                try? store.perform(
-                    .smartCommit(id: id, parse: parse, in: store.model))
-            }
-        }
-        // One undo step per edit session (F-DOC-2): close the typing
-        // session so a second session on this node registers separately.
-        store.closeEditSession()
-        canvas.setSelection([id])
-
-        switch next {
-        case .none:
-            break
-        case .child:
-            createAfterCommit(anchor: id) { .addChild(parent: $0, index: nil, node: $1) }
-        case .siblingBelow:
-            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: false, node: $1) }
-        case .siblingAbove:
-            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: true, node: $1) }
-        case .insertParent:
-            createAfterCommit(anchor: id) { .insertParent(anchor: $0, node: $1) }
-        }
-    }
-
-    /// True when `id` was an empty, contentless leaf before this editing
-    /// session (the stored title is still empty) and is not the map's
-    /// only root. Deletes it, selects what the delete leaves selected,
-    /// and reports whether it did.
-    private func dropBlankNewNode(_ id: String) -> Bool {
-        guard let store, let node = store.model.nodes[id], Self.isBlankLeaf(node),
-            node.parent != nil || store.model.roots.count > 1
-        else { return false }
-        store.closeEditSession()
-        let replacement = MapStore.selectionAfterDelete(
-            model: store.model, deletedIDs: [id], selection: [id])
-        // Best: undo the creation itself, so ⌘Z never resurrects a blank
-        // box and the undo stack stays clean. Only when the newest undo
-        // step is exactly that creation (one node fewer, this one gone);
-        // otherwise redo it and fall back to an ordinary delete.
-        let manager = store.undoManager
-        let nodeCount = store.model.nodes.count
-        if manager.canUndo {
-            manager.undo()
-            if store.model.nodes[id] == nil, store.model.nodes.count == nodeCount - 1 {
-                canvas.setSelection(replacement)
-                return true
-            }
-            if manager.canRedo { manager.redo() }
-        }
-        perform(.deleteSubtrees(ids: [id])) { _ in replacement }
-        return true
-    }
-
-    /// No text, children or content of any kind.
-    static func isBlankLeaf(_ node: Node) -> Bool {
-        node.title.text.isEmpty && node.children.isEmpty && (node.note ?? "").isEmpty
-            && node.task == nil && (node.tags ?? []).isEmpty && (node.markers ?? []).isEmpty
-            && node.image == nil && (node.attachments ?? []).isEmpty && node.link == nil
-            && node.source == nil && node.math != true
-    }
-
-    /// The create half of commit-and-create (F-EDT-1): one add command
-    /// relative to the just-committed node, then edit the fresh node.
-    private func createAfterCommit(anchor: String, _ make: (String, Node) -> MapCommand) {
-        let node = Node(id: UUID().uuidString)
-        perform(make(anchor, node)) { _ in [node.id] }
-        canvas.beginEditing(nodeID: node.id)
-    }
-
-    /// F-CAN-5: double-click on empty canvas creates a floating root
-    /// centered at that point. Roots carry no absolute position, so the
-    /// click point is stored as the root's manual `offset` from its auto
-    /// slot (SPEC §8.2); `SceneGeometry` applies offsets after auto
-    /// layout (also the F-LAY-11 groundwork). One undoable grouped
-    /// command, then edit mode.
-    private func createFloatingNode(at modelPoint: CGPoint) {
-        guard let store else { return }
-        let node = Node(id: UUID().uuidString)
-        // Probe the post-add layout for the new root's auto slot.
-        var probe = store.model
-        try? MapCommand.addRoot(index: nil, node: node).apply(to: &probe)
-        let probeScene = SceneGeometry.build(
-            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer,
-            theme: ThemeCatalog.shared.theme(for: probe))
-        let autoFrame = probeScene.nodes[node.id]?.frame ?? .zero
-        let offset = ModelOffset(
-            x: modelPoint.x - autoFrame.midX,
-            y: modelPoint.y - autoFrame.midY)
-        let command = MapCommand.group(
-            name: "Add Node",
-            commands: [
-                .addRoot(index: nil, node: node),
-                .setOffset(id: node.id, offset: offset),
-            ])
-        do {
-            try store.perform(command)
-        } catch {
-            return
-        }
-        canvas.setSelection([node.id])
-        canvas.beginEditing(nodeID: node.id)
-    }
-
-    // MARK: create (F-EDT-1)
-
-    /// ⏎/⌘⏎/F2 on a single selected node edits it instead (F-EDT-2);
-    /// while editing, the create keys commit and create (F-EDT-1).
-    @objc func editTitleAction(_ sender: Any?) {
-        if canvas.isEditing {
-            canvas.nodeTextEditor.selectAllText()
-            return
-        }
-        guard canvas.selection.count == 1, let id = canvas.selection.first else { return }
-        canvas.beginEditing(nodeID: id)
-    }
-
-    @objc func addChildAction(_ sender: Any?) {
-        if canvas.isEditing {
-            canvas.commitEditing(next: .child)
-            return
-        }
-        // F-AI-2: ⇥ with ghosts presented accepts ALL suggestions —
-        // one grouped command, one undo step, author .ai.
-        if ai.presentingGhosts {
-            ai.acceptAll()
-            return
-        }
-        addCommand { .addChild(parent: $0, index: nil, node: $1) }
-    }
-
-    @objc func addSiblingBelowAction(_ sender: Any?) {
-        if canvas.isEditing {
-            canvas.commitEditing(next: .siblingBelow)
-            return
-        }
-        if canvas.selection.count == 1, let id = canvas.selection.first {
-            // F-EDT-2: ⏎ on a selected node enters edit mode.
-            canvas.beginEditing(nodeID: id)
-            return
-        }
-        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
-    }
-
-    /// Always creates a sibling below the selection, without ⏎'s
-    /// enter-edit rule — for callers with no keyboard context, such as
-    /// VoiceOver's Add Sibling action and the toolbar button.
-    @objc func addSiblingBelow(_ sender: Any?) {
-        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
-    }
-
-    @objc func addSiblingAboveAction(_ sender: Any?) {
-        if canvas.isEditing {
-            canvas.commitEditing(next: .siblingAbove)
-            return
-        }
-        addCommand { .addSibling(anchor: $0, before: true, node: $1) }
-    }
-
-    @objc func insertParentAction(_ sender: Any?) {
-        if canvas.isEditing {
-            canvas.commitEditing(next: .insertParent)
-            return
-        }
-        addCommand { .insertParent(anchor: $0, node: $1) }
-    }
-
-    @objc func addRootAction(_ sender: Any?) {
-        if canvas.isEditing {
-            // ⇧⏎ inside the text is a line break, not a new root (F-EDT-1).
-            canvas.nodeTextEditor.insertLineBreak()
-            return
-        }
-        let node = Node(id: UUID().uuidString)
-        perform(.addRoot(index: nil, node: node)) { _ in [node.id] }
-        canvas.beginEditing(nodeID: node.id)
+        return nil
     }
 
     // MARK: delete (F-EDT-4)
