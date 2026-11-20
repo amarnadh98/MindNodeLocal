@@ -166,6 +166,15 @@ public final class NodeTextEditor {
         // The node's raster hides its title from now (the overlay draws
         // the live text — SPEC §11.4).
         canvas.editingTargetDidChange()
+        if prefill != nil {
+            // The replace-edit flow (F-EDT-2): the first keystroke already
+            // replaced the title, so the session carries a draft from its
+            // first instant. Publish it — otherwise the node box, its
+            // selection ring and the overlay keep the replaced title's
+            // geometry until the second keystroke, and the box visibly
+            // lags the typed text (F-EDT-8, live growth).
+            textDidChange()
+        }
     }
 
     private func configure(_ view: EditingTextView) {
