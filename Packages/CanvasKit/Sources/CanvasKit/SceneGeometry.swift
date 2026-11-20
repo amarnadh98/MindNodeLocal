@@ -417,8 +417,10 @@ public enum SceneGeometry {
             // the range frames from here and nudges the summary node
             // beyond the brace; the node pass below folds the nudge in.
             var placed: [String: CGRect] = [:]
+            // Manual offsets are rare: skip the per-node lookup when none.
+            let hasOffsets = !offsets.isEmpty
             for (id, frame) in frames {
-                let offset = offsets[id] ?? .zero
+                let offset = hasOffsets ? offsets[id] ?? .zero : .zero
                 placed[id] = frame.offsetBy(dx: offset.x, dy: offsetY + offset.y)
                 rootOf[id] = rootID
             }
@@ -427,13 +429,17 @@ public enum SceneGeometry {
 
             var bottom = (frames[rootID]?.maxY ?? 0)
             var rootFoldedIDs: Set<String> = []
+            // Summary nudges and decorations are the exception, not the
+            // rule: skip their per-node lookups when the maps are empty.
+            let hasAdjustments = !adjustments.isEmpty
+            let hasDecorations = !cache.decorations.isEmpty
             for (id, frame) in placed {
                 guard let node = model.nodes[id] else { continue }
                 let info = ancestry[id] ?? AncestryInfo(depth: 0, level1AncestorID: id)
                 let level1Index =
                     info.depth == 0 ? 0 : rootLevel1Index[info.level1AncestorID] ?? 0
                 let title = id == editingTitle?.id ? editingTitle?.title : node.title
-                let adjust = adjustments[id] ?? .zero
+                let adjust = hasAdjustments ? adjustments[id] ?? .zero : .zero
                 let translated = frame.offsetBy(dx: adjust.x, dy: adjust.y)
                 // F-STY-2/F-STY-3: the override seam. Nil-patch nodes
                 // (the overwhelming majority) resolve to the memoized
@@ -452,7 +458,7 @@ public enum SceneGeometry {
                 if folded != nil {
                     rootFoldedIDs.insert(id)
                 }
-                let nodeDecorations = cache.decorations[id] ?? nil
+                let nodeDecorations = hasDecorations ? cache.decorations[id] ?? nil : nil
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
@@ -561,19 +567,19 @@ public enum SceneGeometry {
                 ? parentBaseStyle
                 : caches.theme.applyingOverrides(
                     node.style, to: parentBaseStyle, variant: caches.variant)
+            // One dictionary read per parent, not two per child.
+            let parentFrame = nodes[id]?.frame ?? .zero
             for childID in children {
                 guard let childScene = nodes[childID] else { continue }
                 let direction: BranchDirection
                 switch structure {
                 case .mindmapBalanced:
-                    direction =
-                        childScene.frame.midX >= (nodes[id]?.frame.midX ?? 0)
-                        ? directions.0 : directions.1
+                    direction = childScene.frame.midX >= parentFrame.midX ? directions.0 : directions.1
                 default:
                     direction = directions.0
                 }
                 let from = NodeRenderer.outgoingAnchor(
-                    style: parentStyle, frame: nodes[id]?.frame ?? .zero, direction: direction)
+                    style: parentStyle, frame: parentFrame, direction: direction)
                 let childStyle = childScene.style
                 let to = NodeRenderer.incomingAnchor(
                     style: childStyle, frame: childScene.frame, direction: direction)

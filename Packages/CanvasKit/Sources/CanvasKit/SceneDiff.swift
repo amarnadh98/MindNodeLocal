@@ -78,6 +78,16 @@ public enum SceneDiffer {
             nodes[id] = .added
         }
 
+        // The keystroke case: the same branches in the same order (only
+        // frames and widths moved). Compare pairwise — no dictionaries.
+        if let old, aligned(old.branches, new.branches) {
+            var morphs: [BranchMorph] = []
+            for (oldBranch, newBranch) in zip(old.branches, new.branches) where oldBranch != newBranch {
+                morphs.append(BranchMorph(old: oldBranch, new: newBranch))
+            }
+            return SceneDiff(nodes: nodes, branchesAdded: [], branchesRemoved: [], branchMorphs: morphs)
+        }
+
         var oldBranches: [BranchKey: SceneBranch] = [:]
         for branch in old?.branches ?? [] {
             oldBranches[BranchKey(parentID: branch.parentID, childID: branch.childID)] = branch
@@ -105,6 +115,17 @@ public enum SceneDiffer {
             branchesAdded: added,
             branchesRemoved: removed,
             branchMorphs: morphs)
+    }
+
+    /// True when both lists hold the same parent→child pairs in the same
+    /// order.
+    static func aligned(_ old: [SceneBranch], _ new: [SceneBranch]) -> Bool {
+        guard old.count == new.count else { return false }
+        for index in old.indices
+        where old[index].parentID != new[index].parentID || old[index].childID != new[index].childID {
+            return false
+        }
+        return true
     }
 
     /// Same title, style, level, level-1 index, decorations and media
