@@ -30,7 +30,9 @@ require_tool codesign
 
 if [ "$MODE" = "adhoc" ]; then
     log "Ad-hoc signing $(basename "$APP_PATH")"
-    codesign --force --sign - --options runtime "$APP_PATH"
+    # No --options runtime: see build-app.sh — library validation
+    # would refuse the ad-hoc Sparkle.framework at launch.
+    codesign --force --sign - "$APP_PATH"
 fi
 
 log "Verifying signature"

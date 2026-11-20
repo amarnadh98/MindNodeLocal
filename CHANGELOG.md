@@ -102,6 +102,9 @@
 ### Fixed
 - PNG/JPEG/HEIC export and the Quick Look thumbnails drew maps with left-hand branches (any balanced map) shifted right by the bounds origin, cropping the left side. `ImageExporter` subtracted the export bounds origin and so did `ScenePainter`; now only the painter does. The image tests' corner-pixel helper sampled an arbitrary pixel and only passed because of the shift. It now reads the real top-left pixel, and a new test checks every node paints at its export position.
 
+### Fixed (release)
+- Ad-hoc release builds (`scripts/release/build-dmg-local.sh`, SPEC §13 path B) aborted at launch with "Library missing". The Hardened Runtime's library validation refused the embedded Sparkle.framework because an ad-hoc signature has no Team ID. The ad-hoc path now builds and signs without the Hardened Runtime. It can't be notarized anyway, and the Developer ID path keeps the runtime. ADR-0021's note on this is corrected.
+
 ### Fixed (CI)
 - The `xcode` job could hang for hours after every test had passed. A test document's timed autosave fired late, failed, and AppKit's modal error alert kept the test host from exiting. The hosted test runner no longer schedules timed autosaves (`MapDocument.schedulesAutosaving`); explicit autosaves still run. CI now runs the app tests through `scripts/ci/xcode-test-watchdog.sh`. If the host is still alive 2 minutes after the tests finish, the script samples it into the log and fails the job. The job also has a 30-minute timeout.
 
