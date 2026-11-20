@@ -45,7 +45,10 @@ enum MenuCommandListing {
             // now, and that someone must still validate the item as
             // enabled (e.g. "Find Next" needs an active find session).
             guard let action = item.action, !action.description.isEmpty else { continue }
-            guard item.isEnabled else { continue }
+            // In an autoenabling menu `isEnabled` only caches the last
+            // menu update (stale when no document window was key then);
+            // `isPermitted` below re-runs validation against today's target.
+            guard item.isEnabled || menu.autoenablesItems else { continue }
             guard let target = target(for: action), isPermitted(item, target: target)
             else { continue }
             result.append(

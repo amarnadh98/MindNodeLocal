@@ -108,6 +108,7 @@
 
 ### Fixed (app)
 - The running app never created its `AppDelegate`. `@main` on an `NSApplicationDelegate` only calls `NSApplicationMain`, which builds the delegate from a main nib, and Arbor has none. So since M0, a launched Arbor had only AppKit's default app menu: no File, Edit, Format, View, Window or Help menus, no Library, quick-entry hotkey, menu-bar item, Services, welcome window or URL handling. Tests missed it because they construct `AppDelegate()` by hand. `AppDelegate.main()` now installs a retained `AppDelegate.shared` before `NSApplicationMain`, and the new `AppLaunchTests` checks that the hosted app has its delegate and the full menu bar.
+- The command palette (⇧⌘P) skipped any command whose menu item had been disabled at the last menu update, for example every document command after a launch with no window open. With autoenabling menus, `isEnabled` is only that cached state. The palette now always re-validates against the current target. The fix above exposed this, because the live launch menu replaced the test-built one.
 
 ### Fixed (release)
 - Ad-hoc release builds (`scripts/release/build-dmg-local.sh`, SPEC §13 path B) aborted at launch with "Library missing". The Hardened Runtime's library validation refused the embedded Sparkle.framework because an ad-hoc signature has no Team ID. The ad-hoc path now builds and signs without the Hardened Runtime. It can't be notarized anyway, and the Developer ID path keeps the runtime. ADR-0021's note on this is corrected.
