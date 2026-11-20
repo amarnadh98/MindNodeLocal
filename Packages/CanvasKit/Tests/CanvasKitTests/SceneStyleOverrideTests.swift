@@ -220,7 +220,7 @@ struct SceneStyleOverrideTests {
                 for: .setThemeOverrides(overrides: ThemePatch(rainbowBranches: false)), in: edited)
                 == nil)
         #expect(
-            SceneGeometry.dirtyIDs(for: .setAppearance(.dark), in: edited) == nil)
+            SceneGeometry.dirtyIDs(for: .setAppearance(mode: .dark), in: edited) == nil)
         #expect(
             SceneGeometry.dirtyIDs(
                 for: .setStructure(id: "root", structure: "mindmap.right"), in: edited)
@@ -322,7 +322,7 @@ struct SceneStyleOverrideTests {
         #expect(tree.foldedPillLayers["one"] != nil)
 
         // The hit test lands inside (and near) the pill only.
-        #expect(tree.foldedPillID(atModel: pillFrame.center()) == "one")
+        #expect(tree.foldedPillID(atModel: pillFrame.center) == "one")
         #expect(tree.foldedPillID(atModel: CGPoint(x: pillFrame.maxX + 3, y: pillFrame.midY)) == "one")
         #expect(tree.foldedPillID(atModel: CGPoint(x: pillFrame.maxX + 60, y: pillFrame.midY)) == nil)
         #expect(tree.foldedPillID(atModel: CGPoint(x: pillFrame.minX - 60, y: pillFrame.midY)) == nil)
@@ -340,11 +340,5 @@ struct SceneStyleOverrideTests {
                 scene: unfoldedScene, grid: unfoldedGrid, camera: camera, viewport: viewport))
         #expect(tree.foldedPillLayers.isEmpty)
         #expect(tree.foldedPillFrames.isEmpty)
-    }
-}
-
-extension CGRect {
-    fileprivate func center() -> CGPoint {
-        CGPoint(x: midX, y: midY)
     }
 }

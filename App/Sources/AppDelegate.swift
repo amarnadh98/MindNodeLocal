@@ -366,11 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
                     item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
                     .separator(),
-                    // F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays
-                    // File ▸ Export…, SPEC §5.17).
-                    item(
-                        "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
-                        "E", modifiers: [.command, .shift]),
+                    editThemeMenuItem(),
                 ]
                     // M2 (F-STY-1/3/8): node shapes, the reset-to-theme
                     // and Recolor Branches — every item routes to ONE
@@ -499,6 +495,14 @@ extension AppDelegate {
                 "Recolor Branches",
                 #selector(DocumentWindowController.recolorBranchesAction(_:)), ""),
         ]
+    }
+
+    /// F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays File ▸
+    /// Export…, SPEC §5.17).
+    private func editThemeMenuItem() -> NSMenuItem {
+        item(
+            "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
+            "E", modifiers: [.command, .shift])
     }
 
     private func shapeMenuName(_ shape: NodeShape) -> String {

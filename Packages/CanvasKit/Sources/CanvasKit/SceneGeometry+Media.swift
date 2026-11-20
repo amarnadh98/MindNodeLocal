@@ -92,7 +92,7 @@ extension SceneGeometry {
             }
             let contentSize = NodeRenderer.contentSize(
                 textSize: textSize, style: style, decorations: nodeDecorations)
-            let width = contentSize.width + style.paddingWidth * 2
+            let width = max(contentSize.width + style.paddingWidth * 2, style.minWidth)
             let height = contentSize.height + style.paddingHeight * 2
             return LayoutSourceNode(
                 id: id,

@@ -190,7 +190,7 @@ final class InspectorPaneController {
             }
         }
         model.onAppearance = { [weak self] mode in
-            self?.perform(.setAppearance(mode))
+            self?.perform(.setAppearance(mode: mode ?? .auto))
         }
         model.onDefaultTheme = { id in
             DocumentPreferences.defaultThemeID = id
