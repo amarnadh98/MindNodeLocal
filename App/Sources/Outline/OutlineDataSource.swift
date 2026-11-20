@@ -62,7 +62,7 @@ final class OutlineDataSource: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         return cell
     }
 
-    func outlineView(_ outlineView: NSOutlineView, rowViewFor item: Any) -> NSTableRowView? {
+    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
         guard let controller, let id = item as? String, model?.nodes[id] != nil else { return nil }
         let rowView = OutlineRowView(frame: .zero)
         rowView.depth = controller.depth(of: id)
