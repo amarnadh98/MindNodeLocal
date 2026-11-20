@@ -33,7 +33,9 @@ extension DocumentWindowController {
     static let minimapDefaultsKey = "ShowsMinimap"
     /// The toolbar's identifier — also the UserDefaults key its
     /// customization autosave lives under.
-    static let toolbarAutosaveName = "ArborDocumentToolbar"
+    /// The `.v2` suffix retires configurations saved while the toolbar was
+    /// icon-only, so everyone gets the labelled default once.
+    static let toolbarAutosaveName = "ArborDocumentToolbar.v2"
 
     /// The default item order (§4.1: editing left, zoom + minimap right
     /// of the flexible space).
@@ -60,7 +62,9 @@ extension DocumentWindowController {
         toolbar.allowsUserCustomization = true
         // Persisted per user under the identifier (§14.1).
         toolbar.autosavesConfiguration = true
-        toolbar.displayMode = .iconOnly
+        // Labels under the icons: what each button does should be readable
+        // without hovering (right-click the toolbar to change it).
+        toolbar.displayMode = .iconAndLabel
         toolbar.sizeMode = .regular
         documentToolbar = toolbar
         window.toolbar = toolbar
