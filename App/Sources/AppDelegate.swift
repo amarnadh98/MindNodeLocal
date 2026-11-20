@@ -121,22 +121,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // F-DOC-1: Versions browser, Duplicate and Lock ride
                     // NSDocument's own actions; validation lives with the
                     // window controller.
-                    + documentSafetyItems() + [
-                        .separator(),
-                        // M6 (F-PRE-1/4): present the map; ⌘⏎ resumes a
-                        // run paused into live edit (its item validates
-                        // only then, so ⌘⏎ keeps its editing meaning).
-                        item(
-                            "Present", #selector(DocumentWindowController.presentAction(_:)),
-                            "\r", modifiers: [.command, .option]),
-                        item(
-                            "Resume Presentation", #selector(DocumentWindowController.resumePresentationAction(_:)),
-                            "\r", modifiers: [.command]),
-                        item(
-                            "Export Slides as PDF…",
-                            #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
-                        .separator(),
-                        item("Close", #selector(NSWindow.performClose(_:)), "w"),
+                    + documentSafetyItems() + [.separator()]
+                    // M6 (F-PRE-1/4): present the map; ⌘⏎ resumes a run
+                    // paused into live edit (its item validates only
+                    // then, so ⌘⏎ keeps its editing meaning).
+                    + presentationMenuItems() + printMenuItems() + [
+                        item("Close", #selector(NSWindow.performClose(_:)), "w")
                     ]))
         mainMenu.addItem(
             menu(
@@ -494,6 +484,33 @@ extension AppDelegate {
             item(
                 "Recolor Branches",
                 #selector(DocumentWindowController.recolorBranchesAction(_:)), ""),
+        ]
+    }
+
+    /// The presentation entries (Present ⌥⌘⏎, Resume ⌘⏎, Export Slides).
+    private func presentationMenuItems() -> [NSMenuItem] {
+        [
+            item(
+                "Present", #selector(DocumentWindowController.presentAction(_:)),
+                "\r", modifiers: [.command, .option]),
+            item(
+                "Resume Presentation", #selector(DocumentWindowController.resumePresentationAction(_:)),
+                "\r", modifiers: [.command]),
+            item(
+                "Export Slides as PDF…",
+                #selector(DocumentWindowController.exportSlidesPDFAction(_:)), ""),
+            .separator(),
+        ]
+    }
+
+    /// F-INT-9: Print keeps the macOS-standard ⌘P (the Quick Open
+    /// conflict was settled in ADR-0013 — Quick Open ⇧⌘O, Command
+    /// Palette ⇧⌘P — so Page Setup carries no shortcut).
+    private func printMenuItems() -> [NSMenuItem] {
+        [
+            item("Print…", #selector(NSDocument.printDocument(_:)), "p"),
+            item("Page Setup…", #selector(NSDocument.runPageLayout(_:)), ""),
+            .separator(),
         ]
     }
 
