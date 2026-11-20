@@ -47,8 +47,10 @@ extension SceneGeometry {
             // nodes (the incremental walk's overwhelming majority)
             // resolve the memoized level style directly. The palette
             // index is irrelevant to measurement, so the base style
-            // resolves at index 0.
-            let baseStyle = inputs.caches.style(level: depth, level1Index: 0)
+            // resolves at index 0. A Box|Line flip's recast base is
+            // memoized too (ADR-0034), since the donor padding changes
+            // the measured size.
+            let baseStyle = inputs.caches.style(level: depth, level1Index: 0, shapeOverride: node.style?.shape)
             let style =
                 node.style == nil
                 ? baseStyle

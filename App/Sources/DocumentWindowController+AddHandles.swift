@@ -10,6 +10,11 @@ extension DocumentWindowController {
         guard let store, store.model.nodes[id] != nil, !canvas.isEditing else { return }
         canvas.setSelection([id])
         var node = Node(id: UUID().uuidString)
+        // ADR-0034: the new child copies the last sibling's explicit
+        // shape, so lines stay lines and boxes stay boxes.
+        if let shape = childCreationShape(parent: id) {
+            node.style = NodeStylePatch(shape: shape)
+        }
         if store.model.nodes[id]?.parent == nil {
             switch side {
             case .left: node.side = .left

@@ -50,8 +50,41 @@ struct InspectorStyleTab: View {
 
     // MARK: node section (F-STY-1 shapes)
 
+    /// ADR-0034's Box|Line control: the discoverable two-way shape
+    /// choice, above the full shape list. One `setStyle` command per
+    /// pick over the whole selection (through `model.onStylePatch`,
+    /// the same route every row takes); a mixed selection lights no
+    /// segment.
+    private var shapeClassRow: some View {
+        let isBox = model.selectionShapeClass
+        return InspectorRow(
+            title: "Box or Line", key: .shape,
+            overridden: model.isOverridden(.shape),
+            mixed: model.selectionShapeClassMixed,
+            onReset: { reset(.shape) },
+            control: {
+                Picker(
+                    "Box or Line",
+                    selection: Binding<Int?>(
+                        get: { isBox.map { $0 ? 1 : 0 } },
+                        set: { tag in
+                            guard let tag else { return }
+                            apply(.shape, tag == 1 ? NodeShape.roundedRect : .underline)
+                        })
+                ) {
+                    Text("Box").tag(Int?(1))
+                    Text("Line").tag(Int?(0))
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .accessibilityLabel("Node shape")
+                .accessibilityValue(isBox == nil ? "Mixed" : (isBox! ? "Box" : "Line"))
+            })
+    }
+
     private var nodeSection: some View {
         Section("Node") {
+            shapeClassRow
             shapeRow
             ColorPickerRow(
                 title: "Fill",

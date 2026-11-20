@@ -591,12 +591,18 @@ extension DocumentWindowController {
     /// Builds one grouped add command over the selection, selects the
     /// fresh nodes afterwards and — when exactly one was created, the
     /// keyboard case — opens the new node in the editor (F-EDT-1).
-    private func addCommand(_ make: (String, Node) -> MapCommand) {
+    /// `shapeFor` is the ADR-0034 creation default, per anchor.
+    private func addCommand(
+        _ make: (String, Node) -> MapCommand, shapeFor: ((String) -> NodeShape?)? = nil
+    ) {
         let anchors = selectedIDs
-        let nodes = anchors.map { _ in Node(id: UUID().uuidString) }
+        var nodes = anchors.map { _ in Node(id: UUID().uuidString) }
         var commands: [MapCommand] = []
-        for (anchor, node) in zip(anchors, nodes) {
-            commands.append(make(anchor, node))
+        for (index, anchor) in anchors.enumerated() {
+            if let shape = shapeFor?(anchor) {
+                nodes[index].style = NodeStylePatch(shape: shape)
+            }
+            commands.append(make(anchor, nodes[index]))
         }
         let created = Set(nodes.map(\.id))
         if let command = grouped("Add Node", commands) {
@@ -642,13 +648,21 @@ extension DocumentWindowController {
         case .none:
             break
         case .child:
-            createAfterCommit(anchor: id) { .addChild(parent: $0, index: nil, node: $1) }
+            createAfterCommit(anchor: id, shape: childCreationShape(parent: id)) {
+                .addChild(parent: $0, index: nil, node: $1)
+            }
         case .siblingBelow:
-            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: false, node: $1) }
+            createAfterCommit(anchor: id, shape: siblingCreationShape(anchor: id)) {
+                .addSibling(anchor: $0, before: false, node: $1)
+            }
         case .siblingAbove:
-            createAfterCommit(anchor: id) { .addSibling(anchor: $0, before: true, node: $1) }
+            createAfterCommit(anchor: id, shape: siblingCreationShape(anchor: id)) {
+                .addSibling(anchor: $0, before: true, node: $1)
+            }
         case .insertParent:
-            createAfterCommit(anchor: id) { .insertParent(anchor: $0, node: $1) }
+            // The inserted parent keeps the theme's level style for its
+            // new depth (ADR-0034 leaves it to the theme).
+            createAfterCommit(anchor: id, shape: nil) { .insertParent(anchor: $0, node: $1) }
         }
     }
 
@@ -691,43 +705,12 @@ extension DocumentWindowController {
 
     /// The create half of commit-and-create (F-EDT-1): one add command
     /// relative to the just-committed node, then edit the fresh node.
-    private func createAfterCommit(anchor: String, _ make: (String, Node) -> MapCommand) {
-        let node = Node(id: UUID().uuidString)
+    /// `shape` is the ADR-0034 creation default (nil = the theme's
+    /// level style decides).
+    private func createAfterCommit(anchor: String, shape: NodeShape?, _ make: (String, Node) -> MapCommand) {
+        var node = Node(id: UUID().uuidString)
+        if let shape { node.style = NodeStylePatch(shape: shape) }
         perform(make(anchor, node)) { _ in [node.id] }
-        canvas.beginEditing(nodeID: node.id)
-    }
-
-    /// F-CAN-5: double-click on empty canvas creates a floating root
-    /// centered at that point. Roots carry no absolute position, so the
-    /// click point is stored as the root's manual `offset` from its auto
-    /// slot (SPEC §8.2); `SceneGeometry` applies offsets after auto
-    /// layout (also the F-LAY-11 groundwork). One undoable grouped
-    /// command, then edit mode.
-    private func createFloatingNode(at modelPoint: CGPoint) {
-        guard let store else { return }
-        let node = Node(id: UUID().uuidString)
-        // Probe the post-add layout for the new root's auto slot.
-        var probe = store.model
-        try? MapCommand.addRoot(index: nil, node: node).apply(to: &probe)
-        let probeScene = SceneGeometry.build(
-            model: probe, variant: currentVariant(), measurer: SceneRenderer.sharedMeasurer,
-            theme: ThemeCatalog.shared.theme(for: probe))
-        let autoFrame = probeScene.nodes[node.id]?.frame ?? .zero
-        let offset = ModelOffset(
-            x: modelPoint.x - autoFrame.midX,
-            y: modelPoint.y - autoFrame.midY)
-        let command = MapCommand.group(
-            name: "Add Node",
-            commands: [
-                .addRoot(index: nil, node: node),
-                .setOffset(id: node.id, offset: offset),
-            ])
-        do {
-            try store.perform(command)
-        } catch {
-            return
-        }
-        canvas.setSelection([node.id])
         canvas.beginEditing(nodeID: node.id)
     }
 
@@ -755,7 +738,7 @@ extension DocumentWindowController {
             ai.acceptAll()
             return
         }
-        addCommand { .addChild(parent: $0, index: nil, node: $1) }
+        addCommand({ .addChild(parent: $0, index: nil, node: $1) }, shapeFor: childCreationShape)
     }
 
     @objc func addSiblingBelowAction(_ sender: Any?) {
@@ -768,14 +751,16 @@ extension DocumentWindowController {
             canvas.beginEditing(nodeID: id)
             return
         }
-        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
+        addCommand(
+            { .addSibling(anchor: $0, before: false, node: $1) }, shapeFor: siblingCreationShape)
     }
 
     /// Always creates a sibling below the selection, without ⏎'s
     /// enter-edit rule — for callers with no keyboard context, such as
     /// VoiceOver's Add Sibling action and the toolbar button.
     @objc func addSiblingBelow(_ sender: Any?) {
-        addCommand { .addSibling(anchor: $0, before: false, node: $1) }
+        addCommand(
+            { .addSibling(anchor: $0, before: false, node: $1) }, shapeFor: siblingCreationShape)
     }
 
     @objc func addSiblingAboveAction(_ sender: Any?) {
@@ -783,7 +768,8 @@ extension DocumentWindowController {
             canvas.commitEditing(next: .siblingAbove)
             return
         }
-        addCommand { .addSibling(anchor: $0, before: true, node: $1) }
+        addCommand(
+            { .addSibling(anchor: $0, before: true, node: $1) }, shapeFor: siblingCreationShape)
     }
 
     @objc func insertParentAction(_ sender: Any?) {

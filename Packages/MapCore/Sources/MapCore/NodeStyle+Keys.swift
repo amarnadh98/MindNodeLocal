@@ -113,12 +113,14 @@ extension NodeStylePatch {
     }
 
     /// The keys whose changes can move the node's **measured size**
-    /// (font, padding, width floors): the layout-dirty set of a
+    /// (font, padding, width floors — and `shape`, because a Box|Line
+    /// class flip resolves through a donor level whose padding
+    /// changes, ADR-0034): the layout-dirty set of a
     /// `setStyle`/`resetStyle` is exactly these (SPEC §11.3); every
-    /// other field (colors, borders, shapes, branch styling) only
-    /// repaints.
+    /// other field (colors, borders, branch styling) only repaints.
+    /// Same-class shape swaps over-mark — always safe (§11.3).
     public static let sizeAffectingKeys: Set<NodeStyleKey> = [
-        .padding, .fontName, .fontSize, .fontWeight, .fontItalic, .minWidth, .maxWidth,
+        .shape, .padding, .fontName, .fontSize, .fontWeight, .fontItalic, .minWidth, .maxWidth,
     ]
 
     /// `true` when the patch carries a value for any size-affecting

@@ -125,9 +125,11 @@ extension SceneGeometry {
     /// split from the dispatcher to keep each function under the
     /// complexity budget.
     ///
-    /// - `setStyle`: only font/padding/width fields can move a frame
-    ///   (`NodeStylePatch.affectsMeasuredSize`); colors, borders,
-    ///   shapes and branch styling repaint only.
+    /// - `setStyle`: only size-affecting fields can move a frame
+    ///   (`NodeStylePatch.affectsMeasuredSize` — font/padding/width,
+    ///   and `shape`, whose Box|Line class flips resolve through a
+    ///   donor level's padding, ADR-0034); colors, borders and branch
+    ///   styling repaint only.
     /// - `resetStyle`: the post-command model can't tell which fields
     ///   left (the dirty set is derived after apply), so a reset
     ///   touching any size-affecting key — or a wholesale clear —

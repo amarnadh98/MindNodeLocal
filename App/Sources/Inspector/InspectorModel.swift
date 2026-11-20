@@ -115,6 +115,30 @@ final class InspectorModel: ObservableObject {
         return selectedNodes.allSatisfy { $0.storedPatch?.hasOverride(key) == true }
     }
 
+    // MARK: Box or Line (ADR-0034)
+
+    /// The selection's Box|Line state: each node's stored shape
+    /// override's class, else the theme's level shape; `nil` when the
+    /// selection is empty or mixed. Built-in themes never vary level
+    /// shapes between appearances; the light scheme reads the shape.
+    var selectionShapeClass: Bool? {
+        var classes: Set<Bool> = []
+        for node in selectedNodes {
+            let shape =
+                node.storedPatch?.shape
+                ?? BuiltInThemes.theme(id: themeID).light.levels.style(forLevel: node.level).shape
+            classes.insert(shape.drawsBackground)
+        }
+        return classes.count == 1 ? classes.first : nil
+    }
+
+    /// True when the selection's Box|Line state disagrees with the
+    /// theme's level styles — the segmented row lights no segment.
+    var selectionShapeClassMixed: Bool {
+        guard !selectedNodes.isEmpty else { return false }
+        return selectionShapeClass == nil
+    }
+
     // MARK: mutation closures (wired by the pane controller)
 
     var onStylePatch: ((NodeStylePatch) -> Void)?
