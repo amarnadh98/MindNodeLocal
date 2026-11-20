@@ -32,10 +32,14 @@ if [ "$MODE" = "adhoc" ]; then
     log "Ad-hoc signing $(basename "$APP_PATH")"
     # No --options runtime: see build-app.sh — library validation
     # would refuse the ad-hoc Sparkle.framework at launch.
-    codesign --force --sign - "$APP_PATH"
+    # --preserve-metadata keeps the build's entitlements; a bare
+    # re-sign drops them, leaving an unsandboxed app.
+    codesign --force --sign - --preserve-metadata=entitlements "$APP_PATH"
 fi
 
 log "Verifying signature"
+codesign -d --entitlements - "$APP_PATH" 2>/dev/null | grep -q 'com.apple.security.app-sandbox' || \
+    die "the signed app lost its sandbox entitlement"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1 | tail -2
 codesign -dv "$APP_PATH" 2>&1 | grep --fixed-strings 'Authority=' || \
     codesign -dv "$APP_PATH" 2>&1 | grep --fixed-strings 'Signature='
