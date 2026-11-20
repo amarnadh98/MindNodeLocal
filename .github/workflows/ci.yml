@@ -14,6 +14,7 @@ jobs:
   packages:
     name: swift test (${{ matrix.package }})
     runs-on: xcode-27
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -34,8 +35,11 @@ jobs:
 
   lint:
     runs-on: xcode-27
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Job time limits
+        run: scripts/ci/check-job-timeouts.sh
       - name: swift-format
         run: |
           swift format lint --strict --configuration .swift-format -r Packages
@@ -48,6 +52,7 @@ jobs:
   perf:
     name: release-mode budgets
     runs-on: xcode-27
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: MapLayout release tests (10 ms budget locally; 2x guard on shared runners)
@@ -57,7 +62,7 @@ jobs:
 
   xcode:
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
