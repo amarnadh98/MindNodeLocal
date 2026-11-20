@@ -173,6 +173,7 @@ final class AutomationRouter {
             throw RouteError.emptyOutline
         }
         try open.store.perform(command)
+        open.updateChangeCount(.changeDone)
         selectNewNodes(from: command, in: open)
     }
 

@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // F-INT-4: the local MCP socket endpoint (ADR-0030), read-only
         // by default; the helper falls back to files when it is down.
         AutomationRuntime.start()
+        // F-INT-2: index maps for Spotlight as they are saved.
+        SpotlightIndexer.start()
         // F-ONB-1: once per user, before any document opens.
         welcomeCoordinator.showIfNeeded()
     }
