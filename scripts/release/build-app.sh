@@ -40,8 +40,12 @@ if [ "$MODE" = "developer-id" ]; then
     SIGN_ARGS=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=$APPLE_SIGNING_IDENTITY")
 else
     # The ad-hoc identity '-' works on any machine, certificates or
-    # not, and still enables the Hardened Runtime flag on the bundle.
-    SIGN_ARGS=("CODE_SIGN_IDENTITY=-")
+    # not. The Hardened Runtime stays off: its library validation
+    # rejects the embedded Sparkle.framework (an ad-hoc signature has
+    # no Team ID to match), so the app would abort at launch with
+    # "Library missing". Ad-hoc builds can't be notarized, so the
+    # runtime buys nothing here.
+    SIGN_ARGS=("CODE_SIGN_IDENTITY=-" "ENABLE_HARDENED_RUNTIME=NO")
 fi
 
 log "Archiving Arbor ($MODE)"
