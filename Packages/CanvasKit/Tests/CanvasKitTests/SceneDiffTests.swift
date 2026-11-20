@@ -131,4 +131,33 @@ struct SceneDiffTests {
         #expect(morph?.old.from != morph?.new.from)
         #expect(morph?.old.childID == morph?.new.childID)
     }
+
+    /// The keystroke fast path (same branches, same order) must agree with
+    /// the keyed path, which handles added and removed branches.
+    @Test func alignedBranchesTakeTheFastPathAndMatchTheKeyedResult() {
+        let measurer = SceneRenderer.sharedMeasurer
+        let base = SceneGeometry.build(model: sceneModel(), variant: .light, measurer: measurer)
+        var moved = sceneModel()
+        moved.nodes["branch-1"]?.offset = ModelOffset(x: 0, y: 30)
+        let offset = SceneGeometry.build(model: moved, variant: .light, measurer: measurer)
+
+        #expect(SceneDiffer.aligned(base.branches, offset.branches))
+        let fast = SceneDiffer.diff(old: base, new: offset)
+
+        // Same scenes with a branch dropped from the old one: not aligned,
+        // so the keyed path runs and reports it added.
+        let dropped = CanvasScene(
+            nodes: base.nodes, branches: Array(base.branches.dropFirst()), canvasColor: base.canvasColor)
+        #expect(!SceneDiffer.aligned(dropped.branches, offset.branches))
+        let keyed = SceneDiffer.diff(old: dropped, new: offset)
+        #expect(keyed.branchesAdded.count == 1)
+
+        // The morphs the fast path found are the ones the keyed path finds
+        // for every branch both versions share.
+        let keyedMorphs = Set(keyed.branchMorphs.map { "\($0.new.parentID)>\($0.new.childID)" })
+        let fastMorphs = Set(fast.branchMorphs.map { "\($0.new.parentID)>\($0.new.childID)" })
+        #expect(!fastMorphs.isEmpty)
+        #expect(keyedMorphs.isSubset(of: fastMorphs))
+        #expect(fast.branchesAdded.isEmpty && fast.branchesRemoved.isEmpty)
+    }
 }

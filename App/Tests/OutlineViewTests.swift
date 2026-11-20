@@ -36,6 +36,26 @@ struct OutlineViewTests {
         #expect(controller.activeViewMode == .map)
     }
 
+    /// AppKit asks the delegate for `outlineView(_:rowViewForItem:)`. The
+    /// custom row view (depth guides) once never appeared, because the
+    /// method was spelled `rowViewFor`, which nothing calls.
+    @Test func outlineRowsUseTheCustomRowViewWithTheirDepth() throws {
+        let (document, controller) = try Self.makeShownDocument()
+        defer { document.close() }
+        let outline = controller.outlineController
+        let rootID = try #require(document.model.roots.first)
+        let child = Node(id: "outline-child", title: NodeTitle(text: "child"))
+        try document.store.perform(.addChild(parent: rootID, index: nil, node: child))
+
+        controller.showOutlineViewAction(nil)
+        outline.outlineView.expandItem(rootID)
+        let row = outline.outlineView.row(forItem: "outline-child")
+        #expect(row >= 0)
+        let rowView = try #require(
+            outline.outlineView.rowView(atRow: row, makeIfNecessary: true) as? OutlineRowView)
+        #expect(rowView.depth == 1)
+    }
+
     @Test func editingARowTitleThroughTheOutlineChangesTheMapNodeInOneUndoStep() throws {
         let (document, controller) = try Self.makeShownDocument()
         defer { document.close() }
