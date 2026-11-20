@@ -154,6 +154,10 @@ public final class CanvasView: NSView {
         didSet { syncSelectionRings() }
     }
 
+    /// Space-drag pan state (F-CAN-1, ADR-0033); the interaction logic
+    /// lives in CanvasView+Pan.swift.
+    var spacePan = SpacePanState()
+
     /// M3's decoration surface closures + highlight state; see
     /// CanvasView+Decorations.swift.
     let decorationActions = DecorationActions()
@@ -283,6 +287,12 @@ public final class CanvasView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
+        // ADR-0033: a plain Space down arms Space-drag pan mode
+        // (CanvasView+Pan.swift) instead of falling through to the
+        // replace-edit; the tap meaning is deferred to keyUp there.
+        if handleSpacePanKeyDown(event) {
+            return
+        }
         let characters = event.charactersIgnoringModifiers ?? ""
         let hasCommand = event.modifierFlags.contains(.command)
         let hasOption = event.modifierFlags.contains(.option)
@@ -348,6 +358,12 @@ public final class CanvasView: NSView {
         }
         if connectionLabelEditor.isEditing {
             connectionLabelEditor.commit()
+        }
+        // ADR-0033: while Space is held the button-down starts a pan
+        // (CanvasView+Pan.swift) — no selection, rubber band or node
+        // grab, even over a node.
+        if handleSpacePanMouseDown(point) {
+            return
         }
         // The Node Well "+" acts before any node hit-test: it sits outside
         // the node's frame, but its radius can overlap a neighbour.
@@ -459,6 +475,9 @@ public final class CanvasView: NSView {
 
     public override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if handleSpacePanMouseDragged(point) {
+            return
+        }
         if updateRelationDrag(at: point) {
             return
         }
@@ -476,6 +495,9 @@ public final class CanvasView: NSView {
 
     public override func mouseUp(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if handleSpacePanMouseUp(point) {
+            return
+        }
         if finishRelationDrag(at: point) {
             return
         }
