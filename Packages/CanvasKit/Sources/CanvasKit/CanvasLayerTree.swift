@@ -125,6 +125,7 @@ public final class CanvasLayerTree {
     var dyingNodes: [String: NodeVisualLayer] = [:]
     var dyingBranches: [BranchVisualLayer] = []
     private var selectionRings: [String: CAShapeLayer] = [:]
+    let addHandleOverlay = AddHandleOverlay()
     var settleTask: Task<Void, Never>?
     var dyingSweepTask: Task<Void, Never>?
 
@@ -287,6 +288,7 @@ public final class CanvasLayerTree {
             ring.transform = Self.modelSpaceTransform(for: camera)
             ring.lineWidth = 2.5 / camera.scale
         }
+        addHandleOverlay.reposition(camera: camera)
         mastery.updateCamera(camera: camera)
         scheduleSettleIfNeeded(camera: camera, backingScale: backingScale)
         lastScale = camera.scale
@@ -338,6 +340,7 @@ public final class CanvasLayerTree {
             ring.path = Self.ringPath(node: node)
             ring.lineWidth = 2.5 / camera.scale
         }
+        addHandleOverlay.update(selection: selection, in: self, camera: camera, color: color)
     }
 
     static func ringPath(node: SceneNode) -> CGPath {
@@ -384,6 +387,7 @@ public final class CanvasLayerTree {
             ring.removeFromSuperlayer()
             selectionRings.removeValue(forKey: id)
         }
+        addHandleOverlay.clear()
         for pill in foldedPillLayers.values {
             pill.removeFromSuperlayer()
         }

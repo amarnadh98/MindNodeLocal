@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import MapCore
@@ -722,5 +723,148 @@ struct CanvasDragInteractionTests {
             copy.nodes[id]?.modifiedBy = .user
         }
         return copy
+    }
+}
+
+// MARK: - reordering and the Node Well "+"
+
+/// `sceneModel` with every branch fanned to the right, so siblings stack
+/// in one column.
+private func rightModel() -> MapModel {
+    var model = sceneModel()
+    model.nodes["root"]?.structure = "mindmap.right"
+    return model
+}
+
+@MainActor
+struct SiblingReorderTests {
+    private func command(
+        dragging id: String, to point: (CanvasScene) throws -> CGPoint
+    ) throws -> (MapCommand?, DropTarget?) {
+        let harness = DragHarness(model: rightModel())
+        var dropped: MapCommand?
+        harness.view.onDrop = { command, _ in dropped = command }
+        try harness.grab(id)
+        let start = try harness.center(of: id)
+        harness.drag(to: CGPoint(x: start.x + 6, y: start.y + 6))
+        let end = try point(harness.scene)
+        harness.drag(to: end)
+        var target: DropTarget?
+        if case .active(let session) = harness.view.drag { target = session.target }
+        harness.drop(at: end)
+        return (dropped, target)
+    }
+
+    @Test func dragBelowTheLastSiblingMovesItToTheEnd() throws {
+        let (dropped, target) = try command(dragging: "branch-0") { scene in
+            let last = try #require(scene.nodes["branch-2"]?.frame)
+            return CGPoint(x: last.midX, y: last.maxY + 120)
+        }
+        guard case .insertBetween(let parent, let index, _)? = target else {
+            Issue.record("expected an insertion slot, got \(String(describing: target))")
+            return
+        }
+        #expect(parent == "root")
+        #expect(index == 3)
+        #expect(dropped == .moveNode(id: "branch-0", parent: "root", index: 2))
+    }
+
+    @Test func dragAboveTheFirstSiblingMovesItToTheFront() throws {
+        let (dropped, _) = try command(dragging: "branch-2") { scene in
+            let first = try #require(scene.nodes["branch-0"]?.frame)
+            return CGPoint(x: first.midX, y: first.minY - 120)
+        }
+        #expect(dropped == .moveNode(id: "branch-2", parent: "root", index: 0))
+    }
+
+    @Test func letGoOnEmptyCanvasSnapsBackInsteadOfDetaching() throws {
+        let (dropped, target) = try command(dragging: "branch-1") { scene in
+            CGPoint(x: scene.bounds.maxX + 400, y: scene.bounds.minY - 400)
+        }
+        guard case .newRoot? = target else {
+            Issue.record("far from everything should resolve to empty canvas, got \(String(describing: target))")
+            return
+        }
+        #expect(dropped == nil)
+    }
+}
+
+@MainActor
+struct NodeWellHandleTests {
+    @Test func aChildNodeOffersOnePlusOnItsOuterEdge() throws {
+        let scene = buildScene(rightModel())
+        let handles = AddHandleResolver.handles(for: "branch-1", in: scene)
+        #expect(handles.map(\.side) == [.right])
+        let frame = try #require(scene.nodes["branch-1"]?.frame)
+        #expect(handles.first?.anchor == CGPoint(x: frame.maxX, y: frame.midY))
+    }
+
+    @Test func aBalancedRootOffersBothSides() throws {
+        let scene = buildScene(sceneModel())
+        let handles = AddHandleResolver.handles(for: "root", in: scene)
+        #expect(Set(handles.map(\.side)) == [.left, .right])
+    }
+
+    @Test func aOneSidedRootOffersOnlyItsSide() throws {
+        let scene = buildScene(rightModel())
+        #expect(AddHandleResolver.handles(for: "root", in: scene).map(\.side) == [.right])
+    }
+
+    @Test func aLeftBranchPutsItsPlusOnTheLeft() throws {
+        var model = sceneModel()
+        model.nodes["root"]?.structure = "mindmap.left"
+        let scene = buildScene(model)
+        #expect(AddHandleResolver.handles(for: "branch-1", in: scene).map(\.side) == [.left])
+    }
+
+    @Test func selectingANodeShowsItsPlusAndClickingAddsAChild() throws {
+        let harness = DragHarness(model: rightModel())
+        harness.view.setSelection(["branch-1"])
+        let handle = try #require(harness.view.layerTree.addHandles.first)
+        #expect(harness.view.layerTree.addHandleLayers.count == 1)
+
+        var added: (String, AddHandleSide)?
+        harness.view.onAddChildAtHandle = { added = ($0, $1) }
+        let center = handle.center(camera: harness.view.camera)
+        #expect(harness.view.addHandle(at: center)?.nodeID == "branch-1")
+        let event = try #require(
+            NSEvent.mouseEvent(
+                with: .leftMouseDown, location: center, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        harness.view.mouseDown(with: event)
+        #expect(added?.0 == "branch-1")
+        #expect(added?.1 == .right)
+
+        // Nothing selected, or several: no plus.
+        harness.view.setSelection([])
+        #expect(harness.view.layerTree.addHandles.isEmpty)
+        harness.view.setSelection(["branch-0", "branch-1"])
+        #expect(harness.view.layerTree.addHandles.isEmpty)
+    }
+
+    @Test func plusHidesWhileEditing() throws {
+        let harness = DragHarness(model: rightModel())
+        harness.view.setSelection(["branch-1"])
+        #expect(!harness.view.layerTree.addHandles.isEmpty)
+        harness.view.beginEditing(nodeID: "branch-1")
+        #expect(harness.view.layerTree.addHandles.isEmpty)
+    }
+
+    @Test func deleteKeyDeletesTheSelectionAndOptionDeleteTheNodeOnly() throws {
+        let harness = DragHarness(model: rightModel())
+        var calls: [Bool] = []
+        harness.view.onDeleteSelection = { calls.append($0) }
+        func key(_ character: String, _ flags: NSEvent.ModifierFlags) throws -> NSEvent {
+            try #require(
+                NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                    windowNumber: 0, context: nil, characters: character,
+                    charactersIgnoringModifiers: character, isARepeat: false, keyCode: 51))
+        }
+        harness.view.setSelection(["branch-1"])
+        harness.view.keyDown(with: try key("\u{7f}", []))
+        harness.view.keyDown(with: try key("\u{f728}", []))
+        harness.view.keyDown(with: try key("\u{7f}", [.option]))
+        #expect(calls == [false, false, true])
     }
 }

@@ -109,6 +109,15 @@ public final class CanvasView: NSView {
     /// floating root at this model point and enters edit mode.
     public var onCreateFloatingNode: ((CGPoint) -> Void)?
 
+    /// A click on a Node Well "+" (SPEC §6.2): add a child to the node on
+    /// that side. The host performs the command and starts editing it.
+    public var onAddChildAtHandle: ((String, AddHandleSide) -> Void)?
+
+    /// ⌫ / ⌦ on the canvas (F-EDT-4): `nodeOnly` is ⌥ (delete the node and
+    /// promote its children). Handled here as well as by the Edit ▸
+    /// Delete menu equivalents so the key works whatever the menu state.
+    public var onDeleteSelection: ((_ nodeOnly: Bool) -> Void)?
+
     /// F-LAY-14: the user clicked a folded node's count pill → the host
     /// performs ONE `setFolded(id:, folded: false)` undo step.
     public var onUnfoldPill: ((String) -> Void)?
@@ -141,7 +150,9 @@ public final class CanvasView: NSView {
 
     /// Drag state (F-EDT-5); the interaction logic lives in
     /// CanvasView+Drag.swift.
-    var drag: DragState?
+    var drag: DragState? {
+        didSet { syncSelectionRings() }
+    }
 
     /// M3's decoration surface closures + highlight state; see
     /// CanvasView+Decorations.swift.
@@ -152,7 +163,9 @@ public final class CanvasView: NSView {
     /// performs the commands these interactions request.
     public internal(set) var selectedConnectionIDs: Set<String> = []
     /// F-REL-1: the ⌘L source — the next node click makes a connection.
-    var pendingConnectionSource: String?
+    var pendingConnectionSource: String? {
+        didSet { syncSelectionRings() }
+    }
     /// A live midpoint-handle drag (F-REL-1); see
     /// CanvasView+Connections.swift.
     var relationDrag: RelationHandleDrag?
@@ -308,6 +321,13 @@ public final class CanvasView: NSView {
         case ("\u{f705}", false, false):
             // F2 (Edit Title, §6.1).
             beginEditingSelection()
+        case ("\u{7f}", false, _), ("\u{f728}", false, _):
+            // F-EDT-4: ⌫/⌦ delete the selection, ⌥⌫ the node only.
+            if let delete = onDeleteSelection, !isEditing {
+                delete(hasOption)
+            } else {
+                super.keyDown(with: event)
+            }
         default:
             if let prefill = replaceEditText(for: event) {
                 // Typing a printable character on a selected node replaces
@@ -328,6 +348,12 @@ public final class CanvasView: NSView {
         }
         if connectionLabelEditor.isEditing {
             connectionLabelEditor.commit()
+        }
+        // The Node Well "+" acts before any node hit-test: it sits outside
+        // the node's frame, but its radius can overlap a neighbour.
+        if let handle = addHandle(at: point), let add = onAddChildAtHandle {
+            add(handle.nodeID, handle.side)
+            return
         }
         // ⌘L's next click (F-REL-1): a click on another node makes the
         // connection; a click anywhere else just cancels the mode.

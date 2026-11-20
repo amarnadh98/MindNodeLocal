@@ -83,7 +83,56 @@ public enum DropTargetResolver {
             return .insertBetween(parent: gap.parent, index: gap.index, line: gap.line)
         }
 
+        // Dragging a child around its own siblings reorders them, wherever
+        // along the column the cursor is — above the first and below the
+        // last included — instead of tearing it out of its branch.
+        if let reorder = ownSiblingTarget(
+            model: model, scene: scene, dragged: dragged, point: point)
+        {
+            return reorder
+        }
+
         return .newRoot(at: point)
+    }
+
+    /// How far outside the siblings' column (and the corridor back to
+    /// the parent) the cursor still counts as "beside the siblings".
+    static let siblingBandPad: CGFloat = 40
+
+    /// The reorder target when every dragged node shares one parent and
+    /// the cursor is beside that parent's other children. Nil when the
+    /// dragged nodes don't share a parent, there are no other children
+    /// to order against, or the cursor is outside the band.
+    static func ownSiblingTarget(
+        model: MapModel, scene: CanvasScene, dragged: Set<String>, point: CGPoint
+    ) -> DropTarget? {
+        let parents = Set(dragged.map { model.nodes[$0]?.parent })
+        guard parents.count == 1, let optionalParent = parents.first, let parent = optionalParent,
+            let parentFrame = scene.nodes[parent]?.frame
+        else { return nil }
+        let excluded = excludedIDs(dragged: dragged, model: model)
+        let anchors = anchorList(model: model, scene: scene, parent: parent, excluded: excluded)
+        guard !anchors.isEmpty else { return nil }
+        let stack = siblingStacking(of: parent, in: scene)
+        let column = sideAnchors(
+            anchors: anchors, parentFrame: parentFrame, point: point, stack: stack)
+        var band = parentFrame
+        for anchor in column { band = band.union(anchor.frame) }
+        band = band.insetBy(dx: -siblingBandPad, dy: -siblingBandPad)
+        // Along the stacking axis the band is unbounded: any height
+        // beside the column reorders.
+        let inBand =
+            stack == .vertical
+            ? point.x >= band.minX && point.x <= band.maxX
+            : point.y >= band.minY && point.y <= band.maxY
+        guard inBand else { return nil }
+        let slot = slotIndex(
+            model: model, scene: scene, parent: parent, point: point, excluded: excluded)
+        guard
+            let line = slotLine(
+                model: model, scene: scene, parent: parent, index: slot, dragged: dragged)
+        else { return nil }
+        return .insertBetween(parent: parent, index: slot, line: line)
     }
 
     // MARK: hover slots
