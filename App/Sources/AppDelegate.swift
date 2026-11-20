@@ -8,6 +8,20 @@ import UniformTypeIdentifiers
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// The one delegate instance. `NSApp.delegate` is weak, so this keeps
+    /// it alive.
+    static let shared = AppDelegate()
+
+    /// `@main` on an `NSApplicationDelegate` only calls
+    /// `NSApplicationMain`, which creates the delegate from a main nib —
+    /// and Arbor has none. Without this the delegate never existed in the
+    /// running app: no menus beyond the app menu, no Library, hotkey,
+    /// Services, URL handling, welcome window or MCP endpoint.
+    static func main() {
+        NSApplication.shared.delegate = shared
+        _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+    }
+
     /// The Library window's wiring (F-LIB): index, watcher, template
     /// store and the one window. Created at launch so saves are
     /// observed from the first document on.

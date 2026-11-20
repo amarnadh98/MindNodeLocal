@@ -105,6 +105,7 @@
 		854A37BE762EA373518198D4 /* GlobalHotkeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49552EBEBA4082512C5F88A /* GlobalHotkeyCenter.swift */; };
 		856E78DAEF9CDB41C13F248C /* MapIO in Frameworks */ = {isa = PBXBuildFile; productRef = 7645714653A5CB518E996BCF /* MapIO */; };
 		85D6B5C955FCD2BC119CE99A /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AA428D729C901EEC6C0FAB /* InspectorView.swift */; };
+		86233E4498CC9E7BAFF97276 /* AppLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8636A9300D1A1D3C0B1BDA7 /* AppLaunchTests.swift */; };
 		866E528EA2819D97CE3C7379 /* FilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4D58A89C9AF5081E1BB936 /* FilterBar.swift */; };
 		87385042B26AC0884B4C0D44 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAC6BFCC857FA0158B42391 /* ExportCoordinator.swift */; };
 		87FC28654A94E457A5C003AD /* MapAutomation in Frameworks */ = {isa = PBXBuildFile; productRef = 8DA1CD06D06C3F1FC4B0E4EA /* MapAutomation */; };
@@ -430,12 +431,13 @@
 		F401197E85E463072F6963CE /* MapIO */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MapIO; path = Packages/MapIO; sourceTree = SOURCE_ROOT; };
 		F5CB77894DADD2B78F48D728 /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		F5E115EB6405ED29852BAF1F /* arbor-mcp */ = {isa = PBXFileReference; includeInIndex = 0; path = "arbor-mcp"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F8636A9300D1A1D3C0B1BDA7 /* AppLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchTests.swift; sourceTree = "<group>"; };
 		F8ABF2FD51CB88CBF1F23CC7 /* OutlineViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineViewController.swift; sourceTree = "<group>"; };
 		F9B83D4AAB6240FAD03221E5 /* FocusFindCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusFindCoordinator.swift; sourceTree = "<group>"; };
 		FB46BCD65592DE6251B0A425 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FB73A03A348D9A4F91D9E528 /* SampleMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleMap.swift; sourceTree = "<group>"; };
 		FD17D79F4E90F384126B103B /* DocumentSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSafetyTests.swift; sourceTree = "<group>"; };
-		"TEMP_7CB694CD-BC5C-4F7B-9E6A-08547DAB0AE3" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_FBE0223F-E02B-4451-86FF-61F386118EBF" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -826,6 +828,7 @@
 			isa = PBXGroup;
 			children = (
 				DE0F9BFC02649692080AE24A /* AIFeatureTests.swift */,
+				F8636A9300D1A1D3C0B1BDA7 /* AppLaunchTests.swift */,
 				7461ED29149D1DDD24FD5E73 /* AutomationTests.swift */,
 				0DC404C69786196CC5316EA3 /* CanvasAccessibilityTests.swift */,
 				EE7437BEC7881E13E8693B1E /* ClipboardTests.swift */,
@@ -920,12 +923,12 @@
 			path = Extensions;
 			sourceTree = "<group>";
 		};
-		"TEMP_BCB78475-B259-4FF1-85FA-01B2FF2FF8F4" /* t3-6b5625ee-1e8d87c4497b4790 */ = {
+		"TEMP_5FD5E928-D290-4F07-B424-EAFFD9092BB4" /* app-delegate */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_7CB694CD-BC5C-4F7B-9E6A-08547DAB0AE3" /* Config.xcconfig */,
+				"TEMP_FBE0223F-E02B-4451-86FF-61F386118EBF" /* Config.xcconfig */,
 			);
-			path = "t3-6b5625ee-1e8d87c4497b4790";
+			path = "app-delegate";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1164,6 +1167,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				214993110FC0F832EBCAB52E /* AIFeatureTests.swift in Sources */,
+				86233E4498CC9E7BAFF97276 /* AppLaunchTests.swift in Sources */,
 				D7DDCC01D98A37B47B86456D /* AutomationTests.swift in Sources */,
 				5E8D6BC848604A562B0E48BF /* CanvasAccessibilityTests.swift in Sources */,
 				4836DF66B7D3FD3CA53996F9 /* ClipboardTests.swift in Sources */,
@@ -1532,7 +1536,7 @@
 		};
 		A2396F600F9938514A49C23D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_7CB694CD-BC5C-4F7B-9E6A-08547DAB0AE3" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_FBE0223F-E02B-4451-86FF-61F386118EBF" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1649,7 +1653,7 @@
 		};
 		F3B5660B858E3E1D07FBBD89 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_7CB694CD-BC5C-4F7B-9E6A-08547DAB0AE3" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_FBE0223F-E02B-4451-86FF-61F386118EBF" /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
