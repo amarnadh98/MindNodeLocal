@@ -164,4 +164,56 @@ struct CanvasInteractionTests {
         #expect(document.model.roots.count == 1)
         #expect(document.model.nodes.count == 1)
     }
+
+    @Test func draggingTheRootMovesTheWholeMapInOneUndoStep() throws {
+        let (document, controller, canvas) = try makeShownTree()
+        defer { document.close() }
+        let rootID = try #require(document.model.roots.first)
+        // `replaceModel` doesn't rebuild the scene, so the canvas still
+        // renders the pre-replace layout — rebuild it (camera kept) so
+        // frame comparisons below compare like with like.
+        controller.updateScene(preserveCamera: true)
+        let before = try #require(canvas.scene?.nodes[rootID]?.frame)
+        func mouse(_ type: NSEvent.EventType, at viewPoint: CGPoint) throws -> NSEvent {
+            try #require(
+                NSEvent.mouseEvent(
+                    with: type, location: viewPoint, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        }
+
+        // Grab the root's center and drag it straight down, past the
+        // child column, to empty canvas — no modifier (ADR-0032). The
+        // events carry WINDOW coordinates (unflipped); the canvas is a
+        // flipped view, so the view-space points convert through
+        // `convert(_:to: nil)` first.
+        let start = CGPoint(x: before.midX, y: before.midY)
+        let dragDistance: CGFloat = 160
+        let end = CGPoint(x: start.x, y: start.y + dragDistance)
+        func windowPoint(for modelPoint: CGPoint) -> CGPoint {
+            canvas.convert(canvas.camera.screenPoint(for: modelPoint), to: nil)
+        }
+        canvas.mouseDown(with: try mouse(.leftMouseDown, at: windowPoint(for: start)))
+        canvas.mouseDragged(with: try mouse(.leftMouseDragged, at: windowPoint(for: end)))
+        canvas.mouseUp(with: try mouse(.leftMouseUp, at: windowPoint(for: end)))
+
+        // The whole map moved and stays moved: the root carries a manual
+        // offset, and the rebuilt scene (and the minimap's mirror of it)
+        // placed the root where it was dropped.
+        let movedOffset = try #require(document.model.nodes[rootID]?.offset)
+        #expect(abs(movedOffset.y - dragDistance) < 0.5)
+        #expect(abs(movedOffset.x) < 0.5)
+        let after = try #require(canvas.scene?.nodes[rootID]?.frame)
+        #expect(abs(after.midY - before.midY - dragDistance) < 0.5)
+        #expect(abs(after.midX - before.midX) < 0.5)
+        #expect(canvas.selection == [rootID])
+        let minimapRoot = try #require(controller.minimap?.scene?.nodes[rootID]?.frame)
+        #expect(abs(minimapRoot.midY - after.midY) < 0.001, "the minimap mirrors the moved map")
+
+        // One undo step restores the pre-drag position exactly.
+        document.undoManager?.undo()
+        #expect(document.model.nodes[rootID]?.offset == nil)
+        let restored = try #require(canvas.scene?.nodes[rootID]?.frame)
+        #expect(abs(restored.midY - before.midY) < 0.001)
+        #expect(document.undoManager?.canUndo == false)
+    }
 }

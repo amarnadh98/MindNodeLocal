@@ -36,6 +36,24 @@ import Testing
     #expect(read.validationErrors.isEmpty)
 }
 
+@Test func rootManualOffsetSurvivesTheRoundTrip() throws {
+    // ADR-0032: a root dragged around the canvas stores its move as
+    // the root's manual `offset` — the save+reopen contract is that the
+    // map comes back where it was left.
+    var model = try sampleTree()
+    let rootID = try #require(model.roots.first)
+    model.nodes[rootID]?.offset = ModelOffset(x: 260, y: -140)
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("arbor-test-\(UUID().uuidString).arbor")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    try ArborPackage.write(model, meta: PackageMeta(docID: model.docID), to: url)
+    let read = try ArborPackage.read(at: url)
+
+    #expect(read.model == model)
+    #expect(read.model.nodes[rootID]?.offset == ModelOffset(x: 260, y: -140))
+}
+
 @Test func foreignEntriesSurviveWrapperUpdates() throws {
     let model = MapModel.emptyDocument()
     let meta = PackageMeta(docID: model.docID)

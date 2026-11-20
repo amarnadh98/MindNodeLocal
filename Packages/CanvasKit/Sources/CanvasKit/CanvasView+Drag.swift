@@ -245,9 +245,11 @@ extension CanvasView {
     // MARK: drop resolution
 
     /// The one command this drop performs, per the live modifier state
-    /// (F-EDT-5 + F-REL-1): Space or ⇧ drops as a connection to the
-    /// hovered target, ⌥ free-positions via `setOffset`, D detaches
-    /// into new roots, and no modifier reparents.
+    /// (F-EDT-5 + F-REL-1 + ADR-0032): Space or ⇧ drops as a connection
+    /// to the hovered target, ⌥ free-positions via `setOffset`, D
+    /// detaches into new roots, and no modifier reparents — except that
+    /// a plain drag of ROOTS moves the map (ADR-0032), keeping the
+    /// reparent only over another node's frame.
     private func dropCommand(
         _ session: DragSession, model: MapModel, scene: CanvasScene
     ) -> MapCommand? {
@@ -273,16 +275,26 @@ extension CanvasView {
             let ordered = DragCommands.orderedByStacking(session.dragged, in: scene, parent: parent)
             return DragCommands.reparent(model: model, dragged: ordered, parent: parent, slot: slot)
         case .insertBetween(let parent, let index, _):
+            // ADR-0032: a plain drag of roots never inserts between
+            // siblings — a corridor (like empty canvas) is a map move.
+            if DragCommands.movesRoots(session.dragged, in: model) {
+                return DragCommands.offsets(
+                    model: model, dragged: session.dragged, delta: session.deltaModel)
+            }
             let ordered = DragCommands.orderedByStacking(session.dragged, in: scene, parent: parent)
             return DragCommands.reparent(model: model, dragged: ordered, parent: parent, slot: index)
-        case .newRoot:
-            // Letting go on empty canvas never tears a child out of its
-            // branch — it snaps back. D (detach) is the deliberate way.
-            // Roots are only re-stacked.
-            guard session.dragged.allSatisfy({ model.nodes[$0]?.parent == nil }) else { return nil }
-            return DragCommands.newRoots(model: model, dragged: session.dragged)
-        case .none:
-            return nil
+        case .newRoot, .none:
+            // ADR-0032: a plain drag of the ROOT moves the whole map —
+            // MindNode's contract. Roots carry no absolute position,
+            // so the drag delta becomes the root's manual `offset`
+            // (the same F-LAY-11 mechanism the ⌥ free-position drop
+            // uses) and every descendant travels along. Empty canvas
+            // still never tears a child out of its branch (D is the
+            // deliberate way to detach); dropping a root ON another
+            // node's frame keeps the reparent above.
+            guard DragCommands.movesRoots(session.dragged, in: model) else { return nil }
+            return DragCommands.offsets(
+                model: model, dragged: session.dragged, delta: session.deltaModel)
         }
     }
 
@@ -368,7 +380,11 @@ extension CanvasView {
                 stroke(line, in: context, color: accent)
             }
         }
-        if case .insertBetween(_, _, let line) = session.target {
+        // ADR-0032: an all-roots drag never inserts between siblings
+        // (the corridor drop moves the map), so no insertion line
+        // misleads there.
+        let rootMove = dragModel.map { DragCommands.movesRoots(session.dragged, in: $0) } ?? false
+        if case .insertBetween(_, _, let line) = session.target, !rootMove {
             stroke(line, in: context, color: accent)
         }
 
