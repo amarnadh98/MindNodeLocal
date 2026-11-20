@@ -58,6 +58,19 @@ final class InspectorPaneController {
         install(in: window, collapsed: false)
     }
 
+    /// Format ▸ Theme ▸ Show Theme Inspector: a show-always door —
+    /// unlike the ⌥⌘I toggle it never uninstalls a visible pane, it
+    /// just lands on `tab` (installing when hidden).
+    func show(tab: InspectorModel.Tab) {
+        guard let host, let window = host.window else { return }
+        model.tab = tab
+        if !isInstalled {
+            install(in: window, collapsed: false)
+        }
+        DocumentPreferences.inspectorVisible = isVisible
+        host.documentToolbar?.validateVisibleItems()
+    }
+
     private func install(in window: NSWindow, collapsed: Bool) {
         guard splitController == nil else { return }
         let main = NSViewController()
