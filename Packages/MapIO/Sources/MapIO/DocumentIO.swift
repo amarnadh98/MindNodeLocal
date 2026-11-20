@@ -9,8 +9,10 @@ import MapCore
 /// package stays with the document layer (`MapDocumentCoder`).
 public enum DocumentIO {
     /// Imports `data` as `format`. For `.xmind` the bytes are the whole
-    /// zip archive; for `.mindnode` they are the package's `contents.xml`
-    /// entry; for the text formats they are UTF-8 text.
+    /// zip archive; for `.mindnode` they are the whole file — a zip in
+    /// the current format, or the legacy package's `contents.xml`
+    /// entry (the importer sniffs which); for the text formats they
+    /// are UTF-8 text.
     public static func importDocument(_ data: Data, format: DocumentFormat) throws -> MapModel {
         switch format.id {
         case DocumentFormats.opml.id:
@@ -24,7 +26,7 @@ public enum DocumentIO {
         case DocumentFormats.xmind.id:
             return try XMindIO.importDocument(archive: data)
         case DocumentFormats.mindnode.id:
-            return try MindNodeIO.importDocument(contentsXML: data)
+            return try MindNodeIO.importDocument(archive: data)
         default:
             throw DocumentIOError.notImplemented("import of \(format.displayName) is a later slice")
         }
