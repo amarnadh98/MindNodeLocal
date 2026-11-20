@@ -104,10 +104,11 @@ struct ThemesTests {
 
         defaults.set("ocean", forKey: ThemeCatalog.defaultThemeKey)
         #expect(ThemeCatalog.defaultThemeID == "ocean")
-        // A deleted user theme's id falls back to Paper (the catalog
-        // has no such user theme in this test's environment).
+        // A deleted user theme's id falls back to the new-map default
+        // (Studio; the catalog has no such user theme in this test's
+        // environment).
         defaults.set("user-ghost", forKey: ThemeCatalog.defaultThemeKey)
-        #expect(ThemeCatalog.defaultThemeID == BuiltInThemes.defaultID)
+        #expect(ThemeCatalog.defaultThemeID == BuiltInThemes.newDocumentDefaultID)
 
         // New documents adopt the default (F-STY-6).
         defaults.set("graphite", forKey: ThemeCatalog.defaultThemeKey)

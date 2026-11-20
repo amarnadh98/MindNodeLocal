@@ -1,5 +1,6 @@
 import Foundation
 import MapCore
+import MapRender
 import Testing
 
 @testable import SceneExport
@@ -13,6 +14,13 @@ struct SVGExporterTests {
         let scene = ExportFixtures.scene(for: model)
         let svg = SVGExporter.export(scene: scene, model: model)
 
+        // `UPDATE_GOLDEN=1 swift test …` rewrites the committed golden from
+        // the current output (review the diff before committing it).
+        if ProcessInfo.processInfo.environment["UPDATE_GOLDEN"] != nil {
+            let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("Fixtures/canonical-map.svg")
+            try svg.write(to: source, atomically: true, encoding: .utf8)
+        }
         let goldenURL = try #require(
             Bundle.module.url(forResource: "canonical-map", withExtension: "svg", subdirectory: "Fixtures"))
         let golden = try String(contentsOf: goldenURL, encoding: .utf8)
@@ -78,4 +86,10 @@ struct SVGExporterTests {
     }
 }
 
-private final class WellFormednessChecker: NSObject, XMLParserDelegate {}
+private final class WellFormednessChecker: NSObject, XMLParserDelegate {
+    @Test func theRoundedFamilyTokenBecomesARealCSSFontStack() {
+        let stack = SVGSupport.fontFamily(FontSpec(size: 18, family: FontSpec.roundedFamily))
+        #expect(stack.contains("ui-rounded"))
+        #expect(!stack.contains("system-rounded"), "the internal token must never reach the SVG")
+    }
+}

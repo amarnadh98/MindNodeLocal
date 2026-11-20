@@ -251,6 +251,7 @@ extension Theme {
                     monospace: font.monospace),
                 underlineWidth: underlineWidth,
                 shadows: shadows,
+                minWidth: CGFloat(levelStyle.minWidth ?? 0),
                 maxWidth: CGFloat(levelStyle.maxWidth)),
             variant: variant)
     }

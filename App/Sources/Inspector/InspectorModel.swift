@@ -51,7 +51,7 @@ final class InspectorModel: ObservableObject {
     @Published var canvasColorOverride: String?
     /// The id currently hovered in the theme grid (view-only preview).
     @Published var previewedThemeID: String?
-    @Published var defaultThemeID: String = "paper"
+    @Published var defaultThemeID: String = BuiltInThemes.newDocumentDefaultID
 
     // MARK: app-level rows the Canvas pane mirrors
 

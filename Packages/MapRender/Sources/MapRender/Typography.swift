@@ -28,9 +28,15 @@ public struct FontSpec: Sendable, Hashable {
         self.monospace = monospace
     }
 
-    var ctFont: CTFont {
+    /// The Core Text font the measurer and renderer use for this spec.
+    /// Toll-free bridged to `NSFont`, so an overlay editor can show the
+    /// exact face the node was laid out with.
+    public var ctFont: CTFont {
         if monospace {
             return CTFontCreateWithName("Menlo-Regular" as CFString, size, nil)
+        }
+        if family == Self.roundedFamily {
+            return weighted(base: Self.roundedSystemFont(size: size))
         }
         if let family {
             return CTFontCreateWithName(family as CFString, size, nil)
@@ -47,6 +53,24 @@ public struct FontSpec: Sendable, Hashable {
             CTFontCopyFontDescriptor(system), attributes as CFDictionary)
         let weighted = CTFontCreateWithFontDescriptor(descriptor, size, nil)
         return applyItalic(to: weighted)
+    }
+
+    /// The family token for the rounded system face (SF Rounded), the
+    /// soft, friendly type of a polished mind-mapping app.
+    public static let roundedFamily = "system-rounded"
+
+    private static func roundedSystemFont(size: CGFloat) -> CTFont {
+        CTFontCreateWithName(".AppleSystemUIFontRounded-Regular" as CFString, size, nil)
+    }
+
+    /// `base` at this spec's weight, then its italic.
+    private func weighted(base: CTFont) -> CTFont {
+        guard weight != 0.0 else { return applyItalic(to: base) }
+        let traits: [CFString: Any] = [kCTFontWeightTrait: weight as NSNumber]
+        let attributes: [CFString: Any] = [kCTFontTraitsAttribute: traits]
+        let descriptor = CTFontDescriptorCreateCopyWithAttributes(
+            CTFontCopyFontDescriptor(base), attributes as CFDictionary)
+        return applyItalic(to: CTFontCreateWithFontDescriptor(descriptor, size, nil))
     }
 
     private func applyItalic(to font: CTFont) -> CTFont {

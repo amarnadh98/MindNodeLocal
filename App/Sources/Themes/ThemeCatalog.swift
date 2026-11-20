@@ -60,20 +60,34 @@ final class ThemeCatalog {
     /// The Settings ▸ General default for new documents (F-STY-6):
     /// persisted per user; read back by `MapDocument` when it builds a
     /// fresh empty model. An id that no longer resolves (a deleted
-    /// user theme) falls back to Paper.
+    /// user theme) falls back to the new-document default (Studio).
     static var defaultThemeID: String {
         get {
             let stored = UserDefaults.standard.string(forKey: defaultThemeKey) ?? ""
-            guard !stored.isEmpty else { return BuiltInThemes.defaultID }
+            guard !stored.isEmpty else { return BuiltInThemes.newDocumentDefaultID }
             let resolves =
                 BuiltInThemes.all.contains(where: { $0.id == stored })
                 || shared.userThemes.contains(where: { $0.id == stored })
             if resolves {
                 return stored
             }
-            return BuiltInThemes.defaultID
+            return BuiltInThemes.newDocumentDefaultID
         }
         set { UserDefaults.standard.set(newValue, forKey: defaultThemeKey) }
+    }
+
+    private static let defaultMigrationKey = "arbor.defaultThemeMigratedToStudio"
+
+    /// Once per user: Studio became the new-document default. A stored
+    /// "paper" from before that is the old default, not a choice anyone
+    /// made, so clear it (a later deliberate pick sticks).
+    static func migrateDefaultThemeToStudio() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: defaultMigrationKey) else { return }
+        defaults.set(true, forKey: defaultMigrationKey)
+        if defaults.string(forKey: defaultThemeKey) == BuiltInThemes.defaultID {
+            defaults.removeObject(forKey: defaultThemeKey)
+        }
     }
 
     // MARK: file I/O

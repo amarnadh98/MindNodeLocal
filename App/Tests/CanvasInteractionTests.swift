@@ -49,9 +49,11 @@ struct CanvasInteractionTests {
         canvas.setSelection([childID])
         let handle = try #require(canvas.addHandles.first)
         let center = handle.center(camera: canvas.camera)
+        // Mouse events carry window coordinates.
+        let windowPoint = canvas.convert(center, to: nil)
         let click = try #require(
             NSEvent.mouseEvent(
-                with: .leftMouseDown, location: center, modifierFlags: [], timestamp: 0,
+                with: .leftMouseDown, location: windowPoint, modifierFlags: [], timestamp: 0,
                 windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
         canvas.mouseDown(with: click)
 

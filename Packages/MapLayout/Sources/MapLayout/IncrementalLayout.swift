@@ -29,6 +29,11 @@ public struct LayoutSourceNode: Sendable, Equatable {
 /// working orientation. `dirty` (below) must additionally name every node
 /// whose own inputs changed, so an untouched entry implies an untouched
 /// subtree; over-marking dirty ids is always safe, under-marking is not.
+/// One caveat: an edit the walk cannot see at all — a change below a
+/// folded node or inside a pruned region — names ids this pass never
+/// resolves. `update`'s epilogue responds by purging the recorded parent
+/// chain of every unresolved dirty id, so the stale entries cannot be
+/// reused when the region becomes visible again.
 public struct LayoutState: Sendable {
     /// One cached subtree placement, keyed by the subtree's root id.
     struct Entry: Sendable {
@@ -148,6 +153,29 @@ public enum IncrementalLayout {
         for (id, parent) in engine.parents {
             parents[id] = parent
         }
+        if let dirty, !fullPass {
+            // The reuse contract's one blind spot: a dirty id the walk
+            // cannot see this pass — it lives below a folded node, or
+            // inside the filter's pruned region — is never validated,
+            // and every cached entry along its recorded parent chain
+            // still describes the pre-edit tree. Drop those entries:
+            // an absent entry recomputes on the next pass that can
+            // reach it, so no stale placement is ever served when the
+            // region reopens (an unfold, a move out of the fold) — and
+            // no reused ancestor can shadow a purged descendant,
+            // because its own chain entry is purged with it.
+            let visited = Set(engine.fetched.keys)
+            let cap = parents.count + 1
+            for id in dirty where !visited.contains(id) {
+                var current: String? = id
+                var steps = 0
+                while let node = current, steps <= cap {
+                    entries.removeValue(forKey: node)
+                    current = parents[node].flatMap { $0 }
+                    steps += 1
+                }
+            }
+        }
         var newState = LayoutState()
         newState.entries = entries
         newState.parents = parents
@@ -171,8 +199,10 @@ final class IncrementalEngine {
     /// for the partition and again inside its side's stack.
     private(set) var updated: [String: LayoutState.Entry] = [:]
     private(set) var parents: [String: String?] = [:]
-    /// Source lookups, once per node per pass.
-    private var fetched: [String: LayoutSourceNode] = [:]
+    /// Source lookups, once per node per pass. Read by `update`'s
+    /// epilogue: the ids fetched this pass are exactly the ids it
+    /// validated (reused or relaid).
+    private(set) var fetched: [String: LayoutSourceNode] = [:]
 
     init(
         rootID: String,

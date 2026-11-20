@@ -12,13 +12,13 @@ struct BuiltInThemeTests {
         #expect(
             BuiltInThemes.all.map(\.id)
                 == [
-                    "paper", "graphite", "pastel", "ocean", "forest", "sunset",
+                    "studio", "paper", "graphite", "pastel", "ocean", "forest", "sunset",
                     "mono-ink", "chalkboard", "neon", "blueprint", "sakura", "study",
                 ])
         #expect(
             BuiltInThemes.all.map(\.name)
                 == [
-                    "Paper", "Graphite", "Pastel", "Ocean", "Forest", "Sunset",
+                    "Studio", "Paper", "Graphite", "Pastel", "Ocean", "Forest", "Sunset",
                     "Mono Ink", "Chalkboard", "Neon", "Blueprint", "Sakura", "Study",
                 ])
         #expect(Set(BuiltInThemes.all.map(\.id)).count == BuiltInThemes.all.count)

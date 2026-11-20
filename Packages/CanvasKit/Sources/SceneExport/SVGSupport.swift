@@ -134,6 +134,9 @@ enum SVGSupport {
         if font.monospace {
             return "Menlo, monospace"
         }
+        if font.family == FontSpec.roundedFamily {
+            return "ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, sans-serif"
+        }
         if let family = font.family, !family.isEmpty {
             return escapeAttribute(family)
         }

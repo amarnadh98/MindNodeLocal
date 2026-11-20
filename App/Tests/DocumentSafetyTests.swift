@@ -29,6 +29,21 @@ struct DocumentSafetyTests {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
     }
 
+    /// Locking and unlocking complete asynchronously — `lock:` autosaves
+    /// first and then coordinates with the file system, and a cold
+    /// runner's first file-coordination round trip can outlast any fixed
+    /// spin. Poll with a deadline instead; the caller still asserts the
+    /// end state, so a lock that genuinely fails fails the test.
+    private func waitFor(
+        _ condition: @autoclosure () -> Bool,
+        timeout: TimeInterval = 10
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+    }
+
     private func item(_ title: String, action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         return item
@@ -205,13 +220,13 @@ struct DocumentSafetyTests {
             !controller.validateMenuItem(item("Unlock", action: #selector(NSDocument.unlock(_:)))))
 
         document.lock(nil)
-        settle()
+        waitFor(document.isLocked)
         #expect(document.isLocked)
         #expect(!controller.validateMenuItem(item("Lock", action: #selector(NSDocument.lock(_:)))))
         #expect(controller.validateMenuItem(item("Unlock", action: #selector(NSDocument.unlock(_:)))))
 
         document.unlock(nil)
-        settle()
+        waitFor(!document.isLocked)
         #expect(!document.isLocked)
     }
 
