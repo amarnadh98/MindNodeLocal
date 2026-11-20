@@ -105,8 +105,6 @@
 			<array>
 				<string>com.mindnode.mindnode</string>
 			</array>
-			<key>LSTypeIsPackage</key>
-			<true/>
 			<key>NSDocumentClass</key>
 			<string>$(PRODUCT_MODULE_NAME).MapDocument</string>
 		</dict>
@@ -321,7 +319,7 @@
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>com.apple.package</string>
+				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
 			<string>MindNode Document</string>
