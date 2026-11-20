@@ -79,9 +79,6 @@
 - **Release pipeline** (SPEC §13, step for step in reusable `scripts/release/*.sh`, shellcheck-clean): `release.yml` on `v*.*.*` tags (same `xcode-27` runner as CI) — test, archive, sign (Developer ID from secrets when present, else ad-hoc), notarize + staple (Developer ID only), create-dmg with an /Applications drop link, Sparkle `generate_appcast` with the EdDSA key from the `SPARKLE_EDDSA_PRIVATE_KEY` secret, upload to a GitHub Release, publish `appcast.xml` to GitHub Pages (`gh-pages`). `scripts/release/build-dmg-local.sh` produces a proven ad-hoc DMG locally: it builds Release, re-signs, creates the DMG and mount-checks it (Arbor.app + Applications alias present) before printing the path.
 - **README ship rewrite:** feature overview, install instructions for both SPEC §13 paths (notarized DMG; ad-hoc with Privacy & Security ▸ Open Anyway or `xattr -dr com.apple.quarantine`), build-from-source including the local-DMG script, and the privacy note. Screenshot placeholders for the v1.0.0 capture pass are listed in `docs/design/screenshots.md` (no fabricated images). `docs/release-checklist.md` covers the M9 exit criteria: one-time EdDSA/Pages/secrets setup, per-release version + tag steps, the fresh-Mac install test, the accessibility audit and the performance pass.
 
-### Fixed (M5)
-- The Quick Look and Spotlight extensions never registered with the system. They weren't sandboxed, which pluginkit requires of app extensions. The Spotlight importer also used the wrong extension point (`com.apple.spotlight-importer` instead of `com.apple.spotlight.import`) and lacked `CSSupportedContentTypes`. Ad-hoc builds now register all three, and Finder thumbnails render through `QuickLookThumbnail`. `docs/io/system-integration.md`'s verification log is corrected.
-
 ### Fixed (M1)
 - CI: the 5k-node layout budget check fails at 20 ms on shared runners (10 ms stays enforced locally), ending flaky failures at ~10.4 ms on CI hardware.
 - Relayout animations no longer crash: the pooled `NodeVisualLayer`/`BranchVisualLayer` now implement `init(layer:)`, which Core Animation calls to build presentation layers for every running animation (caught by golden scenario 1 on CI).
@@ -108,6 +105,9 @@
 
 ### Fixed (release)
 - Ad-hoc release builds (`scripts/release/build-dmg-local.sh`, SPEC §13 path B) aborted at launch with "Library missing". The Hardened Runtime's library validation refused the embedded Sparkle.framework because an ad-hoc signature has no Team ID. The ad-hoc path now builds and signs without the Hardened Runtime. It can't be notarized anyway, and the Developer ID path keeps the runtime. ADR-0021's note on this is corrected.
+
+### Fixed (M5)
+- The Quick Look and Spotlight extensions never registered with the system. They weren't sandboxed, which pluginkit requires of app extensions. The Spotlight importer also used the wrong extension point (`com.apple.spotlight-importer` instead of `com.apple.spotlight.import`) and lacked `CSSupportedContentTypes`. Ad-hoc builds now register all three, and Finder thumbnails render through `QuickLookThumbnail`. `docs/io/system-integration.md`'s verification log is corrected.
 
 ### Fixed (CI)
 - Every CI and release job is now capped at 10 minutes (`timeout-minutes: 10`). A hung job used to run until GitHub's 6-hour default stopped it. A new lint step, `scripts/ci/check-job-timeouts.sh`, fails the build if any job lacks `timeout-minutes` or sets it above 10. Today the slowest job takes about 6 minutes.
