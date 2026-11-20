@@ -90,6 +90,35 @@ final class ThemeCatalog {
         }
     }
 
+    /// A development build's pre-M2 default-theme key (commit history:
+    /// `DocumentPreferences.defaultTheme`), superseded by
+    /// `defaultThemeKey`. Nothing at HEAD reads it; cleared once so
+    /// `defaults read` stops describing a "paper" default that no
+    /// code path ever chose.
+    static let legacyDefaultThemeKey = "arbor.defaultThemeID"
+
+    /// Internal (not private) so the hosted test can reset its own
+    /// one-shot flag and prove the migration against a stale domain.
+    static let stalePaperClearKey = "arbor.defaultThemeStalePaperCleared"
+
+    /// Once more (ADR-0034): the v1 migration's one-shot FLAG made a
+    /// stored "paper" immortal — the value was seen back in the
+    /// defaults AFTER the flag was set (a pre-Studio build's picker
+    /// writing its resolved default), so every new map since opened in
+    /// Paper and `migrateDefaultThemeToStudio` will never run again.
+    /// Clear the old default and the dead legacy key one more time;
+    /// a deliberate "Paper" pick made afterwards sticks (this never
+    /// re-runs).
+    static func clearStalePaperDefault() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: stalePaperClearKey) else { return }
+        defaults.set(true, forKey: stalePaperClearKey)
+        defaults.removeObject(forKey: legacyDefaultThemeKey)
+        if defaults.string(forKey: defaultThemeKey) == BuiltInThemes.defaultID {
+            defaults.removeObject(forKey: defaultThemeKey)
+        }
+    }
+
     // MARK: file I/O
 
     /// Re-reads the themes directory. Undecodable files are skipped
