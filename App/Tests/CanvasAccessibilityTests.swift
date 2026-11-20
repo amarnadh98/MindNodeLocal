@@ -77,9 +77,13 @@ struct CanvasAccessibilityTests {
             .filter { $0.isAccessibilitySelected() }
         #expect(selectedRows.count == 1)
 
-        // One undo step: commit the (empty) draft first, then undo the
-        // add — the child subtree is gone.
+        // The empty commit drops the fresh child — one deterministic
+        // delete step (ADR-0034), never an undo: undoing first
+        // RESTORES the child, a second undo removes the creation.
         canvas.commitEditing()
+        #expect(document.model.nodes[childID] == nil)
+        document.undoManager?.undo()
+        #expect(document.model.nodes[childID] != nil)
         document.undoManager?.undo()
         #expect(document.model.nodes[childID] == nil)
         #expect(document.model.nodes[rootID]?.children.isEmpty == true)
