@@ -96,38 +96,42 @@ public enum BranchPath {
                 CGPoint(x: point.x - normal.x * halfWidth, y: point.y - normal.y * halfWidth))
         }
 
+        // Flat ends, each tucked a hair into its node: a round cap pokes
+        // through an outlined node's border as a bulb, where a flat end
+        // meets the node edge flush (the border or fill hides the tuck).
+        tuck(&left, &right)
         let path = CGMutablePath()
-        guard let firstLeft = left.first, let firstRight = right.first else { return path }
+        guard let firstLeft = left.first else { return path }
         path.move(to: firstLeft)
         for point in left.dropFirst() {
             path.addLine(to: point)
         }
-        addRoundCap(path, from: left.last ?? firstLeft, to: right.last ?? firstRight)
         for point in right.reversed() {
             path.addLine(to: point)
         }
-        addRoundCap(path, from: right.first ?? firstRight, to: firstLeft)
         path.closeSubpath()
         return path
     }
 
-    /// A semicircular cap joining the two offset edge points: centered on
-    /// their midpoint, radius half their distance, sweeping the outward
-    /// side (SPEC §7.4's round caps).
-    private static func addRoundCap(_ path: CGMutablePath, from edge: CGPoint, to other: CGPoint) {
-        let center = CGPoint(x: (edge.x + other.x) / 2, y: (edge.y + other.y) / 2)
-        let radius = hypot(other.x - edge.x, other.y - edge.y) / 2
-        guard radius > 0 else { return }
-        path.addArc(
-            center: center,
-            radius: radius,
-            startAngle: angle(of: edge, relativeTo: center),
-            endAngle: angle(of: other, relativeTo: center),
-            clockwise: true)
-    }
+    /// How far a flat branch end runs into its node.
+    static let endTuck: CGFloat = 0.75
 
-    private static func angle(of source: CGPoint, relativeTo center: CGPoint) -> CGFloat {
-        atan2(source.y - center.y, source.x - center.x)
+    /// Pushes both end edges of the offset polylines outward along the
+    /// branch's tangent at that end.
+    private static func tuck(_ left: inout [CGPoint], _ right: inout [CGPoint]) {
+        guard left.count > 1, right.count > 1 else { return }
+        func push(_ points: inout [CGPoint], index: Int, toward other: Int) {
+            let end = points[index]
+            let inner = points[other]
+            let length = max(hypot(end.x - inner.x, end.y - inner.y), 0.0001)
+            points[index] = CGPoint(
+                x: end.x + (end.x - inner.x) / length * endTuck,
+                y: end.y + (end.y - inner.y) / length * endTuck)
+        }
+        push(&left, index: 0, toward: 1)
+        push(&right, index: 0, toward: 1)
+        push(&left, index: left.count - 1, toward: left.count - 2)
+        push(&right, index: right.count - 1, toward: right.count - 2)
     }
 
     private static func cubicPoint(

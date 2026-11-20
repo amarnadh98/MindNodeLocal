@@ -341,8 +341,8 @@ struct SettingsView: View {
         try? ThemeCatalog.shared.deleteUserTheme(id: theme.id)
         reloadThemes()
         if defaultThemeID == theme.id {
-            defaultThemeID = BuiltInThemes.defaultID
-            ThemeCatalog.defaultThemeID = BuiltInThemes.defaultID
+            defaultThemeID = BuiltInThemes.newDocumentDefaultID
+            ThemeCatalog.defaultThemeID = BuiltInThemes.newDocumentDefaultID
         }
     }
 

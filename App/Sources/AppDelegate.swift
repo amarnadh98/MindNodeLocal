@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.servicesProvider = ServicesResponder.shared
         // F-INT-4: the local MCP socket endpoint (ADR-0030), read-only
         // by default; the helper falls back to files when it is down.
-        startIntegrations()
+        runLaunchTasks()
         // F-ONB-1: once per user, before any document opens.
         welcomeCoordinator.showIfNeeded()
     }
@@ -800,9 +800,11 @@ extension AppDelegate {
         _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
     }
 
-    /// F-INT-4 (the local MCP endpoint) and F-INT-2 (indexing each map for
-    /// Spotlight as it is saved).
-    func startIntegrations() {
+    /// The one-time theme-default migration, F-INT-4 (the local MCP
+    /// endpoint) and F-INT-2 (indexing each map for Spotlight as it is
+    /// saved).
+    func runLaunchTasks() {
+        ThemeCatalog.migrateDefaultThemeToStudio()
         AutomationRuntime.start()
         SpotlightIndexer.start()
     }

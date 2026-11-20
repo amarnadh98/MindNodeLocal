@@ -13,6 +13,13 @@ struct SVGExporterTests {
         let scene = ExportFixtures.scene(for: model)
         let svg = SVGExporter.export(scene: scene, model: model)
 
+        // `UPDATE_GOLDEN=1 swift test …` rewrites the committed golden from
+        // the current output (review the diff before committing it).
+        if ProcessInfo.processInfo.environment["UPDATE_GOLDEN"] != nil {
+            let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("Fixtures/canonical-map.svg")
+            try svg.write(to: source, atomically: true, encoding: .utf8)
+        }
         let goldenURL = try #require(
             Bundle.module.url(forResource: "canonical-map", withExtension: "svg", subdirectory: "Fixtures"))
         let golden = try String(contentsOf: goldenURL, encoding: .utf8)

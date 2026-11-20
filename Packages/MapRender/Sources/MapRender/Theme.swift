@@ -166,6 +166,9 @@ public struct ThemeLevelStyle: Codable, Sendable, Hashable {
     /// `#RRGGBB`.
     public var textColor: String
     public var maxWidth: Double
+    /// Auto-width floors here, so short siblings share a width (nil = no
+    /// floor).
+    public var minWidth: Double?
 
     public init(
         shape: NodeShape,
@@ -177,7 +180,8 @@ public struct ThemeLevelStyle: Codable, Sendable, Hashable {
         shadow: [ThemeShadowLayer] = [],
         font: ThemeFont,
         textColor: String,
-        maxWidth: Double = 280
+        maxWidth: Double = 280,
+        minWidth: Double? = nil
     ) {
         self.shape = shape
         self.fill = fill
@@ -189,6 +193,7 @@ public struct ThemeLevelStyle: Codable, Sendable, Hashable {
         self.font = font
         self.textColor = textColor
         self.maxWidth = maxWidth
+        self.minWidth = minWidth
     }
 }
 

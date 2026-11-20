@@ -8,12 +8,17 @@ import MapCore
 /// `Codable` schema, proven by the round-trip tests, and the theme
 /// editor slice (F-STY-5) will use it for import/export.
 public enum BuiltInThemes {
-    /// The default theme id (SPEC §5.8 theme list, F-STY-6).
+    /// The engine's fallback theme id (SPEC §5.8 theme list, F-STY-6): what
+    /// a document with no theme selection, and an unknown id, resolve to.
     public static let defaultID = "paper"
+
+    /// The theme a NEW map starts with, unless the user picks another in
+    /// Settings (the app's `ThemeCatalog.defaultThemeID`).
+    public static let newDocumentDefaultID = "studio"
 
     /// The themes in the SPEC §5.8 order.
     public static let all: [Theme] = [
-        paper, graphite, pastel, ocean, forest, sunset,
+        studio, paper, graphite, pastel, ocean, forest, sunset,
         monoInk, chalkboard, neon, blueprint, sakura, study,
     ]
 
@@ -41,12 +46,13 @@ public enum BuiltInThemes {
         shadow: [ThemeShadowLayer] = [],
         font: ThemeFont,
         text: String,
-        maxWidth: Double = 280
+        maxWidth: Double = 280,
+        minWidth: Double? = nil
     ) -> ThemeLevelStyle {
         ThemeLevelStyle(
             shape: shape, fill: fill, border: border, cornerRadius: radius,
             paddingWidth: padWidth, paddingHeight: padHeight, shadow: shadow,
-            font: font, textColor: text, maxWidth: maxWidth)
+            font: font, textColor: text, maxWidth: maxWidth, minWidth: minWidth)
     }
 
     static func levels(

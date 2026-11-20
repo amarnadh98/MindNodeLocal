@@ -75,7 +75,7 @@ struct BranchPathTests {
 
         #expect(box.contains(from))
         #expect(box.contains(to))
-        #expect(elements.count >= 34)
+        #expect(elements.count >= 33)
         let centerlineSpan = abs(to.y - from.y)
         let spread = (startWidth + endWidth) / 2
         #expect(box.height >= centerlineSpan + spread - 0.5)
@@ -93,12 +93,18 @@ struct BranchPathTests {
         #expect(box.width >= 6 * 0.9)
     }
 
-    @Test func taperedRoundCapsExtendPastTheEndpoints() {
+    /// Ends are flat and tucked a hair into their nodes: a round cap would
+    /// poke through an outlined node's border as a bulb.
+    @Test func taperedEndsAreFlatAndTuckedJustPastTheEndpoints() {
         let from = CGPoint(x: 0, y: 0)
         let to = CGPoint(x: 100, y: 0)
         let path = BranchPath.tapered(from: from, to: to, startWidth: 6, endWidth: 6)
-        #expect(path.contains(CGPoint(x: 2.5, y: 0)), "start cap must bulge left of the anchor")
-        #expect(path.contains(CGPoint(x: 102.5, y: 0)), "end cap must bulge right of the anchor")
+        #expect(path.contains(CGPoint(x: -0.5, y: 2.5)), "start tucks 0.75 behind the anchor, full width")
+        #expect(path.contains(CGPoint(x: 100.5, y: 2.5)), "end tucks 0.75 past the anchor, full width")
+        #expect(!path.contains(CGPoint(x: -2.5, y: 0)), "no round cap behind the start")
+        #expect(!path.contains(CGPoint(x: 102.5, y: 0)), "no round cap past the end")
+        #expect(abs(path.boundingBox.minX - (-BranchPath.endTuck)) < 0.01)
+        #expect(abs(path.boundingBox.maxX - (100 + BranchPath.endTuck)) < 0.01)
     }
 }
 
