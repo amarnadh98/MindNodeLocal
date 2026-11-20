@@ -101,4 +101,67 @@ struct CanvasInteractionTests {
         canvas.keyDown(with: try key("\u{7f}"))
         #expect(document.model.nodes[ids[0]] != nil)
     }
+
+    @Test func aNodeLeftEmptyDisappearsWhenEditingEnds() throws {
+        let (document, controller, canvas) = try makeShownTree()
+        defer { document.close() }
+        let rootID = try #require(document.model.roots.first)
+        let before = document.model.nodes[rootID]?.children ?? []
+
+        // Tab creates an empty child and starts editing it; finishing
+        // without typing removes it again.
+        canvas.setSelection([before[0]])
+        controller.addChildAction(nil)
+        let created = try #require(document.model.nodes[before[0]]?.children.first)
+        #expect(canvas.editingNodeID == created)
+        canvas.commitEditing()
+
+        #expect(document.model.nodes[created] == nil)
+        #expect(canvas.selection == [before[0]], "selection returns to the parent")
+        #expect(document.model.nodes[rootID]?.children == before)
+        // The creation was undone, not followed by a delete: nothing is
+        // left to undo, and ⌘Z can't bring the blank box back.
+        #expect(document.undoManager?.canUndo == false)
+    }
+
+    @Test func tabOnAnEmptyNodeStopsInsteadOfChainingBlankChildren() throws {
+        let (document, controller, canvas) = try makeShownTree()
+        defer { document.close() }
+        let rootID = try #require(document.model.roots.first)
+        let count = document.model.nodes.count
+        canvas.setSelection([rootID])
+        controller.addChildAction(nil)
+        #expect(document.model.nodes.count == count + 1)
+        // ⇥ again on the still-empty new node commits it: it is dropped
+        // and no further blank child appears.
+        controller.addChildAction(nil)
+        #expect(document.model.nodes.count == count)
+    }
+
+    @Test func clearingAnExistingNodesTextKeepsTheNode() throws {
+        let (document, _, canvas) = try makeShownTree()
+        defer { document.close() }
+        let rootID = try #require(document.model.roots.first)
+        let child = try #require(document.model.nodes[rootID]?.children.first)
+        canvas.beginEditing(nodeID: child)
+        canvas.nodeTextEditor.selectAllText()
+        canvas.nodeTextEditor.deleteInEditor(forward: false)
+        canvas.commitEditing()
+        #expect(document.model.nodes[child] != nil)
+        #expect(document.model.nodes[child]?.title.text.isEmpty == true)
+    }
+
+    @Test func theOnlyRootIsNeverDropped() throws {
+        let document = try #require(
+            try NSDocumentController.shared.makeUntitledDocument(ofType: AppIdentity.documentUTI)
+                as? MapDocument)
+        defer { document.close() }
+        document.makeWindowControllers()
+        let controller = try #require(document.windowControllers.first as? DocumentWindowController)
+        controller.showWindow(nil)
+        let canvas = controller.canvas
+        canvas.commitEditing()
+        #expect(document.model.roots.count == 1)
+        #expect(document.model.nodes.count == 1)
+    }
 }
