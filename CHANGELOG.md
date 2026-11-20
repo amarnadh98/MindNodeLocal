@@ -107,6 +107,9 @@
 - PNG/JPEG/HEIC export and the Quick Look thumbnails drew maps with left-hand branches (any balanced map) shifted right by the bounds origin, cropping the left side. `ImageExporter` subtracted the export bounds origin and so did `ScenePainter`; now only the painter does. The image tests' corner-pixel helper sampled an arbitrary pixel and only passed because of the shift. It now reads the real top-left pixel, and a new test checks every node paints at its export position.
 
 ### Fixed (app)
+- **MCP, link and Service edits of an open map were lost.** They registered an undo step but never marked the document edited, so autosave and quit skipped them. Each now marks it edited (hosted tests drive the real MCP path). Confirmed end to end: an `update_node` over MCP reaches disk by autosave in about 20 seconds.
+- **Spotlight (F-INT-2):** Arbor now also indexes each map with Core Spotlight when it saves (title, every node's text and notes, tags), as a file-backed item. macOS does not load the importer extension of an ad-hoc-signed build, so this doesn't depend on it. The extension stays for signed builds.
+- The toolbar shows a label under each icon by default (right-click it to change). Saved configurations from the icon-only toolbar are retired once.
 - Canvas interaction, from hands-on testing against MindNode:
   - **Node Well "+" (SPEC §6.2):** selecting a node shows a round "+" on its outer edge. Clicking it adds a child on that side, selected and open for typing, as one undo step. A balanced root gets one on each side; a left-hand branch gets it on the left. It hides while you edit, drag or pick a connection target.
   - **⌫ / ⌦ on the canvas** now delete the selection (⌥⌫ the node only) directly, instead of relying on the Edit menu's key equivalent.
