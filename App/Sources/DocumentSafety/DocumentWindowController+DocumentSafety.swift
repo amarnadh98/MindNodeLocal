@@ -80,8 +80,11 @@ extension DocumentWindowController {
             #selector(makeStudyDeckAction(_:)), #selector(setCardPolicyAction(_:)),
             #selector(makeClozeAction(_:)),
             // F-STY-5/6: the theme editor's Apply performs a command,
-            // and the appearance override writes the model.
+            // the appearance override writes the model, and choosing a
+            // theme from the Format ▸ Theme / toolbar list is a
+            // `setTheme` command.
             #selector(editThemeAction(_:)), #selector(setAppearanceAction(_:)),
+            #selector(setDocumentThemeAction(_:)),
             #selector(NSText.cut(_:)), #selector(NSText.paste(_:)):
             return false
         default:

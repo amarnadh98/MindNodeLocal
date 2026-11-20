@@ -1,5 +1,6 @@
 import AppKit
 import MapCore
+import MapRender
 
 /// F-STY-5/6 window-side wiring: the Format ▸ "Edit Theme…" sheet and
 /// the View ▸ Appearance radio group (Auto/Light/Dark). The appearance
@@ -17,6 +18,30 @@ extension DocumentWindowController {
     @objc func editThemeAction(_ sender: Any?) {
         guard let mapDocument = document as? MapDocument, let window else { return }
         ThemeEditorController(document: mapDocument).present(asSheetOn: window)
+    }
+
+    /// Format ▸ Theme ▸ <theme> (F-STY-4's discoverable door — the
+    /// SAME one `setTheme` command the inspector's Theme pane
+    /// performs): one undo step, selection and overrides untouched.
+    /// Choosing the already-current theme is a no-op.
+    @objc func setDocumentThemeAction(_ sender: Any?) {
+        guard let menuItem = sender as? NSMenuItem,
+            let id = menuItem.representedObject as? String,
+            let mapDocument = document as? MapDocument
+        else { return }
+        // Leaving (or choosing from) the hover preview: the stored
+        // selection owns the scene again before the command rebuilds.
+        previewThemeID = nil
+        guard (mapDocument.model.theme?.id ?? BuiltInThemes.defaultID) != id else { return }
+        try? mapDocument.store.perform(.setTheme(id: id))
+    }
+
+    /// Format ▸ Theme ▸ Show Theme Inspector: opens the Inspector on
+    /// its Theme tab — a door that works even when the pane is hidden
+    /// and the ⌥⌘I toggle is unknown.
+    @objc func showThemeInspectorAction(_ sender: Any?) {
+        inspector.show(tab: .theme)
+        documentToolbar?.validateVisibleItems()
     }
 
     /// View ▸ Appearance (F-STY-6): Auto follows the system; Light and
@@ -41,14 +66,15 @@ extension DocumentWindowController {
 
 @MainActor
 extension DocumentWindowController {
-    /// The Edit Theme… item needs a document; the Appearance radios
-    /// always enable (they show the current state) but still refuse on
-    /// a read-only document. Returns nil for items that are not
-    /// F-STY's.
+    /// The Edit Theme…, theme-apply and Show Theme Inspector items
+    /// need a document; the Appearance radios always enable (they
+    /// show the current state) but still refuse on a read-only
+    /// document. Returns nil for items that are not F-STY's.
     func validateThemesMenuItem(_ menuItem: NSMenuItem) -> Bool? {
         guard document is MapDocument else { return nil }
         switch menuItem.action {
-        case #selector(editThemeAction(_:)):
+        case #selector(editThemeAction(_:)), #selector(setDocumentThemeAction(_:)),
+            #selector(showThemeInspectorAction(_:)):
             return true
         case #selector(setAppearanceAction(_:)):
             guard let mapDocument = document as? MapDocument else { return false }

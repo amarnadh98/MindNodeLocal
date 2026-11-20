@@ -37,6 +37,7 @@
 		2347E5503CA954880B4D7C7A /* InspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB176F5C98658848EF6962C5 /* InspectorTests.swift */; };
 		23ED467A4A42B89DF9F9D180 /* DocumentWindowController+Themes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5339BAE3E160F477DD90E4B2 /* DocumentWindowController+Themes.swift */; };
 		24746A5E041AA7CF7FCEBC12 /* DocumentWindowController+FocusFind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C6EFFC840C452A382C5FB6 /* DocumentWindowController+FocusFind.swift */; };
+		2880AB98AFC0132AD652DB44 /* AppDelegate+ThemeMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64BEEDEFC2E98C3520361018 /* AppDelegate+ThemeMenu.swift */; };
 		29070277CF99CA0BAF73B00C /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4BAC3CC3B9B60A9CE7ED41 /* SettingsWindowController.swift */; };
 		2910866D0BD3BB018A4C63DB /* MapLayout in Frameworks */ = {isa = PBXBuildFile; productRef = 82578E0D053CC6E252ED5CF3 /* MapLayout */; };
 		2A7D45C9FA1E4F92AAF67C9D /* DocumentWindowController+AIActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1F22F8EE1DFBE0EA1D98EE /* DocumentWindowController+AIActions.swift */; };
@@ -108,6 +109,7 @@
 		83A4CD643F43C2DACCFB0BA3 /* ThemeValueHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE80C75D3E3B932F2B6718F5 /* ThemeValueHelpers.swift */; };
 		854A37BE762EA373518198D4 /* GlobalHotkeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49552EBEBA4082512C5F88A /* GlobalHotkeyCenter.swift */; };
 		856E78DAEF9CDB41C13F248C /* MapIO in Frameworks */ = {isa = PBXBuildFile; productRef = 7645714653A5CB518E996BCF /* MapIO */; };
+		85A3996594FE2E9A17AFBF05 /* ThemeMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9CDCFD685E3FF7724043A4 /* ThemeMenuController.swift */; };
 		85D6B5C955FCD2BC119CE99A /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AA428D729C901EEC6C0FAB /* InspectorView.swift */; };
 		86233E4498CC9E7BAFF97276 /* AppLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8636A9300D1A1D3C0B1BDA7 /* AppLaunchTests.swift */; };
 		866E528EA2819D97CE3C7379 /* FilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4D58A89C9AF5081E1BB936 /* FilterBar.swift */; };
@@ -120,6 +122,7 @@
 		8B3C418869473695F92200D4 /* RecallModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D6DFCC7B89DC8ECBD10D7F /* RecallModeTests.swift */; };
 		8BB84F03FB06F2D836DE8933 /* QuickOpenPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403FDA07486CE16C85F44C87 /* QuickOpenPanel.swift */; };
 		8CE6F8EB37F99F034F99F0B3 /* StudyDashboardController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B12C49BCA9FFB90960EB4 /* StudyDashboardController.swift */; };
+		8D607B931CEE7D653422E809 /* ThemePickerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12B979CBB748438719C3C10 /* ThemePickerTests.swift */; };
 		8FBD537B44BB24A8A1382AFC /* SpotlightImporter.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5888471C14CE93641EC89593 /* SpotlightImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9126C76BDDAFE874B9562F53 /* DocumentWindowController+FloatingNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E9C26470B6B165A7F8A750 /* DocumentWindowController+FloatingNode.swift */; };
 		9394A686F1EF42491F878A0F /* SourceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C7474CFC7C31BA9CD3BD49 /* SourceSheet.swift */; };
@@ -345,6 +348,7 @@
 		61BDD25E07D931762D4F0912 /* DocumentWindowController+Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Accessibility.swift"; sourceTree = "<group>"; };
 		6356A6EDFCC1044A5C5B4DEB /* AIController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIController.swift; sourceTree = "<group>"; };
 		637AC550227AA9D11BBA6DAB /* MathImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathImageCache.swift; sourceTree = "<group>"; };
+		64BEEDEFC2E98C3520361018 /* AppDelegate+ThemeMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+ThemeMenu.swift"; sourceTree = "<group>"; };
 		65E2CC9920B02092105A38C2 /* BoxLineControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoxLineControlTests.swift; sourceTree = "<group>"; };
 		66357DB16804230FC249F462 /* ArborShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArborShortcuts.swift; sourceTree = "<group>"; };
 		6646643F7AA0F23892211F0B /* DocumentWindowRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowRenderingTests.swift; sourceTree = "<group>"; };
@@ -389,6 +393,7 @@
 		9EB0CF1D47489251A4CD2FD7 /* InlineEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditingTests.swift; sourceTree = "<group>"; };
 		A07F0CD2C4EC67816D79E880 /* QuickLookPreview.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickLookPreview.entitlements; sourceTree = "<group>"; };
 		A0C65BE650738BE916F0B39C /* DocumentWindowController+Recall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Recall.swift"; sourceTree = "<group>"; };
+		A12B979CBB748438719C3C10 /* ThemePickerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerTests.swift; sourceTree = "<group>"; };
 		A2104D7DC86DA08339D8A71A /* DocumentWindowController+Fold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+Fold.swift"; sourceTree = "<group>"; };
 		A716105D46C0FACDB2930F65 /* DocumentWindowController+DragDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+DragDrop.swift"; sourceTree = "<group>"; };
 		AB176F5C98658848EF6962C5 /* InspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorTests.swift; sourceTree = "<group>"; };
@@ -408,6 +413,7 @@
 		BD74A7E238F1A994718E4DF2 /* DocumentQuickLook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentQuickLook.swift; sourceTree = "<group>"; };
 		BDBA7D8640D6A6D0E72ED21E /* SpotlightIndexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexer.swift; sourceTree = "<group>"; };
 		BE1F22F8EE1DFBE0EA1D98EE /* DocumentWindowController+AIActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentWindowController+AIActions.swift"; sourceTree = "<group>"; };
+		BF9CDCFD685E3FF7724043A4 /* ThemeMenuController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeMenuController.swift; sourceTree = "<group>"; };
 		BFDB01A25A1B67800B8A302E /* AppBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBookmarkStore.swift; sourceTree = "<group>"; };
 		C01AF1A0F9ECD2B3C28700E4 /* StudySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudySessionTests.swift; sourceTree = "<group>"; };
 		C2CEA0B500682CBA656B6851 /* QuickEntryPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryPanelController.swift; sourceTree = "<group>"; };
@@ -744,11 +750,13 @@
 			isa = PBXGroup;
 			children = (
 				473D943BD7A5F4CCBBCDE6C7 /* AppDelegate+ThemeInstall.swift */,
+				64BEEDEFC2E98C3520361018 /* AppDelegate+ThemeMenu.swift */,
 				5339BAE3E160F477DD90E4B2 /* DocumentWindowController+Themes.swift */,
 				4C261BE335774AD53FB4E56C /* ThemeCatalog.swift */,
 				6BFD9F69BE66CE80F4ABC547 /* ThemeEditor.swift */,
 				741826461158BECB0B1076F6 /* ThemeEditorControls.swift */,
 				E8E3A03ABCA1DAA2D1B193C0 /* ThemeEditorView.swift */,
+				BF9CDCFD685E3FF7724043A4 /* ThemeMenuController.swift */,
 				CE80C75D3E3B932F2B6718F5 /* ThemeValueHelpers.swift */,
 			);
 			path = Themes;
@@ -880,6 +888,7 @@
 				D93FC47293B7EBF3595DCD7A /* RelationsTests.swift */,
 				756FFDEF59A4A97A28C77EF8 /* SettingsTests.swift */,
 				C01AF1A0F9ECD2B3C28700E4 /* StudySessionTests.swift */,
+				A12B979CBB748438719C3C10 /* ThemePickerTests.swift */,
 				EF655F76CE45A2DCB91EEEBB /* ThemeScreenshotTests.swift */,
 				0B95BAD94C1249B557EBE8AE /* ThemesTests.swift */,
 				C5E9FF55B4AE3F99741F825B /* UpdaterTests.swift */,
@@ -1222,6 +1231,7 @@
 				FBDDC6E582AC8BF834DEB51D /* RelationsTests.swift in Sources */,
 				A7521B9999AA8D750453A189 /* SettingsTests.swift in Sources */,
 				D5106CD6F6DF0A8F37B02688 /* StudySessionTests.swift in Sources */,
+				8D607B931CEE7D653422E809 /* ThemePickerTests.swift in Sources */,
 				C94341676AD9E436F82CB04F /* ThemeScreenshotTests.swift in Sources */,
 				DB0191D50D932BFB929265BC /* ThemesTests.swift in Sources */,
 				131091CD41E226E04A93D261 /* UpdaterTests.swift in Sources */,
@@ -1265,6 +1275,7 @@
 				440690FEC0E3A4A7ADE089B6 /* AppDelegate+CaptureSettings.swift in Sources */,
 				502A3489CF439B74818AB45C /* AppDelegate+Help.swift in Sources */,
 				A0BBA636307A95554C4AEAED /* AppDelegate+ThemeInstall.swift in Sources */,
+				2880AB98AFC0132AD652DB44 /* AppDelegate+ThemeMenu.swift in Sources */,
 				22A087CBF9DC29D1EF454FB3 /* AppDelegate+Updater.swift in Sources */,
 				40619BC1B6C241492F5039CC /* AppDelegate.swift in Sources */,
 				F39B1DC08A3DF5433F14D703 /* AppIdentity.swift in Sources */,
@@ -1371,6 +1382,7 @@
 				33FD56F19024DD133879E230 /* ThemeEditor.swift in Sources */,
 				5AA3C5F1DF9FDBD94343614F /* ThemeEditorControls.swift in Sources */,
 				E2C02E3B94208B7FAC7E2087 /* ThemeEditorView.swift in Sources */,
+				85A3996594FE2E9A17AFBF05 /* ThemeMenuController.swift in Sources */,
 				83A4CD643F43C2DACCFB0BA3 /* ThemeValueHelpers.swift in Sources */,
 				CC9B904F02D8ADBCDA1F5DCD /* TipCenter.swift in Sources */,
 				BCF732BBB6B16499D6E3021E /* WelcomeView.swift in Sources */,
