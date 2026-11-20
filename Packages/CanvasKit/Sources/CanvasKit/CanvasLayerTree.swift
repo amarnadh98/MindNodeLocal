@@ -351,13 +351,19 @@ public final class CanvasLayerTree {
     }
 
     /// The editing node hides its title (SPEC §11.4: the overlay draws
-    /// the live text); re-rasters only the two layers involved.
+    /// the live text); re-rasters only the two layers involved, inside
+    /// a disabled-actions transaction — a bare `contents` write rides
+    /// CA's default 250 ms crossfade, leaving a stray animation on the
+    /// layer through the session's first keystrokes.
     public func setEditingNode(_ id: String?, camera: Camera, backingScale: CGFloat) {
         guard id != editingID else { return }
         let previous = editingID
         editingID = id
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         rerasterNode(previous, camera: camera, backingScale: backingScale)
         rerasterNode(id, camera: camera, backingScale: backingScale)
+        CATransaction.commit()
     }
 
     /// Drops everything back into the pools (the scene was cleared).
@@ -545,12 +551,16 @@ public final class CanvasLayerTree {
     static func clampedRasterScale(backingScale: CGFloat, camera: Camera) -> CGFloat {
         min(max(backingScale * camera.scale, 1), maxRasterScale)
     }
+}
 
-    // MARK: test seams (headless introspection)
-
+// MARK: test seams (headless introspection) — an extension so the class
+// body stays inside the lint type_body_length budget.
+extension CanvasLayerTree {
     func nodeLayerContents(_ id: String) -> Any? { nodeLayers[id]?.contents }
     func nodeLayerContentsScale(_ id: String) -> CGFloat { nodeLayers[id]?.contentsScale ?? 0 }
     func nodeRasterKey(_ id: String) -> NodeRasterKey? { nodeLayers[id]?.rasterKey }
+    /// The selection ring's model-space path bounds.
+    func selectionRingBounds(_ id: String) -> CGRect? { selectionRings[id]?.path?.boundingBox }
     /// The layer's base opacity — what highlight mode (F-TAG-2) set.
     func nodeLayerOpacity(_ id: String) -> Float { nodeLayers[id]?.opacity ?? 0 }
 }
