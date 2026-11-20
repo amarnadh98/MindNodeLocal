@@ -173,6 +173,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         canvas.onDrop = { [weak self] command, selection in
             self?.performDragDrop(command, selection: selection)
         }
+        // The Node Well "+" and the ⌫ key (SPEC §6.2, F-EDT-4).
+        canvas.onAddChildAtHandle = { [weak self] id, side in
+            self?.addChildFromHandle(id, side: side)
+        }
+        canvas.onDeleteSelection = { [weak self] nodeOnly in
+            if nodeOnly {
+                self?.deleteNodeOnlyAction(nil)
+            } else {
+                self?.deleteSubtreeAction(nil)
+            }
+        }
         // F-FOC wiring: the coordinator reaches back through this weak
         // reference (see FocusFindCoordinator).
         focusFind.controller = self

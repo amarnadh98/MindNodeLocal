@@ -57,7 +57,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        // The hosted test runner closes its last document window between
+        // tests; quitting then would kill the run and restart the host.
+        !MapDocument.isTestHost
     }
 
     /// Dock drops and Finder double-clicks of foreign formats

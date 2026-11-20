@@ -130,12 +130,31 @@ extension CanvasView {
     /// Selection rings follow every selection mutation (they live in
     /// the layer tree, not in the view's drawing).
     func syncSelectionRings() {
+        layerTree.addHandlesEnabled = addHandlesAllowed
         layerTree.updateSelection(selection, color: selectionColor, camera: camera)
+    }
+
+    /// The Node Well "+" buttons only show while the canvas is idle: not
+    /// editing a title, dragging, or waiting on a ⌘L connection target.
+    var addHandlesAllowed: Bool {
+        !isEditing && drag == nil && pendingConnectionSource == nil
+    }
+
+    /// The Node Well "+" buttons showing right now (host/test inspection).
+    public var addHandles: [AddHandle] { layerTree.addHandles }
+
+    /// The "+" under a view point, if one is showing there.
+    func addHandle(at viewPoint: CGPoint) -> AddHandle? {
+        layerTree.addHandles.first { handle in
+            let center = handle.center(camera: camera)
+            return hypot(center.x - viewPoint.x, center.y - viewPoint.y) <= AddHandle.radius + 3
+        }
     }
 
     /// The editing target changed (NodeTextEditor hook): hide or
     /// reveal the affected node's title in its raster (SPEC §11.4).
     func editingTargetDidChange() {
+        syncSelectionRings()
         layerTree.setEditingNode(
             nodeTextEditor.editingNodeID, camera: camera, backingScale: backingScale)
     }

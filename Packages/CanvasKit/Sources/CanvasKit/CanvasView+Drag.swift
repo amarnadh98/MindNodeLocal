@@ -276,6 +276,10 @@ extension CanvasView {
             let ordered = DragCommands.orderedByStacking(session.dragged, in: scene, parent: parent)
             return DragCommands.reparent(model: model, dragged: ordered, parent: parent, slot: index)
         case .newRoot:
+            // Letting go on empty canvas never tears a child out of its
+            // branch — it snaps back. D (detach) is the deliberate way.
+            // Roots are only re-stacked.
+            guard session.dragged.allSatisfy({ model.nodes[$0]?.parent == nil }) else { return nil }
             return DragCommands.newRoots(model: model, dragged: session.dragged)
         case .none:
             return nil
