@@ -105,6 +105,7 @@
 
 ### Fixed (release)
 - Ad-hoc release builds (`scripts/release/build-dmg-local.sh`, SPEC §13 path B) aborted at launch with "Library missing". The Hardened Runtime's library validation refused the embedded Sparkle.framework because an ad-hoc signature has no Team ID. The ad-hoc path now builds and signs without the Hardened Runtime. It can't be notarized anyway, and the Developer ID path keeps the runtime. ADR-0021's note on this is corrected.
+- `sign-app.sh --adhoc` stripped the app's entitlements when it re-signed the bundle, because a bare `codesign --force` drops them. The ad-hoc DMG's Arbor therefore ran **unsandboxed**, without its network-client, user-selected-files or mach-lookup entitlements. The re-sign now passes `--preserve-metadata=entitlements`, and the script fails if the signed app has lost `app-sandbox`.
 
 ### Fixed (M5)
 - The Quick Look and Spotlight extensions never registered with the system. They weren't sandboxed, which pluginkit requires of app extensions. The Spotlight importer also used the wrong extension point (`com.apple.spotlight-importer` instead of `com.apple.spotlight.import`) and lacked `CSSupportedContentTypes`. Ad-hoc builds now register all three, and Finder thumbnails render through `QuickLookThumbnail`. `docs/io/system-integration.md`'s verification log is corrected.
