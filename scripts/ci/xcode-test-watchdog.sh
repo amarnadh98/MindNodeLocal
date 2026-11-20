@@ -26,6 +26,8 @@ while kill -0 "$XCB_PID" 2>/dev/null; do
             echo "=== sample $pid"
             sample "$pid" 5 2>&1 | head -400
         done
+        log show --last 15m --style compact --predicate 'process == "Arbor"' 2>/dev/null \
+            | grep -iE "ARBOR-DIAG|error|autosav" | tail -60
         pkill -f "Arbor.app/Contents/MacOS/Arbor"
         sleep 10
         kill "$XCB_PID" 2>/dev/null
