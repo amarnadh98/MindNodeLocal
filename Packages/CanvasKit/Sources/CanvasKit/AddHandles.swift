@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import MapLayout
 import MapRender
 import QuartzCore
 
@@ -40,13 +41,19 @@ public struct AddHandle: Equatable, Sendable {
     var key: String { "\(nodeID)|\(side.rawValue)" }
 }
 
-/// Where a node offers "+" buttons — pure, from the scene alone. A node
-/// grows its branches away from its parent, so a child node gets one
-/// handle on its outer edge. A root gets both horizontal sides — unless
-/// its children already fan out one way (a one-sided layout), or it is a
-/// vertical chart, where children only go one way.
+/// Where a node offers "+" buttons — pure, from the scene and the
+/// model. A child node grows its branches away from its parent, so a
+/// child gets one handle on its outer edge. A root's sides come from
+/// its *declared* structure (nil or `mindmap.balanced` = balanced): a
+/// balanced root always offers both sides, no matter where its current
+/// children happen to sit — a left child stays legal even when every
+/// existing child is pinned right. Only an explicitly one-sided
+/// structure (`mindmap.right`/`mindmap.left`/`logic.right`) or a
+/// vertical org chart restricts the sides.
 public enum AddHandleResolver {
-    public static func handles(for id: String, in scene: CanvasScene) -> [AddHandle] {
+    public static func handles(
+        for id: String, in scene: CanvasScene, rootStructure: LayoutStructure? = nil
+    ) -> [AddHandle] {
         guard let node = scene.nodes[id] else { return [] }
         let frame = node.frame
         let sides: [AddHandleSide]
@@ -55,7 +62,7 @@ public enum AddHandleResolver {
         {
             sides = [side(of: frame, relativeTo: parentFrame, axis: incoming.axis)]
         } else {
-            sides = rootSides(id: id, frame: frame, scene: scene)
+            sides = rootSides(structure: rootStructure ?? .mindmapBalanced)
         }
         return sides.map { AddHandle(nodeID: id, side: $0, anchor: edgeMidpoint(of: frame, side: $0)) }
     }
@@ -67,21 +74,21 @@ public enum AddHandleResolver {
         }
     }
 
-    private static func rootSides(id: String, frame: CGRect, scene: CanvasScene) -> [AddHandleSide] {
-        let outgoing = scene.branches.filter { $0.parentID == id }
-        guard let first = outgoing.first else { return [.left, .right] }
-        let childSides = Set(
-            outgoing.compactMap { branch -> AddHandleSide? in
-                guard let childFrame = scene.nodes[branch.childID]?.frame else { return nil }
-                return side(of: childFrame, relativeTo: frame, axis: branch.axis)
-            })
-        if first.axis == .vertical { return AddHandleSide.allCases.filter(childSides.contains) }
-        // A balanced root alternates its first children, so one occupied
-        // side with two or more children means a one-sided layout.
-        if childSides.count == 1, outgoing.count >= 2 {
-            return AddHandleSide.allCases.filter(childSides.contains)
+    /// A root's sides from its declared structure: both horizontal
+    /// sides unless the structure is explicitly one-sided or vertical.
+    public static func rootSides(structure: LayoutStructure) -> [AddHandleSide] {
+        switch structure {
+        case .mindmapBalanced:
+            return [.left, .right]
+        case .mindmapRight, .logicChartRight:
+            return [.right]
+        case .mindmapLeft:
+            return [.left]
+        case .orgDown:
+            return [.below]
+        case .orgUp:
+            return [.above]
         }
-        return [.left, .right]
     }
 
     private static func edgeMidpoint(of frame: CGRect, side: AddHandleSide) -> CGPoint {
@@ -101,17 +108,11 @@ public enum AddHandleResolver {
 final class AddHandleOverlay {
     var layers: [String: CAShapeLayer] = [:]
     var handles: [AddHandle] = []
-    /// Off while editing, dragging or picking a connection target.
-    var isEnabled = false
 
-    /// Shows the buttons for a single selected node, or removes them.
-    func update(selection: Set<String>, in tree: CanvasLayerTree, camera: Camera, color: CGColor) {
-        var wanted: [AddHandle] = []
-        if isEnabled, selection.count == 1, let id = selection.first, let scene = tree.scene,
-            tree.nodeLayers[id] != nil
-        {
-            wanted = AddHandleResolver.handles(for: id, in: scene)
-        }
+    /// Shows exactly these buttons — the canvas view resolves which
+    /// nodes offer them (the single selected node plus the hovered
+    /// one, SPEC §6.2) and gates on editing/dragging — or removes them.
+    func set(_ wanted: [AddHandle], in tree: CanvasLayerTree, camera: Camera, color: CGColor) {
         handles = wanted
         let keys = Set(wanted.map(\.key))
         for (key, layer) in layers where !keys.contains(key) {
@@ -176,8 +177,11 @@ final class AddHandleOverlay {
 extension CanvasLayerTree {
     var addHandles: [AddHandle] { addHandleOverlay.handles }
     var addHandleLayers: [String: CAShapeLayer] { addHandleOverlay.layers }
-    var addHandlesEnabled: Bool {
-        get { addHandleOverlay.isEnabled }
-        set { addHandleOverlay.isEnabled = newValue }
+
+    /// Shows exactly these Node Well buttons; the canvas view resolves
+    /// the node set (selection + hover) and the edit/drag gates, so
+    /// this stays a plain presentation call.
+    func setAddHandles(_ handles: [AddHandle], camera: Camera, color: CGColor) {
+        addHandleOverlay.set(handles, in: self, camera: camera, color: color)
     }
 }
