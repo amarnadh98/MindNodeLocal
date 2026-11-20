@@ -776,3 +776,21 @@ extension AppDelegate {
         return menuItem
     }
 }
+
+// MARK: - Launch
+
+extension AppDelegate {
+    /// The one delegate instance. `NSApp.delegate` is weak, so this keeps
+    /// it alive.
+    static let shared = AppDelegate()
+
+    /// `@main` on an `NSApplicationDelegate` only calls
+    /// `NSApplicationMain`, which creates the delegate from a main nib —
+    /// and Arbor has none. Without this the delegate never existed in the
+    /// running app: no menus beyond the app menu, no Library, hotkey,
+    /// Services, URL handling, welcome window or MCP endpoint.
+    static func main() {
+        NSApplication.shared.delegate = shared
+        _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+    }
+}
