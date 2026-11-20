@@ -340,7 +340,6 @@ public final class CanvasLayerTree {
             ring.path = Self.ringPath(node: node)
             ring.lineWidth = 2.5 / camera.scale
         }
-        addHandleOverlay.update(selection: selection, in: self, camera: camera, color: color)
     }
 
     static func ringPath(node: SceneNode) -> CGPath {

@@ -6,8 +6,14 @@ extension DocumentWindowController {
     /// A click on a Node Well "+" (SPEC §6.2): one new child under the
     /// node, selected and open for typing — one undo step, like ⇥. A root
     /// that fans both ways pins the child to the side that was clicked.
+    /// A click can arrive with an edit session still open (a menu path
+    /// or a commit the click itself will mediate): commit it first — a
+    /// half-open session must never silently swallow the add.
     func addChildFromHandle(_ id: String, side: AddHandleSide) {
-        guard let store, store.model.nodes[id] != nil, !canvas.isEditing else { return }
+        guard let store, store.model.nodes[id] != nil else { return }
+        if canvas.isEditing {
+            canvas.commitEditing()
+        }
         canvas.setSelection([id])
         var node = Node(id: UUID().uuidString)
         // ADR-0034: the new child copies the last sibling's explicit

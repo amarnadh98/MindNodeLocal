@@ -424,10 +424,17 @@ extension CanvasView {
     public override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         toolTip = decorationHoverText(at: point)
+        // The Node Well hover follows the pointer (SPEC §6.2,
+        // CanvasView+Hover.swift).
+        hoverMoved(to: point)
     }
 
     public override func mouseExited(with event: NSEvent) {
         toolTip = nil
+        if hoverNodeID != nil {
+            hoverNodeID = nil
+            updateAddHandles()
+        }
         super.mouseExited(with: event)
     }
 

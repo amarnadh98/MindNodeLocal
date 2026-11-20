@@ -802,7 +802,63 @@ struct NodeWellHandleTests {
 
     @Test func aOneSidedRootOffersOnlyItsSide() throws {
         let scene = buildScene(rightModel())
-        #expect(AddHandleResolver.handles(for: "root", in: scene).map(\.side) == [.right])
+        #expect(
+            AddHandleResolver.handles(for: "root", in: scene, rootStructure: .mindmapRight)
+                .map(\.side) == [.right])
+    }
+
+    // MARK: a root's sides come from its declared structure (SPEC §6.2)
+
+    /// A balanced root always offers both sides — even when every
+    /// existing child sits on the right (the layout may look one-sided,
+    /// but a left child stays legal), and when it has no children.
+    @Test func aBalancedRootOffersBothSidesWhateverItsChildrenDo() throws {
+        let both = buildScene(sceneModel())
+        #expect(
+            Set(
+                AddHandleResolver.handles(for: "root", in: both, rootStructure: nil)
+                    .map(\.side)) == [.left, .right])
+
+        var pinnedRight = sceneModel()
+        for id in pinnedRight.nodes["root"]?.children ?? [] {
+            pinnedRight.nodes[id]?.side = .right
+        }
+        let right = buildScene(pinnedRight)
+        #expect(
+            Set(
+                AddHandleResolver.handles(for: "root", in: right, rootStructure: .mindmapBalanced)
+                    .map(\.side)) == [.left, .right],
+            "children all pinned right must not hide the left plus")
+
+        var childless = sceneModel()
+        childless.nodes["root"]?.children = []
+        for id in ["branch-0", "branch-1", "branch-2"] {
+            childless.nodes.removeValue(forKey: id)
+        }
+        let empty = buildScene(childless)
+        #expect(
+            Set(
+                AddHandleResolver.handles(for: "root", in: empty, rootStructure: nil)
+                    .map(\.side)) == [.left, .right])
+    }
+
+    @Test func oneSidedStructuresRestrictToTheirSide() {
+        #expect(AddHandleResolver.rootSides(structure: .mindmapRight) == [.right])
+        #expect(AddHandleResolver.rootSides(structure: .mindmapLeft) == [.left])
+        #expect(AddHandleResolver.rootSides(structure: .logicChartRight) == [.right])
+        #expect(AddHandleResolver.rootSides(structure: .mindmapBalanced) == [.left, .right])
+    }
+
+    @Test func orgChartsGrowVertically() throws {
+        let scene = buildScene(orgModel())
+        #expect(
+            AddHandleResolver.handles(for: "root", in: scene, rootStructure: .orgDown)
+                .map(\.side) == [.below])
+        #expect(AddHandleResolver.rootSides(structure: .orgUp) == [.above])
+        // A child of a vertical chart grows away from its parent: the
+        // outer edge is below the parent's.
+        #expect(
+            AddHandleResolver.handles(for: "a", in: scene).map(\.side) == [.below])
     }
 
     @Test func aLeftBranchPutsItsPlusOnTheLeft() throws {
