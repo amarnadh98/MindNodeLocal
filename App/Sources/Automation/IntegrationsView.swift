@@ -28,7 +28,7 @@ final class IntegrationsModel: ObservableObject {
     }
 
     var socketPath: String {
-        AutomationPaths.socketURL(directory: AutomationSettings.stateDirectory).path
+        AutomationPaths.appSocketURL().path
     }
 
     func copyClaudeDesktopConfig() {

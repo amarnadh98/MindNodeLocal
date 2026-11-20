@@ -8,7 +8,9 @@ import Foundation
 /// `<home>/Library/Containers/<bundle-id>/Data/Library/Application Support/Arbor/`
 ///
 /// which is exactly where the sandboxed app's
-/// `.applicationSupportDirectory` points inside its container. An
+/// `.applicationSupportDirectory` points inside its container. The
+/// socket alone lives one level up, in the container's home (see
+/// `appSocketURL()`). An
 /// environment override (`ARBOR_MCP_STATE_DIR`) exists for tests and
 /// development builds.
 public enum AutomationPaths {
@@ -47,6 +49,36 @@ public enum AutomationPaths {
 
     public static func socketURL(directory: URL) -> URL {
         directory.appendingPathComponent(socketName)
+    }
+
+    /// The app's socket. It sits in the container's home (`…/Data/`),
+    /// not the state directory: `sun_path` holds 104 bytes, and
+    /// `…/Data/Library/Application Support/Arbor/arbor-mcp.sock` overflows
+    /// it for any home path longer than about 13 characters, so the app
+    /// could never bind. An unsandboxed (development) app keeps it in its
+    /// state directory rather than the user's real home.
+    public static func appSocketURL() -> URL {
+        let environment = ProcessInfo.processInfo.environment
+        if let override = environment[stateDirectoryOverride], !override.isEmpty {
+            return socketURL(directory: URL(fileURLWithPath: override))
+        }
+        guard environment["APP_SANDBOX_CONTAINER_ID"] != nil else {
+            return socketURL(directory: appStateDirectory())
+        }
+        return socketURL(directory: URL(fileURLWithPath: NSHomeDirectory()))
+    }
+
+    /// The helper's view of `appSocketURL()` for a sandboxed app.
+    public static func helperSocketURL(bundleIdentifier: String) -> URL {
+        if let override = ProcessInfo.processInfo.environment[stateDirectoryOverride], !override.isEmpty {
+            return socketURL(directory: URL(fileURLWithPath: override))
+        }
+        return socketURL(directory: containerHome(bundleIdentifier: bundleIdentifier))
+    }
+
+    static func containerHome(bundleIdentifier: String) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Containers/\(bundleIdentifier)/Data")
     }
 
     public static func settingsURL(directory: URL) -> URL {

@@ -32,8 +32,10 @@ a policy flag that says whether edits are allowed.
    buffered `print`), so piped clients see each response immediately.
 2. **When Arbor runs, the helper forwards every tool call over a Unix
    domain socket** bound by the app at
-   `~/Library/Containers/<bundle-id>/Data/Library/Application Support/Arbor/arbor-mcp.sock`,
-   mode 0600 — the app's container, reachable by the unsandboxed helper
+   `~/Library/Containers/<bundle-id>/Data/arbor-mcp.sock` (the container's
+   home, not `Library/Application Support/Arbor/` beside the settings file:
+   that path overflows `sun_path`'s 104 bytes for most home-directory
+   names, so the app could never bind), mode 0600 — the app's container, reachable by the unsandboxed helper
    and by nothing else. The app answers against its open documents
    (`MapStore`, one undo step, `modifiedBy: "mcp"`) and falls back to
    coordinated file access for closed maps. A stale socket

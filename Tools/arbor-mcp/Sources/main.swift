@@ -20,7 +20,7 @@ import MapCore
 let appBundleIdentifier = "com.example.arbor"
 
 let stateDirectory = AutomationPaths.stateDirectory(bundleIdentifier: appBundleIdentifier)
-let socketPath = AutomationPaths.socketURL(directory: stateDirectory).path
+let socketPath = AutomationPaths.helperSocketURL(bundleIdentifier: appBundleIdentifier).path
 let policyDirectory = stateDirectory
 
 let localSpace = LocalDocumentSpace(

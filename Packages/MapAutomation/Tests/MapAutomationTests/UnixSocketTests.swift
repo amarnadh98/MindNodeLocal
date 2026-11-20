@@ -85,4 +85,22 @@ struct UnixSocketTests {
             ToolCall(name: "read_map", arguments: .object([("doc", .string("fixture-doc"))])))
         #expect(result["content"]?.string?.contains("Kitchen Reno") == true)
     }
+
+    /// The real socket location has to fit `sun_path`. The old one in
+    /// `…/Data/Library/Application Support/Arbor/` was 106 bytes under
+    /// `/Users/amarnadh`, so the app never bound and the helper always
+    /// fell back to file access.
+    @Test func containerSocketPathFitsSunPath() {
+        let home = "/Users/a-rather-long-user-name"
+        let containerHome = URL(fileURLWithPath: "\(home)/Library/Containers/com.example.arbor/Data")
+        let socket = AutomationPaths.socketURL(directory: containerHome).path
+        #expect(UnixSocket.makeAddress(for: socket) != nil)
+
+        let stateDirectory = containerHome.appendingPathComponent("Library/Application Support/Arbor")
+        #expect(UnixSocket.makeAddress(for: AutomationPaths.socketURL(directory: stateDirectory).path) == nil)
+
+        #expect(
+            AutomationPaths.containerHome(bundleIdentifier: "com.example.arbor").path.hasSuffix(
+                "/Library/Containers/com.example.arbor/Data"))
+    }
 }

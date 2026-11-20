@@ -22,7 +22,7 @@ enum AutomationRuntime {
         let directory = AutomationSettings.stateDirectory
         try? FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
-        let path = AutomationPaths.socketURL(directory: directory).path
+        let path = AutomationPaths.appSocketURL().path
         let space = AppDocumentSpace()
         let listener = UnixSocketServer(path: path) { request in
             await handle(request, space: space)
