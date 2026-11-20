@@ -2,7 +2,8 @@ import MapCore
 
 /// The command → layout-dirty mapping for the incremental scene path
 /// (SPEC §11.3), split out of `SceneGeometry` to keep each file under
-/// the lint budgets.
+/// the lint budgets. The exhaustive switch is deliberately flat —
+/// every command kind reads in one place.
 extension SceneGeometry {
     /// The layout-dirty node ids for `command` applied to `model` (the
     /// post-command model): every node whose own layout inputs — measured
@@ -14,6 +15,7 @@ extension SceneGeometry {
     /// falls back to a full rebuild. Over-marking is always safe; the
     /// engine validates every reused entry's own size and child ids as
     /// a second line.
+    // swiftlint:disable:next cyclomatic_complexity
     public static func dirtyIDs(for command: MapCommand, in model: MapModel) -> Set<String>? {
         func withParent(_ id: String) -> Set<String> {
             var ids = Set<String>([id])
@@ -94,6 +96,29 @@ extension SceneGeometry {
             return Set(ids)
         case .setNodeTags(let id, _):
             return [id]
+        case .setImage(let id, _):
+            // The image block is a layout input (its stored display
+            // size joins `contentSize`), so the node re-measures.
+            return [id]
+        case .setMarkers(let id, _):
+            // The marker row is a leading decoration: the node's own
+            // size is re-measured.
+            return [id]
+        case .setAttachments(let id, _):
+            // An attachment badge is a trailing decoration.
+            return [id]
+        case .setSource(let id, _):
+            // The citation chip is a trailing decoration.
+            return [id]
+        case .setMath(let id, _):
+            // The rendered math image replaces the title's measured
+            // size (falling back to the source text when absent).
+            return [id]
+        case .setFilters:
+            // Saved-filter definitions are not a layout input; the
+            // active filter itself is view state the host rebuilds
+            // through when it changes.
+            return []
         }
     }
 

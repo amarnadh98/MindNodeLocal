@@ -216,4 +216,104 @@ public enum SmartTyping {
         }
         return result
     }
+
+    // MARK: commit parse (F-EDT-10)
+
+    /// Everything a title commit can carry beyond the text itself
+    /// (F-EDT-10): the parsed title, `#tag` names, the task prefix,
+    /// the LaTeX/code markers and the `--` note split. Pure — the
+    /// committing layer turns one parse into ONE grouped command.
+    public struct CommitParse: Sendable, Equatable {
+        public var title: NodeTitle
+        public var tags: [String]
+        /// True when a `[ ] `/`-[] ` prefix made the node a task
+        /// (false for `[x] `); nil = the text said nothing about tasks.
+        public var task: Bool?
+        /// True when a `[x] `/`-[x] ` prefix completed the task.
+        public var taskDone: Bool?
+        /// True when `$$…$$` wrapped the whole title (F-CNT-5).
+        public var math: Bool
+        /// True when ``` fences wrapped the whole title: the title is
+        /// code (F-CNT-6) — the commit marks its single run `code`.
+        public var code: Bool
+        /// The `--`-split note (F-EDT-10): everything after a line
+        /// that is exactly `--`. nil = no split happened.
+        public var note: String?
+
+        public init(
+            title: NodeTitle, tags: [String] = [], task: Bool? = nil, taskDone: Bool? = nil,
+            math: Bool = false, code: Bool = false, note: String? = nil
+        ) {
+            self.title = title
+            self.tags = tags
+            self.task = task
+            self.taskDone = taskDone
+            self.math = math
+            self.code = code
+            self.note = note
+        }
+    }
+
+    /// The full title-commit parse (F-EDT-10): `#tag` tokens, the
+    /// task prefixes, `$$…$$` LaTeX, ``` code fences and a `--` line
+    /// that splits the rest into the node's note. Order: the task
+    /// prefix first, then the whole-title math/code wraps, then
+    /// tags, then the `--` note split on the remaining lines.
+    public static func parseCommit(in title: NodeTitle) -> CommitParse {
+        var text = title.text
+        var task: Bool?
+        var taskDone: Bool?
+
+        // `[ ] `/`-[] ` makes an open task, `[x] `/`-[x] ` a done one
+        // (the uppercase X variant users type after IME toggling).
+        let openPrefixes = ["[ ] ", "-[] "]
+        let donePrefixes = ["[x] ", "[X] ", "-[x] "]
+        if let prefix = donePrefixes.first(where: text.hasPrefix) {
+            text = String(text.dropFirst(prefix.count))
+            task = true
+            taskDone = true
+        } else if let prefix = openPrefixes.first(where: text.hasPrefix) {
+            text = String(text.dropFirst(prefix.count))
+            task = true
+            taskDone = false
+        }
+
+        var math = false
+        if text.hasPrefix("$$"), text.hasSuffix("$$"), text.count > 4 {
+            math = true
+            text = String(text.dropFirst(2).dropLast(2))
+        }
+
+        var code = false
+        if text.hasPrefix("```"), text.hasSuffix("```"), text.count > 6 {
+            code = true
+            text = String(text.dropFirst(3).dropLast(3))
+        }
+
+        // `--` alone on a line: everything after it starts the note.
+        var note: String?
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        if let divider = lines.firstIndex(of: "--"), divider < lines.count - 1 {
+            text = lines[..<divider].joined(separator: "\n")
+            note = lines[(divider + 1)...].joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if note?.isEmpty == true { note = nil }
+        }
+
+        let parsed = parseTags(in: NodeTitle(text: text, runs: title.runs))
+        var parsedTitle = parsed.title
+        if code {
+            // A code title carries one `code` run over its whole text
+            // (§8.3's allow-list), so the renderer draws it
+            // monospaced.
+            let units = parsedTitle.text.utf16.count
+            parsedTitle.runs = parsedTitle.runs.filter { $0.code == true }
+            if parsedTitle.runs.isEmpty, units > 0 {
+                parsedTitle.runs = [Run(range: [0, units], code: true)]
+            }
+        }
+        return CommitParse(
+            title: parsedTitle, tags: parsed.tags, task: task, taskDone: taskDone,
+            math: math, code: code, note: note)
+    }
 }

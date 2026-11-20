@@ -49,8 +49,8 @@ public enum ScenePainter {
 
         for node in export.nodes {
             NodeRenderer.draw(
-                style: node.style, title: node.title, measurer: measurer,
-                in: context, frame: node.frame)
+                style: node.style, title: node.title, decorations: node.decorations,
+                measurer: measurer, media: node.media, in: context, frame: node.frame)
         }
         context.restoreGState()
     }

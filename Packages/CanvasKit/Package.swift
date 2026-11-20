@@ -16,6 +16,10 @@ let package = Package(
         // canvas overlay, presentation builds and study recall read
         // (SPEC §10). CanvasKit → MapStudy → MapCore; no cycle.
         .package(path: "../MapStudy"),
+        // M3 (F-CNT-5, ADR-0027): LaTeX math rendering. Runtime
+        // dependency 2 of 8 (SPEC §11.1); linked into CanvasKit only —
+        // the pure SceneExport target never imports it.
+        .package(url: "https://github.com/mgriebling/SwiftMath", from: "1.7.0"),
     ],
     targets: [
         .target(
@@ -25,6 +29,7 @@ let package = Package(
                 .product(name: "MapLayout", package: "MapLayout"),
                 .product(name: "MapRender", package: "MapRender"),
                 .product(name: "MapStudy", package: "MapStudy"),
+                .product(name: "SwiftMath", package: "SwiftMath"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

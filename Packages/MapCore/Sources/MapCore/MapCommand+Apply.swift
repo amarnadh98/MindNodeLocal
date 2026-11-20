@@ -441,6 +441,43 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             model.nodes[id]?.tags = tags
+
+        case .setImage(let id, let image):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.image = image
+
+        case .setMarkers(let id, let markers):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.markers = markers
+
+        case .setAttachments(let id, let attachments):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.attachments = attachments
+
+        case .setSource(let id, let source):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            // A whitespace-only URL is no source (like `setLink`).
+            if var source, source.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                source.url = ""
+            }
+            model.nodes[id]?.source = source
+
+        case .setMath(let id, let math):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            model.nodes[id]?.math = math
+
+        case .setFilters(let filters):
+            model.filters = filters
         }
     }
 

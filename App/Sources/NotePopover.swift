@@ -105,18 +105,70 @@ private struct NoteEditorView: View {
 }
 
 /// A small live Markdown renderer for the preview toggle: headings,
-/// bullets, quotes, code lines, and inline styles via
-/// `AttributedString(markdown:)` (inline-only, per §8.3's allow-list).
+/// bullets, quotes, **code blocks** (F-CNT-6: monospaced,
+/// theme-aware, fenced blocks render as one shaded block),
+/// **LaTeX** (`$$…$$` blocks render through SwiftMath, F-CNT-5), and
+/// inline styles via `AttributedString(markdown:)` (inline-only, per
+/// §8.3's allow-list).
 private struct NotePreview: View {
     let markdown: String
 
     var body: some View {
-        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
+        // Fenced code blocks and $$ math blocks swallow their span;
+        // everything else renders line by line.
+        let blocks = NoteBlocks.parse(markdown)
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, raw in
-                noteLine(String(raw))
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .line(let raw):
+                    noteLine(raw)
+                case .code(let body):
+                    codeBlock(body)
+                case .math(let latex):
+                    mathBlock(latex)
+                }
             }
         }
+    }
+
+    /// F-CNT-6: a fenced block renders as one monospaced, shaded,
+    /// theme-aware block (syntax-agnostic styling — SPEC allows a
+    /// tokenizer later).
+    private func codeBlock(_ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(body.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) {
+                _, raw in
+                Text(String(raw.isEmpty ? " " : raw))
+                    .font(.system(size: 12, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.6), lineWidth: 0.5)
+        )
+        .accessibilityLabel(Text("Code block"))
+    }
+
+    /// F-CNT-5: `$$…$$` renders through SwiftMath (ADR-0027); a parse
+    /// error falls back to the source text.
+    private func mathBlock(_ latex: String) -> some View {
+        Group {
+            if let image = MathImageCache.image(
+                latex: latex, fontSize: 14, color: .labelColor)
+            {
+                Image(nsImage: image)
+                    .interpolation(.high)
+            } else {
+                Text("$$\(latex)$$")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityLabel(Text("Math block \(latex)"))
     }
 
     @ViewBuilder
@@ -141,9 +193,6 @@ private struct NotePreview: View {
             }
         } else if line.hasPrefix("> ") {
             Text(inline(line.dropFirst(2))).italic().padding(.leading, 8)
-        } else if line.hasPrefix("```") {
-            Text(line.hasPrefix("```") && line.count == 3 ? "" : String(line.dropFirst(3)))
-                .font(.system(size: 12, design: .monospaced))
         } else {
             Text(inline(Substring(line)))
         }
@@ -159,5 +208,49 @@ private struct NotePreview: View {
             return parsed
         }
         return AttributedString(String(text))
+    }
+}
+
+/// The note's block structure (F-CNT-5/6): fenced code and `$$` math
+/// spans lift out of the line flow; pure — the preview's parse.
+private enum NoteBlocks {
+    enum Block {
+        case line(String)
+        case code(String)
+        case math(String)
+    }
+
+    static func parse(_ markdown: String) -> [Block] {
+        var blocks: [Block] = []
+        var lines = Array(markdown.split(separator: "\n", omittingEmptySubsequences: false)[...])
+        while let index = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("```") }) {
+            if index > 0 {
+                blocks.append(contentsOf: lines[..<index].map { .line(String($0)) })
+            }
+            let afterFence = lines[(index + 1)...]
+            if let end = afterFence.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("```") }) {
+                blocks.append(.code(afterFence[..<end].joined(separator: "\n")))
+                lines = Array(afterFence[(end + 1)...])
+            } else {
+                blocks.append(.code(afterFence.joined(separator: "\n")))
+                lines = []
+            }
+        }
+        var rest = Array(lines)
+        while let index = rest.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "$$" }) {
+            let after = rest[(index + 1)...]
+            if let end = after.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "$$" }) {
+                if index > 0 {
+                    blocks.append(contentsOf: rest[..<index].map { .line(String($0)) })
+                }
+                blocks.append(
+                    .math(after[..<end].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)))
+                rest = Array(after[(end + 1)...])
+            } else {
+                break
+            }
+        }
+        blocks.append(contentsOf: rest.map { .line(String($0)) })
+        return blocks
     }
 }

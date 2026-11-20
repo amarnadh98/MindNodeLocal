@@ -393,6 +393,49 @@ final class MapDocument: NSDocument {
         return (try? ReviewLogCodec.decode(text)) ?? []
     }
 
+    // MARK: assets (SPEC §8.1, F-CNT-2/7)
+
+    /// Stores `data` content-addressed in the package's `assets/` and
+    /// returns the filename (`<sha256>.<ext>`). The bytes live in the
+    /// package wrapper immediately, so an autosave or a save writes
+    /// them even before the referencing command lands. Idempotent for
+    /// identical bytes.
+    func addAsset(_ data: Data, ext: String) -> String {
+        if packageWrapper == nil {
+            // An unsaved document: give it a package skeleton so the
+            // asset has somewhere to live before the first save.
+            packageWrapper = FileWrapper(directoryWithFileWrappers: [:])
+        }
+        guard let root = packageWrapper else { return "" }
+        return ArborPackage.addAsset(data, ext: ext, in: root)
+    }
+
+    /// One asset's bytes by filename (an in-memory wrapper hit), or
+    /// nil when the package has no such entry. Main-actor by
+    /// construction — the off-main decode takes the returned bytes.
+    func assetData(_ name: String) -> Data? {
+        guard let root = packageWrapper else { return nil }
+        return ArborPackage.assetData(name, in: root)
+    }
+
+    /// Extracts `attachment` to a cache directory for Quick Look
+    /// (F-CNT-7) and returns the URL; nil when the asset is missing.
+    /// The directory is per-docID, refreshed on each open so stale
+    /// extractions never shadow the package.
+    func extractedAssetURL(_ attachment: Attachment) -> URL? {
+        guard let data = assetData(attachment.asset) else { return nil }
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ArborAttachments/\(store.model.docID)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let url = base.appendingPathComponent(attachment.name)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            return nil
+        }
+        return url
+    }
+
     // MARK: external modification (F-DOC-3)
 
     /// NSFilePresenter (NSDocument already conforms): the document's

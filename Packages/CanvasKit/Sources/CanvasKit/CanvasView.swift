@@ -354,6 +354,12 @@ public final class CanvasView: NSView {
             return
         }
         if event.clickCount == 2 {
+            // F-CNT-7: an attachment badge's double-click Quick Looks
+            // its files instead of editing the title.
+            if decorationDoubleClick(at: point) {
+                needsDisplay = true
+                return
+            }
             if let id = nodeID(at: point) {
                 selection = [id]
                 onSelectionChange?(selection)

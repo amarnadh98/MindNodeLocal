@@ -277,6 +277,34 @@ extension MapCommand {
                 throw ArborError.commandFailure("missing node \(id)")
             }
             return .setNodeTags(id: id, tags: node.tags)
+
+        case .setImage(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setImage(id: id, image: node.image)
+        case .setMarkers(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setMarkers(id: id, markers: node.markers)
+        case .setAttachments(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setAttachments(id: id, attachments: node.attachments)
+        case .setSource(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setSource(id: id, source: node.source)
+        case .setMath(let id, _):
+            guard let node = model.nodes[id] else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setMath(id: id, math: node.math)
+        case .setFilters:
+            return .setFilters(model.filters)
         }
     }
 

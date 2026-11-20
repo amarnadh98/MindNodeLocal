@@ -114,6 +114,34 @@ struct SceneGeometryContentIncrementalTests {
         try round(.setNote(id: "leafB", note: "  "), "whitespace note clears")
         try round(.setLink(id: "leafB", link: nil), "link off")
 
+        // M3 media (F-CNT-2/3/5/7/8): every one is a decoration or a
+        // layout input of the node itself — the command-derived dirty
+        // set must keep incremental == full.
+        try round(
+            .setImage(
+                id: "leafB", image: NodeImage(asset: "aabb.png", size: [60, 30], placement: .below)),
+            "image on")
+        try round(.setImage(id: "leafB", image: nil), "image off")
+        try round(
+            .setMarkers(id: "leafB", markers: ["sf:star.fill", "sticker:priority-2"]), "markers on")
+        try round(
+            .setMarkers(id: "leafB", markers: ["sticker:priority-2"]), "markers shrink")
+        try round(.setMarkers(id: "leafB", markers: nil), "markers off")
+        try round(
+            .setAttachments(
+                id: "leafB", attachments: [Attachment(asset: "ccdd.pdf", name: "Paper.pdf")]),
+            "attachment on")
+        try round(
+            .setSource(
+                id: "leafB", source: SourceRef(url: "https://example.com", page: 3)),
+            "source on")
+        try round(.setMath(id: "leafB", math: true), "math on")
+        try round(.setMath(id: "leafB", math: nil), "math off")
+        // Saved filters are document state, not a layout input.
+        try round(
+            .setFilters([SavedFilter(id: "f1", name: "Has Image", query: "has:image")]),
+            "saved filter")
+
         // The rings survived the whole sequence.
         let final = SceneGeometry.update(
             model: model, cache: cache, variant: .light, measurer: measurer, dirty: [])
@@ -229,6 +257,13 @@ struct SceneGeometryContentIncrementalTests {
             .setTaskValue(id: "child", task: nil),
             .toggleTag(ids: ["child"], tagID: "t", assigned: true),
             .setNodeTags(id: "child", tags: nil),
+            // M3 media commands (F-CNT-2/3/5/7/8).
+            .setImage(id: "child", image: NodeImage(asset: "x.png", size: [40, 20])),
+            .setMarkers(id: "child", markers: ["sticker:priority-1"]),
+            .setAttachments(id: "child", attachments: [Attachment(asset: "y.pdf", name: "Y.pdf")]),
+            .setSource(id: "child", source: SourceRef(url: "https://example.com")),
+            .setMath(id: "child", math: true),
+            .setFilters([SavedFilter(id: "f", name: "n", query: "is:task")]),
         ]
         for command in known {
             #expect(

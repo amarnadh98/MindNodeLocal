@@ -506,6 +506,23 @@ extension AppDelegate {
                 "Highlight Tasks",
                 #selector(DocumentWindowController.highlightTasksAction(_:)),
                 ""),
+            .separator(),
+            // M3 media (SPEC §6.1 Content: "Media ⇧⌘M"): the picker
+            // popover — Image, SF Symbols, Emoji and the Arbor sticker
+            // set (F-CNT-2/3).
+            item(
+                "Media…",
+                #selector(DocumentWindowController.mediaAction(_:)),
+                "M", modifiers: [.command, .shift]),
+            item(
+                "Image…",
+                #selector(DocumentWindowController.imageAction(_:)),
+                ""),
+            // F-CNT-8: the source anchor sheet.
+            item(
+                "Source…",
+                #selector(DocumentWindowController.sourceAction(_:)),
+                ""),
         ]
     }
 
@@ -605,6 +622,12 @@ extension AppDelegate {
             item(
                 "Use Selection for Find",
                 #selector(DocumentWindowController.useSelectionForFindAction(_:)), "e"))
+        // F-TAG-3: the filter bar (SPEC §6.1 Find: ⇧⌥⌘F).
+        submenu.addItem(
+            item(
+                "Filter Bar",
+                #selector(DocumentWindowController.filterBarAction(_:)),
+                "F", modifiers: [.command, .option, .shift]))
         let menuItem = NSMenuItem()
         menuItem.title = "Find"
         menuItem.submenu = submenu

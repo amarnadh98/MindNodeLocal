@@ -14,6 +14,9 @@ enum SVGNodeElement {
     ) {
         var nodeLines: [String] = []
         shapeElement(node, into: &nodeLines)
+        // F-CNT-2/3/5: the image block, marker row and rendered math
+        // (decorations first — the title block may sit under the image).
+        SVGMediaElement.emit(node, into: &nodeLines)
         if options.textAsOutlines {
             glyphOutlines(node, measurer: measurer, into: &nodeLines)
         } else {

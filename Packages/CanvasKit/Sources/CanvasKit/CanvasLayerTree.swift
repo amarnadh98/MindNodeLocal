@@ -515,7 +515,7 @@ public final class CanvasLayerTree {
         let key = NodeRasterKey(
             title: node.title, size: node.frame.size, style: node.style,
             lod: lod, hidesTitle: node.id == editingID, rasterScale: rasterScale,
-            decorations: node.decorations)
+            decorations: node.decorations, mediaRevision: node.media?.revision)
         guard layer.rasterKey != key else { return }
         layer.rasterKey = key
         // §11.4: re-rasterize at contentsScale = backingScale × zoom

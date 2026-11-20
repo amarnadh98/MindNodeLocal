@@ -73,9 +73,10 @@ final class BranchVisualLayer: CAShapeLayer {
 }
 
 /// When a node layer must re-raster: title, frame size, style, LOD
-/// mode, editing state, raster sharpness or **decoration state** (M3:
-/// task, note, link, tags) changed (pan and pure position moves never
-/// repaint — §11.4).
+/// mode, editing state, raster sharpness, **decoration state** (M3:
+/// task, note, link, tags, markers, image, source, attachments) or the
+/// resolved **media revision** (F-CNT-2/3/5: an async decode landing)
+/// changed (pan and pure position moves never repaint — §11.4).
 struct NodeRasterKey: Equatable {
     let title: NodeTitle
     let size: CGSize
@@ -84,6 +85,7 @@ struct NodeRasterKey: Equatable {
     let hidesTitle: Bool
     let rasterScale: CGFloat
     let decorations: NodeDecorations?
+    let mediaRevision: Int?
 
     static func == (lhs: NodeRasterKey, rhs: NodeRasterKey) -> Bool {
         lhs.title == rhs.title
@@ -91,6 +93,7 @@ struct NodeRasterKey: Equatable {
             && lhs.lod == rhs.lod
             && lhs.hidesTitle == rhs.hidesTitle
             && lhs.decorations == rhs.decorations
+            && lhs.mediaRevision == rhs.mediaRevision
             && abs(lhs.rasterScale - rhs.rasterScale) < 0.001
             && SceneDiffer.sameStyle(lhs.style, rhs.style)
     }
@@ -132,6 +135,7 @@ enum NodeRasterizer {
                 title: hidesTitle ? NodeTitle(text: "", runs: []) : node.title,
                 decorations: node.decorations,
                 measurer: measurer,
+                media: node.media,
                 in: context,
                 frame: CGRect(origin: .zero, size: size))
         }

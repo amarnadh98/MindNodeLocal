@@ -82,7 +82,7 @@ public enum SceneRenderer {
             context.setAlpha(alpha)
             NodeRenderer.draw(
                 style: node.style, title: title, decorations: node.decorations,
-                measurer: measurer, in: context, frame: node.frame)
+                measurer: measurer, media: node.media, in: context, frame: node.frame)
             context.restoreGState()
         }
 

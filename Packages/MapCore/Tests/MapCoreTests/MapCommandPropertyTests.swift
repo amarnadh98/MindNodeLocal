@@ -166,6 +166,41 @@ struct CommandPropertyTests {
                 tags: generator.next() % 3 == 0
                     ? nil
                     : (0..<Int(generator.next() % 3)).map { "t\($0)" }),
+            // M3 media/content commands (F-CNT-2/3/5/7/8, F-TAG-3):
+            // the same apply∘inverse identity over fuzzed trees.
+            .setImage(
+                id: nodeID,
+                image: generator.next() % 3 == 0
+                    ? nil
+                    : NodeImage(
+                        asset: "abc\(generator.next() % 9).png",
+                        size: [Double(generator.next() % 200) + 20, 120],
+                        placement: generator.next() % 2 == 0 ? .above : .left)),
+            .setMarkers(
+                id: nodeID,
+                markers: generator.next() % 3 == 0
+                    ? nil
+                    : (0..<Int(generator.next() % 3)).map {
+                        ["sf:star.fill", "emoji:💡", "sticker:priority-\($0 + 1)"][$0 % 3]
+                    }),
+            .setAttachments(
+                id: nodeID,
+                attachments: generator.next() % 3 == 0
+                    ? nil
+                    : [Attachment(asset: "def\(generator.next() % 9).pdf", name: "Paper.pdf")]),
+            .setSource(
+                id: nodeID,
+                source: generator.next() % 3 == 0
+                    ? nil
+                    : SourceRef(
+                        url: "https://example.com/a\(generator.next() % 50)",
+                        page: generator.next() % 2 == 0 ? Int(generator.next() % 300) : nil,
+                        time: generator.next() % 2 == 0 ? Double(generator.next() % 600) : nil)),
+            .setMath(id: nodeID, math: generator.next() % 2 == 0),
+            .setFilters(
+                generator.next() % 3 == 0
+                    ? nil
+                    : [SavedFilter(id: "f\(generator.next())", name: "due", query: "is:task")]),
             (try? MapCommand.duplicate(id: nodeID, in: model)),
             // M6 (F-PRE-2/3): a wholesale presentation-list replace; the
             // inverse restores the pre-state list exactly.
