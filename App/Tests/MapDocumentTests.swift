@@ -137,4 +137,10 @@ struct MapDocumentTests {
         settle()
         #expect(document.isDocumentEdited)
     }
+
+    /// The hosted test runner never schedules timed autosaves, so a late
+    /// autosave error can't leave a modal alert blocking the host's exit.
+    @Test func testHostDoesNotScheduleAutosaves() {
+        #expect(!MapDocument.schedulesAutosaving)
+    }
 }
