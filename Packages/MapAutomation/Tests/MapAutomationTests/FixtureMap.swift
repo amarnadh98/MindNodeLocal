@@ -10,6 +10,8 @@ import Testing
 enum FixtureMap {
     /// root "Kitchen Reno" with children "Budget" (task open, tag
     /// "money") and "Paint colors" (task done, note), plus a grandchild.
+    /// The root is a study deck (F-STD-1), so the auto card rule makes
+    /// its branch nodes cards.
     static func model() -> MapModel {
         var model = MapModel.emptyDocument(docID: "fixture-doc")
         let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -30,6 +32,7 @@ enum FixtureMap {
         }
 
         model.nodes["root"] = node("root", nil, "Kitchen Reno")
+        model.nodes["root"]?.study = NodeStudy(deck: true)
         model.nodes["budget"] = node("budget", "root", "Budget", task: false, tags: ["tag-money"])
         model.nodes["paint"] = node("paint", "root", "Paint colors", task: true, note: "Sage maybe?")
         model.nodes["sage"] = node("sage", "paint", "Sage green", note: "warm light only")

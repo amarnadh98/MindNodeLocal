@@ -241,7 +241,7 @@ public struct MapAutomationEngine: ToolBackend {
         if let taskDone = arguments["taskDone"]?.bool {
             var task = loaded.model.nodes[nodeID]?.task ?? NodeTask()
             task.done = taskDone
-            commands.append(.setTask(id: nodeID, task: task))
+            commands.append(.setTaskValue(id: nodeID, task: task))
             updated.append(.string("taskDone"))
         }
         guard !commands.isEmpty else {

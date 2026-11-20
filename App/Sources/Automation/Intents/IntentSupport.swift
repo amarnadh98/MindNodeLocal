@@ -124,7 +124,7 @@ enum IntentSupport {
         if toggleTask {
             var task = node.task ?? NodeTask()
             task.done.toggle()
-            commands.append(.setTask(id: entity.nodeID, task: task))
+            commands.append(.setTaskValue(id: entity.nodeID, task: task))
         }
         guard !commands.isEmpty else { return }
         let single = commands.count == 1 ? commands[0] : MapCommand.group(name: "Update Node", commands: commands)

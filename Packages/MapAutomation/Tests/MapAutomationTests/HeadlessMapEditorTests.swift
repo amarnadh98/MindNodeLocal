@@ -109,8 +109,8 @@ struct HeadlessMapEditorTests {
         task.done = false
         let commands: [MapCommand] = [
             .setNote(id: "paint", note: "changed note"),
-            .setTask(id: "paint", task: task),
-            .setTask(id: "budget", task: nil),
+            .setTaskValue(id: "paint", task: task),
+            .setTaskValue(id: "budget", task: nil),
         ]
         for command in commands {
             let inverse = try command.inverse(in: model)
