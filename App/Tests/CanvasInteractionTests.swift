@@ -216,4 +216,58 @@ struct CanvasInteractionTests {
         #expect(abs(restored.midY - before.midY) < 0.001)
         #expect(document.undoManager?.canUndo == false)
     }
+
+    @Test func spaceDragPansTheCanvasAndATapStillReplaceEdits() throws {
+        let (document, _, canvas) = try makeShownTree()
+        defer { document.close() }
+        let rootID = try #require(document.model.roots.first)
+        let childID = try #require(document.model.nodes[rootID]?.children.first)
+
+        // Hold Space and drag: the camera pans, and neither the
+        // selection nor the map changes (ADR-0033, F-CAN-1). The mouse
+        // events carry WINDOW coordinates; the points are built through
+        // `convert(_:to: nil)` like the root-drag test above.
+        func spaceKey(_ type: NSEvent.EventType) throws -> NSEvent {
+            try #require(
+                NSEvent.keyEvent(
+                    with: type, location: .zero, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, characters: " ",
+                    charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49))
+        }
+        func mouse(_ type: NSEvent.EventType, at viewPoint: CGPoint) throws -> NSEvent {
+            try #require(
+                NSEvent.mouseEvent(
+                    with: type, location: canvas.convert(viewPoint, to: nil), modifierFlags: [],
+                    timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1,
+                    pressure: 1))
+        }
+        let selectionBefore = canvas.selection
+        let originBefore = canvas.camera.origin
+        let modelBefore = document.model
+        let start = CGPoint(x: 300, y: 200)
+        let end = CGPoint(x: 300 + 140, y: 200 + 80)
+
+        canvas.keyDown(with: try spaceKey(.keyDown))
+        canvas.mouseDown(with: try mouse(.leftMouseDown, at: start))
+        canvas.mouseDragged(with: try mouse(.leftMouseDragged, at: end))
+        canvas.mouseUp(with: try mouse(.leftMouseUp, at: end))
+        canvas.keyUp(with: try spaceKey(.keyUp))
+
+        // The camera moved with the drag (content follows the cursor);
+        // the selection and the model are untouched.
+        #expect(canvas.camera.origin != originBefore)
+        #expect(canvas.camera.origin.x < originBefore.x)
+        #expect(canvas.selection == selectionBefore)
+        #expect(document.model.nodes[rootID]?.children.first == childID)
+        #expect(document.model == modelBefore, "a pan is view state, never a model change")
+
+        // A plain Space tap on a selected node still replace-edits its
+        // title (ADR-0033's tap-vs-hold rule).
+        canvas.setSelection([childID])
+        canvas.keyDown(with: try spaceKey(.keyDown))
+        #expect(!canvas.isEditing)
+        canvas.keyUp(with: try spaceKey(.keyUp))
+        #expect(canvas.editingNodeID == childID)
+        #expect(canvas.editingDraftTitle?.text == " ")
+    }
 }
