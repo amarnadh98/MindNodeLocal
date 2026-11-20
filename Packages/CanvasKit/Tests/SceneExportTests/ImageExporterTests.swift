@@ -86,6 +86,39 @@ struct ImageExporterTests {
         #expect(max(result.pixelSize.width, result.pixelSize.height) == 512)
     }
 
+    /// Every node lands where the export bounds put it, including the
+    /// left-hand branches of a balanced map (bounds.minX < 0). The bounds
+    /// offset is applied once, by `ScenePainter`.
+    @Test func nodesPaintAtTheirExportPositions() throws {
+        let model = ExportFixtures.canonicalMap()
+        let scene = ExportFixtures.scene(for: model)
+        let options = ImageExportOptions(format: .png, pixelScale: 1, transparentBackground: true)
+        let geometry = ExportGeometry.content(
+            scene: scene, model: model, content: .wholeMap, margin: options.margin)
+        try #require(geometry.bounds.minX < -10, "the fixture needs left-hand branches")
+
+        let result = try ImageExporter.export(scene: scene, model: model, options: options)
+        let width = Int(result.pixelSize.width)
+        let height = Int(result.pixelSize.height)
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        try decode(result.data, into: &pixels, width: width, height: height)
+        // Any painted pixel inside the node's frame counts: text-only
+        // nodes leave gaps between glyphs.
+        for node in geometry.nodes {
+            let frame = node.frame.offsetBy(dx: -geometry.bounds.minX, dy: -geometry.bounds.minY)
+            var painted = false
+            for row in Int(frame.minY)..<Int(frame.maxY) where !painted {
+                // The decoded buffer's rows run bottom-up.
+                let y = height - 1 - row
+                for column in Int(frame.minX)..<Int(frame.maxX) where pixels[(y * width + column) * 4 + 3] > 0 {
+                    painted = true
+                    break
+                }
+            }
+            #expect(painted, "node \(node.id) is not painted at its export position")
+        }
+    }
+
     // MARK: pixel helpers
 
     /// The alpha byte of the output's top-left pixel — pure background
@@ -93,15 +126,11 @@ struct ImageExporterTests {
     private func cornerAlpha(of data: Data) throws -> UInt8 {
         let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        var pixel = [UInt8](repeating: 0, count: 4)
-        let context = try #require(
-            CGContext(
-                data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.interpolationQuality = .none
-        context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
-        return pixel[3]
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        try decode(data, into: &pixels, width: image.width, height: image.height)
+        // The decoded buffer's rows run bottom-up: the top-left pixel
+        // starts the last row.
+        return pixels[(image.height - 1) * image.width * 4 + 3]
     }
 
     /// Decodes both files to premultiplied RGBA and requires equality
