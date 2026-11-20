@@ -21,6 +21,9 @@ extension NSToolbarItem.Identifier {
     static let zoomToFit = NSToolbarItem.Identifier("ArborToolbarZoomToFit")
     /// F-CAN-6.
     static let minimap = NSToolbarItem.Identifier("ArborToolbarMinimap")
+    /// F-STY-4's discoverable door: the Theme pull-down (the same
+    /// menu Format ▸ Theme shows).
+    static let theme = NSToolbarItem.Identifier("ArborToolbarTheme")
     /// M6 (F-PRE-1): the ▶︎ Present item (§4.1 toolbar order).
     static let present = NSToolbarItem.Identifier("ArborToolbarPresent")
     /// M6 (F-PRE-2): the Slides sidebar toggle.
@@ -32,15 +35,16 @@ extension DocumentWindowController {
     /// ⌥⌘M's persisted preference (per user, not per document).
     static let minimapDefaultsKey = "ShowsMinimap"
     /// The toolbar's identifier — also the UserDefaults key its
-    /// customization autosave lives under.
-    /// The `.v2` suffix retires configurations saved while the toolbar was
-    /// icon-only, so everyone gets the labelled default once.
-    static let toolbarAutosaveName = "ArborDocumentToolbar.v2"
+    /// customization autosave lives under. The `.v3` suffix retires
+    /// `.v2` configurations saved before the Theme pull-down existed,
+    /// so everyone gets the new default item once (customization
+    /// carries on under `.v3`).
+    static let toolbarAutosaveName = "ArborDocumentToolbar.v3"
 
     /// The default item order (§4.1: editing left, zoom + minimap right
     /// of the flexible space).
     static let defaultToolbarItemOrder: [NSToolbarItem.Identifier] = [
-        .addChild, .addSibling, .deleteSelection, .foldUnfold,
+        .addChild, .addSibling, .deleteSelection, .foldUnfold, .theme,
         .flexibleSpace,
         .present, .slidesSidebar,
         .zoomOut, .zoomPercent, .zoomIn, .zoomToFit, .minimap,
@@ -199,6 +203,22 @@ extension DocumentWindowController {
         return item
     }
 
+    /// F-STY-4: the Theme pull-down — `paintpalette`, the SAME menu
+    /// Format ▸ Theme shows (every catalog theme, the current one
+    /// checked, live hover preview on the canvas), one `setTheme`
+    /// undo step per choice.
+    private func themePopupItem() -> NSToolbarItem {
+        let item = NSMenuToolbarItem(itemIdentifier: .theme)
+        item.label = "Theme"
+        item.paletteLabel = "Theme"
+        item.toolTip = "Change the map's theme"
+        item.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: "Theme")
+        // Owned by this window: the pull-down previews and applies to
+        // this document, whoever is key.
+        item.menu = ThemeMenuController.shared.makeMenu(title: "Theme", owner: self)
+        return item
+    }
+
     func toolbarItem(for identifier: NSToolbarItem.Identifier) -> NSToolbarItem? {
         switch identifier {
         case .addChild:
@@ -254,6 +274,8 @@ extension DocumentWindowController {
                 action: #selector(toggleSlidesSidebarAction(_:)))
         case .zoomPercent:
             return zoomPopupItem()
+        case .theme:
+            return themePopupItem()
         default:
             return nil
         }

@@ -377,7 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
                     item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
                     .separator(),
-                    editThemeMenuItem(),
+                    // F-STY-4's discoverable door: every theme, one
+                    // undoable `setTheme` per choice, live hover
+                    // preview, the editor and the inspector doors —
+                    // the helper lives in AppDelegate+ThemeMenu.
+                    themeMenuItem(),
                 ]
                     // M2 (F-STY-1/3/8): node shapes, the reset-to-theme
                     // and Recolor Branches — every item routes to ONE
@@ -533,14 +537,6 @@ extension AppDelegate {
             item("Page Setup…", #selector(NSDocument.runPageLayout(_:)), ""),
             .separator(),
         ]
-    }
-
-    /// F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays File ▸
-    /// Export…, SPEC §5.17).
-    private func editThemeMenuItem() -> NSMenuItem {
-        item(
-            "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
-            "E", modifiers: [.command, .shift])
     }
 
     private func shapeMenuName(_ shape: NodeShape) -> String {
