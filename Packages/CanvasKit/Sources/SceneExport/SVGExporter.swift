@@ -53,19 +53,31 @@ public enum SVGExporter {
     }
 
     /// One branch connector: tapered branches fill the sampled offset
-    /// polygon (the canvas's own branch drawing); plain ones stroke the
-    /// cubic centerline.
+    /// polygon (the canvas's own branch drawing); the stroke styles
+    /// follow the same §7.4 switch; `none` emits nothing.
     private static func branchElement(_ branch: SceneBranch) -> String {
-        if branch.tapered {
+        switch branch.lineStyle {
+        case .none:
+            return ""
+        case .tapered:
             let path = BranchPath.tapered(
                 from: branch.from, to: branch.to,
                 startWidth: branch.startWidth, endWidth: branch.endWidth,
                 axis: branch.axis)
             return "<path d=\"\(SVGSupport.pathData(path))\" fill=\"\(SVGSupport.cssColor(branch.color))\"/>"
+        case .curved, .straight, .elbow:
+            let path: CGPath
+            switch branch.lineStyle {
+            case .straight:
+                path = BranchPath.straight(from: branch.from, to: branch.to)
+            case .elbow:
+                path = BranchPath.elbow(from: branch.from, to: branch.to, axis: branch.axis)
+            default:
+                path = BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+            }
+            let width = SVGSupport.number(max(branch.startWidth, branch.endWidth))
+            return
+                "<path d=\"\(SVGSupport.pathData(path))\" fill=\"none\" stroke=\"\(SVGSupport.cssColor(branch.color))\" stroke-width=\"\(width)\" stroke-linecap=\"round\"/>"
         }
-        let path = BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
-        let width = SVGSupport.number(min(max(branch.startWidth, branch.endWidth), 6))
-        return
-            "<path d=\"\(SVGSupport.pathData(path))\" fill=\"none\" stroke=\"\(SVGSupport.cssColor(branch.color))\" stroke-width=\"\(width)\"/>"
     }
 }

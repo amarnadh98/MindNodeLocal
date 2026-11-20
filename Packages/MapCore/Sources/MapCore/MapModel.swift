@@ -4,11 +4,23 @@ public struct ThemePatch: Codable, Sendable, Hashable {
     public var canvasColor: String?
     public var paletteColors: [String]?
     public var baseFont: String?
+    /// F-STY-8's rainbow-branches toggle as a document-level override
+    /// of the theme's own setting: `nil` = the theme's value, `false` =
+    /// every branch uses palette color 0, `true` = each level-1 branch
+    /// takes the next palette color. New in formatVersion 4 (optional;
+    /// v3 files decode with `nil`).
+    public var rainbowBranches: Bool?
 
-    public init(canvasColor: String? = nil, paletteColors: [String]? = nil, baseFont: String? = nil) {
+    public init(
+        canvasColor: String? = nil,
+        paletteColors: [String]? = nil,
+        baseFont: String? = nil,
+        rainbowBranches: Bool? = nil
+    ) {
         self.canvasColor = canvasColor
         self.paletteColors = paletteColors
         self.baseFont = baseFont
+        self.rainbowBranches = rainbowBranches
     }
 }
 

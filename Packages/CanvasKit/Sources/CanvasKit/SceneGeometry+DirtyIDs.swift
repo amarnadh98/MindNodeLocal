@@ -53,13 +53,12 @@ extension SceneGeometry {
             return anchorDirtyIDs(anchors)
         case .group(_, let commands):
             return groupDirtyIDs(commands, in: model)
-        case .setTheme:
-            // Every node's font and padding may change: full rebuild.
-            return nil
-        case .setAppearance:
-            // The variant the whole scene resolves in may flip: full
-            // rebuild (F-STY-6).
-            return nil
+        case .setStyle, .resetStyle, .setTheme, .setThemeSelection, .setThemeOverrides,
+            .setAppearance, .setStructure:
+            // The M2 style/theme/structure commands share one arm so
+            // this dispatcher stays under the lint budget; the mapping
+            // itself lives one function down.
+            return styleCommandDirtyIDs(command, in: model)
         case .setOffset, .setConnections, .setBoundaries, .setSummaries, .recolorBranches,
             .setPresentations, .setAIPolicy, .setTitle,
             // F-REL-1/2/3: the fine-grained relation edits are post-layout
@@ -118,6 +117,38 @@ extension SceneGeometry {
             // Saved-filter definitions are not a layout input; the
             // active filter itself is view state the host rebuilds
             // through when it changes.
+            return []
+        }
+    }
+
+    /// The style/theme/structure commands' dirty sets (ADR-0028),
+    /// split from the dispatcher to keep each function under the
+    /// complexity budget.
+    ///
+    /// - `setStyle`: only font/padding/width fields can move a frame
+    ///   (`NodeStylePatch.affectsMeasuredSize`); colors, borders,
+    ///   shapes and branch styling repaint only.
+    /// - `resetStyle`: the post-command model can't tell which fields
+    ///   left (the dirty set is derived after apply), so a reset
+    ///   touching any size-affecting key — or a wholesale clear —
+    ///   re-measures the node; over-marking is safe and cheap.
+    /// - Theme selection/overrides, appearance and structure changes
+    ///   re-resolve the whole canvas: the full-rebuild fallback (nil).
+    private static func styleCommandDirtyIDs(
+        _ command: MapCommand, in model: MapModel
+    ) -> Set<String>? {
+        switch command {
+        case .setStyle(let ids, let patch):
+            return patch.affectsMeasuredSize ? Set(ids) : []
+        case .resetStyle(let ids, let keys):
+            if keys == nil || !Set(keys ?? []).isDisjoint(with: NodeStylePatch.sizeAffectingKeys) {
+                return Set(ids)
+            }
+            return []
+        case .setTheme, .setThemeSelection, .setThemeOverrides, .setAppearance, .setStructure:
+            return nil
+        default:
+            // The dispatcher only routes these commands here.
             return []
         }
     }

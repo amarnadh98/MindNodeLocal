@@ -47,11 +47,11 @@ extension DocumentWindowController {
         activeViewMode = mode
         switch mode {
         case .map:
-            window.contentView = canvas
+            setMainContentView(canvas)
         case .outline:
-            window.contentView = outlineController.view
+            setMainContentView(outlineController.view)
         case .sideBySide:
-            window.contentView = documentSplitView
+            setMainContentView(documentSplitView)
         }
         // The visible pane owns the keyboard (except while an editing
         // session keeps its own first responder).

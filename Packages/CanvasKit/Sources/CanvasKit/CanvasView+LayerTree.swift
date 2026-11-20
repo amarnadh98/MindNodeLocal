@@ -8,6 +8,13 @@ import MapStudy
 /// scene application, the selection rings and the rubber-band overlay,
 /// plus the CA-compositor pixel capture the hosted tests use.
 extension CanvasView {
+    /// The appearance variant the canvas currently renders for (the
+    /// host resolves the document theme against this).
+    public var effectiveVariant: ThemeVariant {
+        let names = [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]
+        let best = effectiveAppearance.bestMatch(from: names) ?? .aqua
+        return best == .darkAqua ? .dark : .light
+    }
     /// Captures the view's current appearance through CA's own
     /// compositor. Layer-hosting views can't rely on AppKit's legacy
     /// caching path: it composes camera-scaled contents displaced and

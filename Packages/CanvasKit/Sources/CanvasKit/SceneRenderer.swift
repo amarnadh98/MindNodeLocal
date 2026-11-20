@@ -58,18 +58,37 @@ public enum SceneRenderer {
             // ends; a hidden branch draws nothing.
             let alpha = revealOverlay?.branchOpacity(parentID: branch.parentID, childID: branch.childID) ?? 1
             guard alpha > 0.01 else { continue }
-            let path =
-                branch.tapered
-                ? MapRender.BranchPath.tapered(
+            // §7.4 line styles after the child's branch override
+            // (ADR-0028), the same switch the layer tree uses.
+            let path: CGPath
+            switch branch.lineStyle {
+            case .tapered:
+                path = MapRender.BranchPath.tapered(
                     from: branch.from, to: branch.to,
                     startWidth: branch.startWidth, endWidth: branch.endWidth,
                     axis: branch.axis)
-                : MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+            case .curved:
+                path = MapRender.BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+            case .straight:
+                path = MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+            case .elbow:
+                path = MapRender.BranchPath.elbow(from: branch.from, to: branch.to, axis: branch.axis)
+            case .none:
+                continue
+            }
             context.saveGState()
             context.setAlpha(alpha)
-            context.setFillColor(branch.color)
-            context.addPath(path)
-            context.fillPath()
+            if branch.tapered {
+                context.setFillColor(branch.color)
+                context.addPath(path)
+                context.fillPath()
+            } else {
+                context.setStrokeColor(branch.color)
+                context.setLineWidth(max(branch.startWidth, branch.endWidth))
+                context.setLineCap(.round)
+                context.addPath(path)
+                context.strokePath()
+            }
             context.restoreGState()
         }
 

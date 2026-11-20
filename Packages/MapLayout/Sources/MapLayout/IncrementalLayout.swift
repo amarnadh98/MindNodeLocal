@@ -106,6 +106,10 @@ public enum IncrementalLayout {
         dirty: Set<String>? = nil,
         source: @escaping (String) -> LayoutSourceNode?
     ) -> (frames: LayoutResult, state: LayoutState) {
+        // F-LAY-4: the logic chart runs the one-sided engine at the
+        // compact, uniform gap rhythm. The state's spacing tag keeps a
+        // cached mind-map state from being reused (and vice versa).
+        let spacing = structure == .logicChartRight ? LogicLayout.compacted(spacing) : spacing
         // A spacing change invalidates every entry: start from a clean
         // state so the pass recomputes everything.
         let fullPass = dirty == nil || state.spacing != spacing
@@ -123,7 +127,10 @@ public enum IncrementalLayout {
 
         let frames: LayoutResult
         switch structure {
-        case .mindmapRight, .mindmapLeft:
+        case .mindmapRight, .mindmapLeft, .logicChartRight:
+            // F-LAY-4's logic chart is the same one-sided placement at
+            // the compacted spacing (applied before the engine was
+            // built), so the tidy invariants carry over untouched.
             let placed = engine.placeOneSided()
             frames = MindmapLayout.assemble(placed, mirror: structure == .mindmapLeft)
         case .orgDown, .orgUp:

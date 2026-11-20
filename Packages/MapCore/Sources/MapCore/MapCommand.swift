@@ -127,6 +127,34 @@ public indirect enum MapCommand: Sendable, Equatable {
     /// the system, light/dark pin the variant the document renders and
     /// exports in. The exact inverse snapshots the pre-state.
     case setAppearance(mode: AppearanceMode)
+    /// Replaces the whole theme selection — id **and** overrides —
+    /// wholesale (F-STY-8's rainbow toggle and any future theme
+    /// editing build on it). `nil` = no selection (default theme).
+    /// Total and exactly invertible by snapshot, so the narrower
+    /// `setTheme`/`setThemeOverrides` commands route their inverses
+    /// through it.
+    case setThemeSelection(ThemeSelection?)
+    /// Replaces the document's stored theme overrides (F-STY-8's
+    /// rainbow toggle; later the theme editor), keeping the selected
+    /// theme id. On a document with no stored selection it creates one
+    /// for the default theme (the toggle must work on fresh maps).
+    /// `nil` clears the overrides.
+    case setThemeOverrides(overrides: ThemePatch?)
+    /// Merges `patch` into every listed node's stored style patch
+    /// (F-STY-2): fields the patch sets overwrite, fields it leaves
+    /// `nil` survive. One command over any number of nodes is one undo
+    /// step. The inverse restores each node's exact pre-state patch.
+    case setStyle(ids: [String], patch: NodeStylePatch)
+    /// Resets the listed style keys on every listed node back to the
+    /// theme's values (F-STY-3 "Reset to theme"); `keys: nil` clears
+    /// the whole patch. One command over any number of nodes is one
+    /// undo step.
+    case resetStyle(ids: [String], keys: [NodeStyleKey]?)
+    /// Sets the structure override of `id`'s subtree (F-LAY-1…4,
+    /// SPEC §5.3: structure is inherited until overridden). `nil`
+    /// returns to the inherited/default structure. The canvas resolves
+    /// a root's structure for its whole tree.
+    case setStructure(id: String, structure: String?)
     /// Replaces the whole presentation list (M6, F-PRE-2/3). Every
     /// slide-authoring action (add/reorder/duplicate/rename/delete
     /// slide, notes, build orders, presentation create/rename/delete)
@@ -217,8 +245,11 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .addSummary: "Add Summary"
         case .removeSummary: "Delete Summary"
         case .recolorBranches: "Recolor Branches"
-        case .setTheme: "Set Theme"
+        case .setTheme, .setThemeOverrides, .setThemeSelection: "Set Theme"
+        case .setStyle: "Set Style"
+        case .resetStyle: "Reset Style"
         case .setAppearance: "Set Appearance"
+        case .setStructure: "Set Layout"
         case .setPresentations: "Edit Slides"
         case .setStudy(let name, _, _): name
         case .setLink: "Set Link"

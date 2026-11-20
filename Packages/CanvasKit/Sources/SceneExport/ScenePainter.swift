@@ -27,10 +27,13 @@ public enum ScenePainter {
         context.translateBy(x: -export.bounds.minX, y: -export.bounds.minY)
 
         for branch in export.branches {
-            // The canvas fills tapered connectors as closed polygons
-            // (`SceneRenderer`); non-tapered connectors stroke the
-            // centerline path instead of filling a zero-area one.
-            if branch.tapered {
+            // The canvas draws tapered connectors as filled offset
+            // polygons (`SceneRenderer`); the stroke styles follow the
+            // same §7.4 switch, and `none` draws nothing.
+            switch branch.lineStyle {
+            case .none:
+                continue
+            case .tapered:
                 let path = BranchPath.tapered(
                     from: branch.from, to: branch.to,
                     startWidth: branch.startWidth, endWidth: branch.endWidth,
@@ -38,10 +41,19 @@ public enum ScenePainter {
                 context.setFillColor(branch.color)
                 context.addPath(path)
                 context.fillPath()
-            } else {
-                let path = BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+            case .curved, .straight, .elbow:
+                let path: CGPath
+                switch branch.lineStyle {
+                case .straight:
+                    path = BranchPath.straight(from: branch.from, to: branch.to)
+                case .elbow:
+                    path = BranchPath.elbow(from: branch.from, to: branch.to, axis: branch.axis)
+                default:
+                    path = BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+                }
                 context.setStrokeColor(branch.color)
-                context.setLineWidth(min(max(branch.startWidth, branch.endWidth), 6))
+                context.setLineWidth(max(branch.startWidth, branch.endWidth))
+                context.setLineCap(.round)
                 context.addPath(path)
                 context.strokePath()
             }

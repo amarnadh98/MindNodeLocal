@@ -25,6 +25,14 @@ public enum BranchDirection: Sendable, Hashable {
     case up
 }
 
+/// Horizontal placement of the title inside the content rect (F-STY-2
+/// text alignment; `.center` is the optical default of §7.5).
+public enum ResolvedTextAlignment: String, Sendable, Hashable {
+    case leading
+    case center
+    case trailing
+}
+
 /// A node's visual style after theme resolution (SPEC §7.2, F-STY-2/F-STY-3):
 /// theme → level style → branch color → per-node overrides, flattened into
 /// one value the renderer consumes. Render types hold `CGColor`/`CGPath`
@@ -35,13 +43,20 @@ public struct ResolvedNodeStyle {
     public var fillColor: CGColor?
     public var borderColor: CGColor?
     public var borderWidth: CGFloat
+    /// Dashed border stroke (F-STY-2; §7.2's 4/3 dash rhythm).
+    public var borderDash: Bool
     public var cornerRadius: CGFloat
     public var paddingWidth: CGFloat
     public var paddingHeight: CGFloat
     public var textColor: CGColor
     public var font: FontSpec
+    /// The title's horizontal alignment inside the content rect
+    /// (F-STY-2 text alignment).
+    public var textAlignment: ResolvedTextAlignment
     public var underlineWidth: CGFloat
     public var shadows: [ShadowLayer]
+    /// Auto-width floors at this (F-STY-2 width min; 0 = no floor).
+    public var minWidth: CGFloat
     public var maxWidth: CGFloat
 
     public init(
@@ -49,26 +64,32 @@ public struct ResolvedNodeStyle {
         fillColor: CGColor?,
         borderColor: CGColor? = nil,
         borderWidth: CGFloat = 0,
+        borderDash: Bool = false,
         cornerRadius: CGFloat = 0,
         paddingWidth: CGFloat = 10,
         paddingHeight: CGFloat = 10,
         textColor: CGColor,
         font: FontSpec,
+        textAlignment: ResolvedTextAlignment = .center,
         underlineWidth: CGFloat = 0,
         shadows: [ShadowLayer] = [],
+        minWidth: CGFloat = 0,
         maxWidth: CGFloat = 280
     ) {
         self.shape = shape
         self.fillColor = fillColor
         self.borderColor = borderColor
         self.borderWidth = borderWidth
+        self.borderDash = borderDash
         self.cornerRadius = cornerRadius
         self.paddingWidth = paddingWidth
         self.paddingHeight = paddingHeight
         self.textColor = textColor
         self.font = font
+        self.textAlignment = textAlignment
         self.underlineWidth = underlineWidth
         self.shadows = shadows
+        self.minWidth = minWidth
         self.maxWidth = maxWidth
     }
 }
@@ -116,8 +137,16 @@ public enum NodeRenderer {
         if style.shape != .underline, style.shape != .none, let borderColor = style.borderColor, style.borderWidth > 0 {
             context.setStrokeColor(borderColor)
             context.setLineWidth(style.borderWidth)
+            if style.borderDash {
+                // §7.2's connection dash rhythm doubles as the dashed
+                // border token (F-STY-2 border dash).
+                context.setLineDash(phase: 0, lengths: [4, 3])
+            } else {
+                context.setLineDash(phase: 0, lengths: [])
+            }
             context.addPath(shapePath(style: style, frame: frame))
             context.strokePath()
+            context.setLineDash(phase: 0, lengths: [])
         }
 
         if let underlineColor = style.borderColor, style.shape == .underline {
@@ -183,8 +212,18 @@ public enum NodeRenderer {
         let textSize = measurer.nodeTitleSize(
             title, font: style.font, maxWidth: titleRow.width)
         guard textSize.width > 0, textSize.height > 0 else { return }
+        // F-STY-2 text alignment: leading/trailing pin the measured text
+        // block to its edge of the title row; center stays §7.5's
+        // optical default.
+        let slack = max(0, titleRow.width - textSize.width)
+        let textOffsetX: CGFloat
+        switch style.textAlignment {
+        case .leading: textOffsetX = 0
+        case .center: textOffsetX = slack / 2
+        case .trailing: textOffsetX = slack
+        }
         let textRect = CGRect(
-            x: titleRow.minX + max(0, (titleRow.width - textSize.width) / 2),
+            x: titleRow.minX + textOffsetX,
             y: titleRow.minY + max(0, (titleRow.height - textSize.height) / 2),
             width: titleRow.width,
             height: textSize.height + 2)
@@ -250,7 +289,7 @@ public enum NodeRenderer {
         case .octagon:
             return polygonPath(frame: frame, sides: 8, rotation: .pi / 8)
         case .cloud:
-            return CGPath(ellipseIn: frame, transform: nil)
+            return cloudPath(frame: frame)
         case .underline, .none:
             return CGPath(rect: .zero, transform: nil)
         }
@@ -321,5 +360,87 @@ public enum NodeRenderer {
         }
         path.closeSubpath()
         return path
+    }
+
+    /// The cloud outline (F-STY-1): a closed silhouette of six circular
+    /// bumps — left, three on top (the middle one largest), right, a
+    /// small shoulder at the bottom right — over a gently sagging
+    /// bottom edge, all inscribed in `frame`. Bumps are true circular
+    /// arcs (not circles unioned by winding), so a dashed border
+    /// strokes one clean outline.
+    private static func cloudPath(frame: CGRect) -> CGPath {
+        let width = frame.width
+        let height = frame.height
+        // Bump anchor points around the silhouette, clockwise in the
+        // flipped (y-down) convention, as frame fractions; `radius` is
+        // each bump's arc radius as a height fraction.
+        let anchors = [
+            (x: 0.10, y: 0.82, radius: 0.26),  // bottom-left shoulder
+            (x: 0.06, y: 0.46, radius: 0.34),  // left bump
+            (x: 0.28, y: 0.13, radius: 0.30),  // top-left bump
+            (x: 0.52, y: 0.02, radius: 0.46),  // top-mid bump (largest)
+            (x: 0.78, y: 0.13, radius: 0.28),  // top-right bump
+            (x: 0.96, y: 0.48, radius: 0.30),  // right bump
+            (x: 0.88, y: 0.82, radius: 0.22),  // bottom-right shoulder
+        ]
+        let points = anchors.map { anchor in
+            CGPoint(
+                x: frame.minX + anchor.x * width,
+                y: frame.minY + anchor.y * height)
+        }
+
+        let centroid = CGPoint(x: frame.midX, y: frame.midY)
+        let path = CGMutablePath()
+        path.move(to: points[0])
+        for index in 0..<points.count {
+            let start = points[index]
+            let end = points[(index + 1) % points.count]
+            addBump(
+                path, from: start, to: end,
+                radius: anchors[index].radius * height, centroid: centroid)
+        }
+        // The sagging bottom edge back to the start.
+        addBump(
+            path, from: points[points.count - 1], to: points[0],
+            radius: 0.9 * width, centroid: centroid)
+        path.closeSubpath()
+        return path
+    }
+
+    /// One circular-arc segment `from` → `to`, bulging away from
+    /// `centroid` (the shape's interior). The center lands on the
+    /// interior side of the chord, so the short-way sweep bows outward;
+    /// degenerate chords (shorter than the diameter) fall back to a
+    /// line.
+    private static func addBump(
+        _ path: CGMutablePath, from: CGPoint, to: CGPoint,
+        radius: CGFloat, centroid: CGPoint
+    ) {
+        let chord = CGPoint(x: to.x - from.x, y: to.y - from.y)
+        let chordLength = hypot(chord.x, chord.y)
+        guard chordLength > 0.0001 else { return }
+        // Clamped so the half-chord always fits: r² = d² + (chord/2)².
+        let radius = max(radius, chordLength * 0.51)
+        let mid = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        let offset = sqrt(max(0, radius * radius - (chordLength / 2) * (chordLength / 2)))
+        let unit = CGPoint(x: -chord.y / chordLength, y: chord.x / chordLength)
+        // Two candidate centers along the chord's perpendicular; the
+        // interior one (nearest the centroid) leaves the bump bowing out.
+        let candidateA = CGPoint(x: mid.x + unit.x * offset, y: mid.y + unit.y * offset)
+        let candidateB = CGPoint(x: mid.x - unit.x * offset, y: mid.y - unit.y * offset)
+        let distanceA = hypot(candidateA.x - centroid.x, candidateA.y - centroid.y)
+        let distanceB = hypot(candidateB.x - centroid.x, candidateB.y - centroid.y)
+        let center = distanceA < distanceB ? candidateA : candidateB
+
+        let startAngle = atan2(from.y - center.y, from.x - center.x)
+        var delta = atan2(to.y - center.y, to.x - center.x) - startAngle
+        // Normalize to the short way (|delta| ≤ π): the small sag/bump
+        // segments never want the long way around.
+        while delta > .pi { delta -= 2 * .pi }
+        while delta < -.pi { delta += 2 * .pi }
+        path.addArc(
+            center: center, radius: radius,
+            startAngle: startAngle, endAngle: startAngle + delta,
+            clockwise: delta < 0)
     }
 }

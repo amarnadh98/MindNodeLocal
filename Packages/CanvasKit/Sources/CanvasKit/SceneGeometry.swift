@@ -26,9 +26,17 @@ public struct SceneNode {
     /// glyph. `nil` when the node has nothing media-backed; the
     /// raster/diff comparison uses its `revision`.
     public var media: NodeMedia? = nil
+    /// F-LAY-14: the number of hidden descendants of a folded node —
+    /// the folded-count pill's label; `nil` on unfolded/leaf nodes.
+    /// Canvas-only (the pill is an interactive affordance, like the
+    /// selection ring); export never draws it.
+    public var foldedCount: Int? = nil
 }
 
 /// One branch connector: parent outgoing anchor to child incoming anchor.
+/// `lineStyle` is how the connector draws (§7.4: curved/tapered/straight/
+/// elbow/none); `tapered` is the fill-vs-stroke convenience that follows
+/// from it.
 public struct SceneBranch {
     public let parentID: String
     public let childID: String
@@ -39,7 +47,12 @@ public struct SceneBranch {
     public let startWidth: CGFloat
     public let endWidth: CGFloat
     public let color: CGColor
-    public let tapered: Bool
+    /// The effective line style after the child node's branch overrides
+    /// (F-STY-2 branch line style; ADR-0028: a node's branch overrides
+    /// act on the connector from its parent to it).
+    public let lineStyle: BranchLineStyle
+
+    public var tapered: Bool { lineStyle == .tapered }
 }
 
 /// A whole map prepared for rendering: laid out in model space (y grows
@@ -57,6 +70,10 @@ public struct CanvasScene {
     /// Summary braces (F-REL-3); the summary node itself is an ordinary
     /// scene node.
     public let summaries: [SceneSummary]
+    /// The ids of nodes carrying a folded-count pill (F-LAY-14) — the
+    /// pill sync's O(1) fast path: a map with no folded node pays one
+    /// `isEmpty` check per scene apply, never a scan (§11.8).
+    public var foldedIDs: Set<String> = []
 
     public init(
         nodes: [String: SceneNode],
@@ -64,7 +81,8 @@ public struct CanvasScene {
         canvasColor: CGColor,
         connections: [SceneConnection] = [],
         boundaries: [SceneBoundary] = [],
-        summaries: [SceneSummary] = []
+        summaries: [SceneSummary] = [],
+        foldedIDs: Set<String> = []
     ) {
         self.nodes = nodes
         self.branches = branches
@@ -72,6 +90,7 @@ public struct CanvasScene {
         self.connections = connections
         self.boundaries = boundaries
         self.summaries = summaries
+        self.foldedIDs = foldedIDs
     }
 
     public var bounds: CGRect {
@@ -94,7 +113,7 @@ final class BuildCaches {
     }
 
     let theme: Theme
-    private let variant: ThemeVariant
+    let variant: ThemeVariant
     private var styles: [StyleKey: ResolvedNodeStyle] = [:]
     private var branchColors: [Int: CGColor] = [:]
 
@@ -139,18 +158,45 @@ public final class SceneBuildCache {
     }
 
     /// A measured node size: the id, title, theme and level (which select
-    /// the resolved style), width mode and **decorations** it was derived
-    /// from, so a cached size is only ever reused for the exact same
-    /// inputs — a decoration change (task mark, badge, pills) makes a new
-    /// key and forces a re-measure.
+    /// the resolved style), the node's **style fingerprint** (F-STY-2:
+    /// only the patch's size-affecting fields — font, padding, width
+    /// floors — change the measured size, and the full patch is a large
+    /// value this key must not carry), width mode and **decorations** it
+    /// was derived from, so a cached size is only ever reused for the
+    /// exact same inputs — a decoration change (task mark, badge, pills)
+    /// or a style edit makes a new key and forces a re-measure.
     struct SizeKey: Hashable {
         let id: String
         let title: NodeTitle
         let themeID: String
         let level: Int
         let variant: ThemeVariant
+        let style: StyleFingerprint
         let width: NodeWidth?
         let decorations: NodeDecorations?
+    }
+
+    /// The size-affecting face of a `NodeStylePatch` (ADR-0028): the
+    /// only fields measurement consumes, small enough to live inside
+    /// `SizeKey` on the §11.8 path. `nil` fields inherit from the theme.
+    struct StyleFingerprint: Hashable {
+        let padding: Double?
+        let fontName: String?
+        let fontSize: Double?
+        let fontWeight: Double?
+        let fontItalic: Bool?
+        let minWidth: Double?
+        let maxWidth: Double?
+
+        init(_ patch: NodeStylePatch?) {
+            self.padding = patch?.padding
+            self.fontName = patch?.fontName
+            self.fontSize = patch?.fontSize
+            self.fontWeight = patch?.fontWeight
+            self.fontItalic = patch?.fontItalic
+            self.minWidth = patch?.minWidth
+            self.maxWidth = patch?.maxWidth
+        }
     }
 
     var roots: [String: RootInfo] = [:]
@@ -296,12 +342,17 @@ public enum SceneGeometry {
         let prunedIDs = request.prunedIDs
         let editingTitle = request.editingTitle
         // F-STY-3/F-STY-4: styles resolve from the document's theme
-        // selection (default Paper) at the current appearance variant.
-        // F-STY-5: an explicit theme wins — the theme editor's draft and
-        // the app's user-theme catalog both resolve before this point.
-        let theme = request.theme ?? BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID)
+        // selection (default Paper) at the current appearance variant,
+        // with the document's stored overrides (canvas color, palette,
+        // base font, rainbow toggle) folded in — the seam the
+        // inspector's Theme pane writes. F-STY-5: an explicit theme (the
+        // theme editor's draft, the user-theme catalog) replaces the
+        // built-in lookup; the document overrides still apply on top.
+        let theme = (request.theme ?? BuiltInThemes.theme(id: model.theme?.id ?? BuiltInThemes.defaultID))
+            .applyingDocumentOverrides(model.theme?.overrides)
         var nodes: [String: SceneNode] = [:]
         var branches: [SceneBranch] = []
+        var foldedIDs: Set<String> = []
         var cursorY: CGFloat = 0
         let caches = BuildCaches(theme: theme, variant: variant)
         // F-TSK-2/F-TAG-1: one cached pass each for task ratios and tag
@@ -354,7 +405,9 @@ public enum SceneGeometry {
             let offsets = accumulatedOffsets(model: model, rootID: rootID)
             let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
             let offsetY = cursorY - treeMinY
-            let rootLevel1Index = levelOneIndices(model: model, rootID: rootID, theme: theme)
+            let rootLevel1Index = levelOneIndices(
+                model: model, rootID: rootID, theme: theme,
+                rainbowOverride: model.theme?.overrides?.rainbowBranches)
             let axis: LayoutAxis =
                 structure == .orgDown || structure == .orgUp ? .vertical : .horizontal
             rootAxes[rootID] = axis
@@ -373,6 +426,7 @@ public enum SceneGeometry {
                 model: model, placed: placed, axis: axis)
 
             var bottom = (frames[rootID]?.maxY ?? 0)
+            var rootFoldedIDs: Set<String> = []
             for (id, frame) in placed {
                 guard let node = model.nodes[id] else { continue }
                 let info = ancestry[id] ?? AncestryInfo(depth: 0, level1AncestorID: id)
@@ -381,8 +435,23 @@ public enum SceneGeometry {
                 let title = id == editingTitle?.id ? editingTitle?.title : node.title
                 let adjust = adjustments[id] ?? .zero
                 let translated = frame.offsetBy(dx: adjust.x, dy: adjust.y)
-                let resolvedStyle = caches.theme.applyingOverrides(
-                    node.style, to: caches.style(level: info.depth, level1Index: level1Index))
+                // F-STY-2/F-STY-3: the override seam. Nil-patch nodes
+                // (the overwhelming majority) resolve to the memoized
+                // level style directly — keeping the cross-module call
+                // off the §11.8 fast path.
+                let baseStyle = caches.style(level: info.depth, level1Index: level1Index)
+                let resolvedStyle =
+                    node.style == nil
+                    ? baseStyle
+                    : caches.theme.applyingOverrides(
+                        node.style, to: baseStyle, variant: caches.variant)
+                let folded: Int? =
+                    node.folded && !node.children.isEmpty
+                    ? foldedDescendantCount(ofChildren: node.children, in: model)
+                    : nil
+                if folded != nil {
+                    rootFoldedIDs.insert(id)
+                }
                 let nodeDecorations = cache.decorations[id] ?? nil
                 nodes[id] = SceneNode(
                     id: id,
@@ -394,11 +463,13 @@ public enum SceneGeometry {
                     width: node.width,
                     decorations: nodeDecorations,
                     media: cache.media?.media(
-                        for: nodeDecorations, title: (title ?? node.title).text, style: resolvedStyle))
+                        for: nodeDecorations, title: (title ?? node.title).text, style: resolvedStyle),
+                    foldedCount: folded)
                 if translated.maxY > bottom {
                     bottom = translated.maxY
                 }
             }
+            foldedIDs.formUnion(rootFoldedIDs)
 
             branches.append(
                 contentsOf: connectors(
@@ -422,66 +493,8 @@ public enum SceneGeometry {
             canvasColor: theme.canvasColor(for: variant),
             connections: overlays.connections,
             boundaries: overlays.boundaries,
-            summaries: overlays.summaries)
-    }
-
-    /// The structure of a root's tree: the root's own override, else the
-    /// document default (SPEC §5.3: structure is inherited until
-    /// overridden; the canvas default is the balanced mind map).
-    static func rootStructure(_ model: MapModel, rootID: String) -> LayoutStructure {
-        guard let raw = model.nodes[rootID]?.structure,
-            let structure = LayoutStructure(rawValue: raw)
-        else {
-            return .mindmapBalanced
-        }
-        return structure
-    }
-
-    /// Depth from the root and the level-1 ancestor that colors this
-    /// node's branch, for every node the scene can show (folded subtrees
-    /// pruned) — one walk, no ancestor chains per node.
-    static func ancestryMap(model: MapModel, rootID: String) -> [String: AncestryInfo] {
-        var result: [String: AncestryInfo] = [:]
-        func walk(_ id: String, depth: Int, level1: String) {
-            guard let node = model.nodes[id] else { return }
-            result[id] = AncestryInfo(
-                depth: depth,
-                // The level-1 ancestor of a root (depth 0) and of a
-                // first-level node is the node itself.
-                level1AncestorID: depth <= 1 ? id : level1)
-            guard !node.folded else { return }
-            let childLevel1 = depth == 0 ? id : (depth == 1 ? id : level1)
-            for childID in node.children {
-                walk(childID, depth: depth + 1, level1: childLevel1)
-            }
-        }
-        walk(rootID, depth: 0, level1: rootID)
-        return result
-    }
-
-    /// A node's manual offset, plus the accumulated offsets of its
-    /// ancestors — the translation applied after auto layout (SPEC §9:
-    /// "offset is added after auto layout; descendants move with it").
-    static func accumulatedOffsets(model: MapModel, rootID: String) -> [String: CGPoint] {
-        var result: [String: CGPoint] = [:]
-
-        func walk(_ id: String, inherited: CGPoint) {
-            var own = inherited
-            if let offset = model.nodes[id]?.offset {
-                own = CGPoint(x: own.x + offset.x, y: own.y + offset.y)
-            }
-            result[id] = own
-            for childID in model.nodes[id]?.children ?? [] {
-                walk(childID, inherited: own)
-            }
-        }
-        walk(rootID, inherited: .zero)
-        return result
-    }
-
-    static func side(of node: Node) -> LayoutSide? {
-        guard let sidePin = node.side else { return nil }
-        return sidePin == .left ? .left : .right
+            summaries: overlays.summaries,
+            foldedIDs: foldedIDs)
     }
 
     /// Depth from the root and the level-1 ancestor that colors this
@@ -495,12 +508,17 @@ public enum SceneGeometry {
     /// The palette index each of `rootID`'s children colors its branch
     /// with (ADR-0009): the stored persistent index, falling back to
     /// the child's position when none is stored; the theme's
-    /// rainbow-branches toggle (F-STY-8) collapses it to 0 when off.
-    static func levelOneIndices(model: MapModel, rootID: String, theme: Theme) -> [String: Int] {
+    /// rainbow-branches toggle (F-STY-8) collapses it to 0 when off —
+    /// the document's stored override of that toggle wins over the
+    /// theme's own value.
+    static func levelOneIndices(
+        model: MapModel, rootID: String, theme: Theme, rainbowOverride: Bool?
+    ) -> [String: Int] {
+        let rainbow = rainbowOverride ?? theme.rainbowBranches
         var indices: [String: Int] = [:]
         for (position, childID) in (model.nodes[rootID]?.children ?? []).enumerated() {
             let stored = model.nodes[childID]?.paletteIndex ?? position
-            indices[childID] = theme.effectivePaletteIndex(stored)
+            indices[childID] = rainbow ? stored : 0
         }
         return indices
     }
@@ -514,9 +532,12 @@ public enum SceneGeometry {
     ) -> [SceneBranch] {
         var result: [SceneBranch] = []
         let structure = rootStructure(model, rootID: rootID)
+        // Hoisted per root: the theme's line style, re-read per branch
+        // otherwise (§11.8).
+        let themeLineStyle = caches.theme.branch.lineStyle
         let (axis, directions): (LayoutAxis, (BranchDirection, BranchDirection)) = {
             switch structure {
-            case .mindmapBalanced, .mindmapRight:
+            case .mindmapBalanced, .mindmapRight, .logicChartRight:
                 (.horizontal, (.right, .left))
             case .mindmapLeft:
                 (.horizontal, (.left, .right))
@@ -529,9 +550,17 @@ public enum SceneGeometry {
 
         func walk(_ id: String, parentInfo: (level: Int, index: Int)) {
             guard let node = model.nodes[id] else { return }
+            // A leaf has no outgoing connector: its style resolution is
+            // skipped entirely (§11.8 — half the nodes of a big map).
             let children = node.folded ? [] : node.children
-            let parentStyle = caches.theme.applyingOverrides(
-                node.style, to: caches.style(level: parentInfo.level, level1Index: parentInfo.index))
+            guard !children.isEmpty else { return }
+            // Same nil-patch fast path as the assembly loop.
+            let parentBaseStyle = caches.style(level: parentInfo.level, level1Index: parentInfo.index)
+            let parentStyle =
+                node.style == nil
+                ? parentBaseStyle
+                : caches.theme.applyingOverrides(
+                    node.style, to: parentBaseStyle, variant: caches.variant)
             for childID in children {
                 guard let childScene = nodes[childID] else { continue }
                 let direction: BranchDirection
@@ -548,8 +577,22 @@ public enum SceneGeometry {
                 let childStyle = childScene.style
                 let to = NodeRenderer.incomingAnchor(
                     style: childStyle, frame: childScene.frame, direction: direction)
-                let widths = taperedWidths(
-                    theme: caches.theme, parentLevel: parentInfo.level, childLevel: childScene.level)
+                // ADR-0028: the child node's branch overrides color the
+                // connector from its parent to it (each node owns exactly
+                // one incoming branch; roots have none).
+                let childPatch = model.nodes[childID]?.style
+                let lineStyle =
+                    childPatch?.branchLineStyle.flatMap {
+                        BranchLineStyle(rawValue: $0.lowercased())
+                    }
+                    ?? themeLineStyle
+                let color =
+                    childPatch?.branchColor.flatMap { ThemeHex.color($0) }
+                    ?? caches.branchColor(level1Index: childScene.level1Index)
+                let widths = overrideWidths(
+                    parentWidth: caches.theme.branchWidth(level: parentInfo.level),
+                    childWidth: caches.theme.branchWidth(level: childScene.level),
+                    patch: childPatch, lineStyle: lineStyle)
                 result.append(
                     SceneBranch(
                         parentID: id,
@@ -560,22 +603,12 @@ public enum SceneGeometry {
                         axis: axis,
                         startWidth: widths.start,
                         endWidth: widths.end,
-                        color: caches.branchColor(level1Index: childScene.level1Index),
-                        tapered: caches.theme.branch.lineStyle == .tapered))
+                        color: color,
+                        lineStyle: lineStyle))
                 walk(childID, parentInfo: (level: parentInfo.level + 1, index: childScene.level1Index))
             }
         }
         walk(rootID, parentInfo: (level: 0, index: 0))
         return result
-    }
-
-    /// Continuous taper from the root to the leaves (§7.2): a branch's
-    /// start width is its parent node's width `w(level)`, and it tapers to
-    /// `w(level + 1)` — no thickness jump at intermediate nodes. The width
-    /// fall-off is theme data (Paper: 6 pt at the root down to 2 pt).
-    static func taperedWidths(
-        theme: Theme, parentLevel: Int, childLevel: Int
-    ) -> (start: CGFloat, end: CGFloat) {
-        (start: theme.branchWidth(level: parentLevel), end: theme.branchWidth(level: childLevel))
     }
 }

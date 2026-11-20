@@ -21,12 +21,24 @@ extension CanvasLayerTree {
     }
 
     static func branchPath(_ branch: SceneBranch) -> CGPath {
-        branch.tapered
-            ? MapRender.BranchPath.tapered(
+        // §7.4 line styles, after the child's branch override (ADR-0028):
+        // tapered fills its offset polygon; curved/straight/elbow stroke;
+        // `none` draws nothing.
+        switch branch.lineStyle {
+        case .tapered:
+            return MapRender.BranchPath.tapered(
                 from: branch.from, to: branch.to,
                 startWidth: branch.startWidth, endWidth: branch.endWidth,
                 axis: branch.axis)
-            : MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+        case .curved:
+            return MapRender.BranchPath.cubic(from: branch.from, to: branch.to, axis: branch.axis)
+        case .straight:
+            return MapRender.BranchPath.straight(from: branch.from, to: branch.to)
+        case .elbow:
+            return MapRender.BranchPath.elbow(from: branch.from, to: branch.to, axis: branch.axis)
+        case .none:
+            return CGMutablePath()
+        }
     }
 
     func configureBranchLayer(
@@ -62,7 +74,10 @@ extension CanvasLayerTree {
         _ layer: BranchVisualLayer, old: SceneBranch?, branch: SceneBranch, reduceMotion: Bool
     ) {
         let newPath = Self.branchPath(branch)
-        if let old, !reduceMotion {
+        // Path morphing needs identical element structure (§11.4); a
+        // line-style switch changes it, so those repaint in place.
+        let morphable = old?.lineStyle == branch.lineStyle
+        if let old, !reduceMotion, morphable {
             // Identical element structure on both paths (fixed
             // 16-sample taper) — §11.4's requirement for path
             // animation.

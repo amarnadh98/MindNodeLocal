@@ -109,6 +109,10 @@ public final class CanvasView: NSView {
     /// floating root at this model point and enters edit mode.
     public var onCreateFloatingNode: ((CGPoint) -> Void)?
 
+    /// F-LAY-14: the user clicked a folded node's count pill → the host
+    /// performs ONE `setFolded(id:, folded: false)` undo step.
+    public var onUnfoldPill: ((String) -> Void)?
+
     /// True until the host has run the first `zoomToFit` against the
     /// window's real on-screen content size (windows open at the creation
     /// frame and resize with the window frame).
@@ -219,12 +223,6 @@ public final class CanvasView: NSView {
     public override var acceptsFirstResponder: Bool { true }
 
     /// The theme variant matching this view's effective appearance.
-    public var effectiveVariant: ThemeVariant {
-        let names = [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]
-        let best = effectiveAppearance.bestMatch(from: names) ?? .aqua
-        return best == .darkAqua ? .dark : .light
-    }
-
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         onEffectiveAppearanceChange?()
@@ -378,6 +376,14 @@ public final class CanvasView: NSView {
         // acts on its node instead of selecting + dragging.
         if handleDecorationClick(at: point, with: event) {
             needsDisplay = true
+            return
+        }
+        // F-LAY-14: a click on a folded node's count pill unfolds it —
+        // one undo step through the host, no selection change.
+        if let foldedID = layerTree.foldedPillID(atModel: camera.modelPoint(for: point)),
+            let unfold = onUnfoldPill
+        {
+            unfold(foldedID)
             return
         }
         if let id = nodeID(at: point) {

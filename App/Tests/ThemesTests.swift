@@ -163,7 +163,9 @@ struct ThemesTests {
         let catalog = makeTempCatalog()
         let controller = ThemeEditorController(document: document, catalog: catalog)
 
-        #expect(document.model.theme?.id == ThemeCatalog.defaultThemeID)
+        // A new document runs the default theme; Paper stays implicit
+        // (no stored selection).
+        #expect((document.model.theme?.id ?? BuiltInThemes.defaultID) == ThemeCatalog.defaultThemeID)
         let previousThemeID = document.model.theme?.id
 
         controller.model.setName("My First Theme")

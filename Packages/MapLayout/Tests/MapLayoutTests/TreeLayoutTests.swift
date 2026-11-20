@@ -5,7 +5,7 @@ import Testing
 @testable import MapLayout
 
 let allStructures: [LayoutStructure] = [
-    .mindmapBalanced, .mindmapRight, .mindmapLeft, .orgDown, .orgUp,
+    .mindmapBalanced, .mindmapRight, .mindmapLeft, .orgDown, .orgUp, .logicChartRight,
 ]
 
 func node(_ id: String, _ width: CGFloat, _ height: CGFloat, _ children: [LayoutNode] = []) -> LayoutNode {
@@ -147,10 +147,11 @@ func subtree(_ tree: LayoutNode, _ id: String) -> LayoutNode? {
 }
 
 @Test func siblingOrderPreserved() {
-    let oneSided: [LayoutStructure] = [.mindmapRight, .mindmapLeft, .orgDown, .orgUp]
+    let oneSided: [LayoutStructure] = [.mindmapRight, .mindmapLeft, .orgDown, .orgUp, .logicChartRight]
     for structure in oneSided {
         let frames = TreeLayout.layout(root: sampleTree(), structure: structure)
-        let horizontal = structure == .mindmapRight || structure == .mindmapLeft
+        let horizontal =
+            structure == .mindmapRight || structure == .mindmapLeft || structure == .logicChartRight
         assertOrderPreserved(sampleTree(), frames, horizontal: horizontal, comment: "\(structure)")
     }
 }

@@ -212,8 +212,43 @@ extension MapCommand {
             }
             return .recolorBranches(assignments: snapshot)
 
-        case .setTheme:
-            return .setTheme(id: model.theme?.id)
+        case .setTheme, .setThemeOverrides, .setThemeSelection:
+            // All three restore the full pre-state selection through the
+            // wholesale snapshot command — exact even across the
+            // nil ⇄ created-selection transitions (an id-only inverse
+            // could not restore a cleared selection's stored overrides).
+            return .setThemeSelection(model.theme)
+
+        case .setStyle(let ids, _):
+            // Restore each node's exact pre-state patch: clear the
+            // stored patch wholesale (removing everything the forward
+            // merge added), then merge the full pre-state snapshot
+            // back in — per id, grouped into the one undo step.
+            var restore: [MapCommand] = []
+            for id in ids where model.nodes[id] != nil {
+                restore.append(.resetStyle(ids: [id], keys: nil))
+                if let stored = model.nodes[id]?.style {
+                    restore.append(.setStyle(ids: [id], patch: stored))
+                }
+            }
+            return .group(name: displayName, commands: restore)
+
+        case .resetStyle(let ids, _):
+            // Merge the full pre-state snapshot back over the post-state
+            // (a subset of it): every cleared field returns, every
+            // surviving field re-set to the same value.
+            var restore: [MapCommand] = []
+            for id in ids {
+                guard let stored = model.nodes[id]?.style else { continue }
+                restore.append(.setStyle(ids: [id], patch: stored))
+            }
+            return .group(name: displayName, commands: restore)
+
+        case .setStructure(let id, _):
+            guard model.nodes[id] != nil else {
+                throw ArborError.commandFailure("missing node \(id)")
+            }
+            return .setStructure(id: id, structure: model.nodes[id]?.structure)
 
         case .setAppearance:
             // Exact snapshot: auto and a missing value are the same

@@ -1,5 +1,6 @@
 import AppKit
 import CanvasKit
+import MapCore
 import MapIO
 import MapLibrary
 import UniformTypeIdentifiers
@@ -365,12 +366,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item("Italic", NSSelectorFromString("toggleItalicAction:"), "i"),
                     item("Underline", NSSelectorFromString("toggleUnderlineAction:"), "u"),
                     .separator(),
-                    // F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays
-                    // File ▸ Export…, SPEC §5.17).
-                    item(
-                        "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
-                        "E", modifiers: [.command, .shift]),
-                ] + contentFormatItems()))
+                    editThemeMenuItem(),
+                ]
+                    // M2 (F-STY-1/3/8): node shapes, the reset-to-theme
+                    // and Recolor Branches — every item routes to ONE
+                    // MapStore command through the window controller.
+                    + styleFormatItems()
+                    + contentFormatItems()))
         mainMenu.addItem(
             menu(
                 "View",
@@ -401,6 +403,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     item(
                         "Minimap", #selector(DocumentWindowController.toggleMinimapAction(_:)),
                         "m", modifiers: [.command, .option]),
+                    // SPEC §4.1/§6.1: the inspector is hidden by
+                    // default; ⌥⌘I toggles it (visibility persisted).
+                    item(
+                        "Toggle Inspector", #selector(DocumentWindowController.toggleInspectorAction(_:)),
+                        "i", modifiers: [.command, .option]),
                     // F-FOC (SPEC §6.1 View + Find): Focus dims and
                     // fits the selected branch; Zen clears the stage;
                     // Quick Open / the command palette fuzzy-jump. Quick
@@ -463,6 +470,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // Menu-building helpers, split out to keep the class body small.
 extension AppDelegate {
+    /// M2 (F-STY-1/3/8, SPEC §6.1): the Format ▸ Style section — every
+    /// node shape (the item's tag is its `NodeShape.allCases` index),
+    /// Reset to Theme and Recolor Branches. All three validate by
+    /// selection through the window controller's inspector helper.
+    private func styleFormatItems() -> [NSMenuItem] {
+        let shapes = NSMenuItem()
+        shapes.title = "Shape"
+        let shapeMenu = NSMenu(title: "Shape")
+        for (index, shape) in NodeShape.allCases.enumerated() {
+            let entry = item(
+                shapeMenuName(shape), #selector(DocumentWindowController.applyShapeAction(_:)), "")
+            entry.tag = index
+            shapeMenu.addItem(entry)
+        }
+        shapes.submenu = shapeMenu
+        return [
+            shapes,
+            item(
+                "Reset Style to Theme",
+                #selector(DocumentWindowController.resetStyleAction(_:)), ""),
+            .separator(),
+            item(
+                "Recolor Branches",
+                #selector(DocumentWindowController.recolorBranchesAction(_:)), ""),
+        ]
+    }
+
+    /// F-STY-5: the theme editor sheet (⇧⌘E — ⌥⌘E stays File ▸
+    /// Export…, SPEC §5.17).
+    private func editThemeMenuItem() -> NSMenuItem {
+        item(
+            "Edit Theme…", #selector(DocumentWindowController.editThemeAction(_:)),
+            "E", modifiers: [.command, .shift])
+    }
+
+    private func shapeMenuName(_ shape: NodeShape) -> String {
+        switch shape {
+        case .roundedRect: "Rounded Rect"
+        case .underline: "Underline"
+        case .none: "Text Only"
+        default: shape.rawValue.capitalized
+        }
+    }
+
     /// M3 content (SPEC §6.1 Content): notes, links, tasks and tags —
     /// the Format menu's section after the rich-text items, validated by
     /// selection (see DocumentWindowController's NSMenuItemValidation).

@@ -30,7 +30,7 @@ struct GhostOverlayTests {
             from: CGPoint(x: 50, y: 40), to: CGPoint(x: 100, y: 40),
             direction: .right, axis: .horizontal,
             startWidth: 3, endWidth: 2,
-            color: CGColor(gray: 0.5, alpha: 1), tapered: false)
+            color: CGColor(gray: 0.5, alpha: 1), lineStyle: .curved)
         return GhostPresentation(parentID: "root", items: items, branches: [branch])
     }
 
