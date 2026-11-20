@@ -6,7 +6,7 @@ SPEC §5.16 ships three app-extension targets alongside the app:
 |---|---|---|
 | `QuickLookThumbnail` | `com.apple.quicklook.thumbnail` | `QLThumbnailProvider`: the stored `QuickLook/Thumbnail.png` when fresh and large enough (downscaled to the request), else a headless re-render from `map.json` at the requested size |
 | `QuickLookPreview` | `com.apple.quicklook.preview` | View-based `QLPreviewingController` showing the stored `QuickLook/Preview.pdf` when fresh, else a fresh render, in an auto-scaling `PDFView` |
-| `SpotlightImporter` | `com.apple.spotlight-importer` | `CSImportExtension`: indexes the title, every node title and note (`textContent`), tag names (`keywords`), and the created/modified dates from `meta.json` |
+| `SpotlightImporter` | `com.apple.spotlight.import` | `CSImportExtension`: indexes the title, every node title and note (`textContent`), tag names (`keywords`), and the created/modified dates from `meta.json` |
 
 All three link the **`SystemIntegration`** product (CanvasKit package,
 ADR-0029) — the same pure code the app's save path and the tests use —
@@ -20,8 +20,12 @@ app's canvas code.
   the file is "content" Quick Look/Spotlight will bother with, not an
   opaque bundle.
 - The Quick Look targets declare `QLSupportedContentTypes:
-  [com.arbor.map]`; the Spotlight importer declares the type in its own
-  `CFBundleDocumentTypes` (`LSItemContentTypes`, `LSTypeIsPackage`).
+  [com.arbor.map]`; the Spotlight importer declares
+  `NSExtensionAttributes.CSSupportedContentTypes: [com.arbor.map]` (and
+  the type in its own `CFBundleDocumentTypes`).
+- All three extensions are sandboxed (`com.apple.security.app-sandbox`).
+  pluginkit refuses to register an unsandboxed app extension, which is
+  why none of them registered before.
 
 ## How to verify locally
 
@@ -54,7 +58,7 @@ database, not to a build directory, so verification has two stages.
    ```sh
    pluginkit -m -p com.apple.quicklook.thumbnail
    pluginkit -m -p com.apple.quicklook.preview
-   pluginkit -m -p com.apple.spotlight-importer
+   pluginkit -m -p com.apple.spotlight.import
    ```
 
    Each line should show the extension's bundle id with a `+` (enabled).
@@ -126,3 +130,31 @@ declaration is live through LaunchServices — and imports "with no
 plugIn", the honest ad-hoc-build result: the SpotlightImporter is not
 registered, so attribute extraction is verified by the same
 `SpotlightRecordTests` the importer maps from.
+
+### 2026-11-20 (ad-hoc release build, corrections)
+
+The 2026-11-19 entry blamed ad-hoc signing for the missing registration.
+That was wrong. Three bugs in the targets themselves were the cause:
+
+- **The extensions weren't sandboxed** (empty entitlements), so pluginkit
+  refused all three. With `app-sandbox` on, an ad-hoc build registers
+  the Quick Look thumbnail and preview (`pluginkit -m -v` shows them as
+  elected, `+`). `qlmanage -t` then produces the thumbnail through
+  `QuickLookThumbnail`.
+- **The Spotlight importer used the wrong extension point**
+  (`com.apple.spotlight-importer`). The real one is
+  `com.apple.spotlight.import`.
+- **The importer didn't declare `CSSupportedContentTypes`.**
+
+With all three fixed, `pluginkit -m -v -p com.apple.spotlight.import`
+lists `com.example.arbor.SpotlightImporter` as elected.
+
+What is **not** confirmed on this machine is mds actually launching the
+importer. After the containing app has launched once, `mdimport` and a
+freshly created file still left `kMDItemTitle`/`kMDItemTextContent`
+empty, and no importer process started. `mdutil -s` reports an unknown
+indexing state for the home volume, so this machine can't settle it.
+Re-check under Developer ID signing. `mdimport -t -d2` always reports
+"with no plugIn" for app-extension importers, because it only runs
+legacy `.mdimporter` bundles, so don't use it for this check.
+`SpotlightRecordTests` still covers the attribute extraction.

@@ -279,6 +279,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.QuickLookThumbnail
     entitlements:
       path: Extensions/QuickLookThumbnail/QuickLookThumbnail.entitlements
+      properties:
+        # macOS loads app extensions only when they are sandboxed;
+        # pluginkit ignores an unsandboxed one whatever its signature.
+        com.apple.security.app-sandbox: true
     sources:
       - Extensions/QuickLookThumbnail
     dependencies:
@@ -310,6 +314,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.QuickLookPreview
     entitlements:
       path: Extensions/QuickLookPreview/QuickLookPreview.entitlements
+      properties:
+        # macOS loads app extensions only when they are sandboxed;
+        # pluginkit ignores an unsandboxed one whatever its signature.
+        com.apple.security.app-sandbox: true
     sources:
       - Extensions/QuickLookPreview
     dependencies:
@@ -342,6 +350,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).arbor.SpotlightImporter
     entitlements:
       path: Extensions/SpotlightImporter/SpotlightImporter.entitlements
+      properties:
+        # macOS loads app extensions only when they are sandboxed;
+        # pluginkit ignores an unsandboxed one whatever its signature.
+        com.apple.security.app-sandbox: true
     sources:
       - Extensions/SpotlightImporter
     dependencies:
@@ -363,8 +375,12 @@ targets:
               - com.arbor.map
             LSTypeIsPackage: true
         NSExtension:
-          NSExtensionPointIdentifier: com.apple.spotlight-importer
+          NSExtensionPointIdentifier: com.apple.spotlight.import
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SpotlightImporter
+          # The content types Spotlight routes to this importer.
+          NSExtensionAttributes:
+            CSSupportedContentTypes:
+              - com.arbor.map
 schemes:
   Arbor:
     build:
