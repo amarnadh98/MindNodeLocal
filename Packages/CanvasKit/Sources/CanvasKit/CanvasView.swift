@@ -158,6 +158,11 @@ public final class CanvasView: NSView {
     /// lives in CanvasView+Pan.swift.
     var spacePan = SpacePanState()
 
+    /// The node under the pointer (SPEC §6.2): hovering it reveals its
+    /// Node Well "+" without a click. The tracking + grace-zone logic
+    /// and every update live in CanvasView+Hover.swift.
+    var hoverNodeID: String?
+
     /// M3's decoration surface closures + highlight state; see
     /// CanvasView+Decorations.swift.
     let decorationActions = DecorationActions()
