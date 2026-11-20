@@ -15,4 +15,12 @@ struct AppLaunchTests {
         // just AppKit's default app menu.
         #expect((NSApp.mainMenu?.numberOfItems ?? 0) > 1)
     }
+
+    /// A launch with nothing open must show something: a new map, or the
+    /// first-launch welcome (which offers "New Map").
+    @Test func launchWithNothingOpenStartsANewMap() {
+        #expect(AppDelegate.opensUntitledMap(welcomeShowing: false, isTestHost: false))
+        #expect(!AppDelegate.opensUntitledMap(welcomeShowing: true, isTestHost: false))
+        #expect(!AppDelegate.opensUntitledMap(welcomeShowing: false, isTestHost: true))
+    }
 }

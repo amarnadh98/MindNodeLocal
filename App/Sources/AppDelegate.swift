@@ -48,8 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    /// A launch or Dock click with no window open starts a new map (SPEC
+    /// §2's golden path: "Launch → New map"), except while the welcome is
+    /// up, which offers "New Map" itself.
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
-        false
+        Self.opensUntitledMap(
+            welcomeShowing: welcomeCoordinator.isShowingOrPending, isTestHost: MapDocument.isTestHost)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -792,5 +796,11 @@ extension AppDelegate {
     static func main() {
         NSApplication.shared.delegate = shared
         _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+    }
+
+    /// The hosted test runner opens its own documents; an extra untitled
+    /// window at launch would only get in their way.
+    static func opensUntitledMap(welcomeShowing: Bool, isTestHost: Bool) -> Bool {
+        !welcomeShowing && !isTestHost
     }
 }

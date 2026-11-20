@@ -13,6 +13,13 @@ final class WelcomeCoordinator: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
+    /// Showing now, or about to at this launch. AppKit asks whether to
+    /// open an untitled map before the welcome is on screen, so the seen
+    /// flag decides, not just the window.
+    var isShowingOrPending: Bool {
+        window?.isVisible == true || !UserDefaults.standard.bool(forKey: Self.seenKey)
+    }
+
     /// Shows the welcome once per user (`force` is Help's reopen).
     func showIfNeeded(force: Bool = false) {
         guard force || !UserDefaults.standard.bool(forKey: Self.seenKey) else { return }
