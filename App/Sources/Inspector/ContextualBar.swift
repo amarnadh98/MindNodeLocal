@@ -22,7 +22,7 @@ final class ContextualBarController {
 
     private(set) var bar: NSVisualEffectView?
     private var showTask: Task<Void, Never>?
-    private weak var host: DocumentWindowController?
+    weak var host: DocumentWindowController?
 
     /// The bar's persisted preference (SPEC §6.3: "can be disabled").
     static var isEnabled: Bool {
@@ -105,6 +105,7 @@ final class ContextualBarController {
             max(canvas.bounds.width - size.width - 8, 8))
         bar.setFrameOrigin(NSPoint(x: x, y: y))
         self.bar = bar
+        syncShapeSegment()
         return true
     }
 
@@ -135,13 +136,14 @@ final class ContextualBarController {
         return bar
     }
 
-    /// §6.3's node-selection controls. Shape and fill are popups (the
-    /// shape item's tag is its `NodeShape.allCases` index); B/I are the
-    /// text style toggles; the rest route to the existing first-
-    /// responder actions.
+    /// §6.3's node-selection controls. The leading Box|Line segmented
+    /// control (ADR-0037) is the discoverable shape choice; fill is a
+    /// palette popup; B/I are the text style toggles; the rest route
+    /// to the existing first-responder actions. The full eleven-shape
+    /// list stays in the inspector's Style tab and Format ▸ Style.
     private func buildControls() -> [NSView] {
         guard let host else { return [] }
-        var views: [NSView] = [shapePopup(), fillPopup()]
+        var views: [NSView] = [shapeSegment(), fillPopup()]
         views.append(button("bold", "Bold text", #selector(boldAction)))
         views.append(button("italic", "Italic text", #selector(italicAction)))
         views.append(NSStackView.separator())
@@ -153,27 +155,6 @@ final class ContextualBarController {
         let more = button("ellipsis.circle", "More style options", #selector(moreAction))
         views.append(more)
         return views
-    }
-
-    private func shapePopup() -> NSView {
-        let popup = NSPopUpButton()
-        popup.bezelStyle = .texturedRounded
-        popup.controlSize = .small
-        for (index, shape) in NodeShape.allCases.enumerated() {
-            popup.menu?.addItem(shapeItem(shape, tag: index))
-        }
-        popup.action = #selector(shapeChosen(_:))
-        popup.target = self
-        popup.toolTip = "Node shape"
-        popup.setAccessibilityLabel("Node shape")
-        return popup
-    }
-
-    private func shapeItem(_ shape: NodeShape, tag: Int) -> NSMenuItem {
-        let entry = NSMenuItem(
-            title: InspectorStyleTab.shapeName(shape), action: nil, keyEquivalent: "")
-        entry.tag = tag
-        return entry
     }
 
     private func fillPopup() -> NSView {
@@ -205,11 +186,6 @@ final class ContextualBarController {
     }
 
     // MARK: actions (through the host — one MapStore command each)
-
-    @objc private func shapeChosen(_ sender: NSPopUpButton) {
-        guard let menuItem = sender.selectedItem else { return }
-        host?.applyShapeAction(menuItem)
-    }
 
     /// The fill palette menu: the theme's branch palette, "None", the
     /// recent colors and the system panel route through the inspector

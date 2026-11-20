@@ -110,6 +110,11 @@ final class BuildCaches {
     struct StyleKey: Hashable {
         let level: Int
         let level1Index: Int
+        /// ADR-0037: a stored Box|Line shape override that flips the
+        /// class the level draws resolves through a donor level; the
+        /// donor is part of the key so at most two extra styles per
+        /// level-index pair get resolved and memoized.
+        let donor: ShapeDonor
     }
 
     let theme: Theme
@@ -122,12 +127,19 @@ final class BuildCaches {
         self.variant = variant
     }
 
-    func style(level: Int, level1Index: Int) -> ResolvedNodeStyle {
-        let key = StyleKey(level: level, level1Index: level1Index)
+    /// The resolved level style (F-STY-3), memoized per
+    /// level/branch-index — and per ADR-0037 donor when a node's
+    /// stored shape override flips the Box|Line class, so the recast
+    /// base (the theme's own box/line look) is resolved once too.
+    func style(level: Int, level1Index: Int, shapeOverride: NodeShape? = nil) -> ResolvedNodeStyle {
+        let donor = theme.shapeDonor(override: shapeOverride, level: level, variant: variant)
+        let key = StyleKey(level: level, level1Index: level1Index, donor: donor)
         if let cached = styles[key] {
             return cached
         }
-        let resolved = theme.resolvedStyle(level: level, level1Index: level1Index, variant: variant)
+        let resolved = theme.resolvedStyle(
+            level: level, level1Index: level1Index, variant: variant,
+            overrides: donor == .none ? nil : NodeStylePatch(shape: shapeOverride))
         styles[key] = resolved
         return resolved
     }
@@ -177,9 +189,12 @@ public final class SceneBuildCache {
     }
 
     /// The size-affecting face of a `NodeStylePatch` (ADR-0028): the
-    /// only fields measurement consumes, small enough to live inside
-    /// `SizeKey` on the §11.8 path. `nil` fields inherit from the theme.
+    /// fields measurement consumes directly, plus `shape` — a Box|Line
+    /// flip resolves through a donor level whose padding changes the
+    /// measured size (ADR-0037) — small enough to live inside `SizeKey`
+    /// on the §11.8 path. `nil` fields inherit from the theme.
     struct StyleFingerprint: Hashable {
+        let shape: NodeShape?
         let padding: Double?
         let fontName: String?
         let fontSize: Double?
@@ -189,6 +204,7 @@ public final class SceneBuildCache {
         let maxWidth: Double?
 
         init(_ patch: NodeStylePatch?) {
+            self.shape = patch?.shape
             self.padding = patch?.padding
             self.fontName = patch?.fontName
             self.fontSize = patch?.fontSize
@@ -444,8 +460,11 @@ public enum SceneGeometry {
                 // F-STY-2/F-STY-3: the override seam. Nil-patch nodes
                 // (the overwhelming majority) resolve to the memoized
                 // level style directly — keeping the cross-module call
-                // off the §11.8 fast path.
-                let baseStyle = caches.style(level: info.depth, level1Index: level1Index)
+                // off the §11.8 fast path. The recast base carries the
+                // Box|Line donor look (ADR-0037) before the patch's own
+                // fields land.
+                let baseStyle =
+                    caches.style(level: info.depth, level1Index: level1Index, shapeOverride: node.style?.shape)
                 let resolvedStyle =
                     node.style == nil
                     ? baseStyle
@@ -560,8 +579,10 @@ public enum SceneGeometry {
             // skipped entirely (§11.8 — half the nodes of a big map).
             let children = node.folded ? [] : node.children
             guard !children.isEmpty else { return }
-            // Same nil-patch fast path as the assembly loop.
-            let parentBaseStyle = caches.style(level: parentInfo.level, level1Index: parentInfo.index)
+            // Same nil-patch fast path as the assembly loop, with the
+            // ADR-0037 recast base for a Box|Line flip.
+            let parentBaseStyle =
+                caches.style(level: parentInfo.level, level1Index: parentInfo.index, shapeOverride: node.style?.shape)
             let parentStyle =
                 node.style == nil
                 ? parentBaseStyle

@@ -240,10 +240,14 @@ struct StyleCommandTests {
     }
 
     @Test func sizeAffectingFieldsAreExactlyTheMeasuredInputs() {
-        // The layout-dirty contract (SPEC §11.3): only font/padding/
-        // width fields can move a node's frame.
-        #expect(!NodeStylePatch(shape: .cloud, fill: "#E5484D").affectsMeasuredSize)
-        #expect(!NodeStylePatch(branchColor: "#E5484D", branchWidth: 4).affectsMeasuredSize)
+        // The layout-dirty contract (SPEC §11.3): font/padding/width
+        // fields can move a node's frame — and so can `shape`, because
+        // a Box|Line class flip resolves through a donor level whose
+        // padding changes (ADR-0037). Same-class shape picks
+        // over-mark; §11.3 makes over-marking safe.
+        #expect(NodeStylePatch(shape: .cloud, fill: "#E5484D").affectsMeasuredSize)
+        #expect(
+            !NodeStylePatch(branchColor: "#E5484D", branchWidth: 4).affectsMeasuredSize)
         #expect(NodeStylePatch(padding: 12).affectsMeasuredSize)
         #expect(NodeStylePatch(fontSize: 20).affectsMeasuredSize)
         #expect(NodeStylePatch(fontWeight: 0.4).affectsMeasuredSize)

@@ -137,8 +137,14 @@ final class AutomationRouter {
         if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             model.title = title
         }
-        // Keep the identity the untitled document was created with.
+        // Keep the identity the untitled document was created with —
+        // and its default theme (F-STY-6): an `x-arbor://new` map is a
+        // new document, and an imported outline carries no theme of
+        // its own (ADR-0037).
         model.docID = document.model.docID
+        if model.theme == nil {
+            model.theme = document.model.theme
+        }
         document.store.replaceModel(model)
         document.updateChangeCount(.changeDone)
         NSDocumentController.shared.addDocument(document)

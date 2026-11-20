@@ -801,6 +801,9 @@ extension AppDelegate {
     /// saved).
     func runLaunchTasks() {
         ThemeCatalog.migrateDefaultThemeToStudio()
+        // ADR-0037: the v1 clear is one-shot and "paper" reappeared
+        // after its flag was set; clear the stale default once more.
+        ThemeCatalog.clearStalePaperDefault()
         AutomationRuntime.start()
         SpotlightIndexer.start()
     }

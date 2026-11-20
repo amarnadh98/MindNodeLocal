@@ -1,6 +1,7 @@
 import AppKit
 import MapCore
 import MapIO
+import MapRender
 
 /// F-ONB-1's sample map: the tutorial that teaches by doing. Every text
 /// is original to Arbor; every branch names a real shortcut the app
@@ -28,7 +29,10 @@ enum SampleMap {
     }
 
     /// The tour's content. Level-1 branches are the chapters; their
-    /// children are the "do this now" steps.
+    /// children are the "do this now" steps. `@MainActor` because the
+    /// default-theme lookup is main-actor confined (the catalog reads
+    /// UserDefaults and its own directory listing).
+    @MainActor
     static func buildModel() -> MapModel {
         var model = MapModel.emptyDocument()
         let date = Date()
@@ -127,6 +131,15 @@ enum SampleMap {
                 model.nodes[stepID] = node(stepID, parent: chapter.id, text: step)
                 model.nodes[chapter.id]?.children.append(stepID)
             }
+        }
+        // The tour is a NEW map (F-STY-6): it opens in the user's
+        // default theme rather than rendering as the engine's Paper
+        // fallback — the first map a new user sees should be the
+        // default look (ADR-0037). Paper stays implicit, like
+        // `MapDocument.initialModel`.
+        let themeID = ThemeCatalog.defaultThemeID
+        if themeID != BuiltInThemes.defaultID {
+            model.theme = ThemeSelection(id: themeID)
         }
         return model
     }

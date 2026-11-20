@@ -181,8 +181,7 @@ extension Theme {
 
     /// Resolves the style for a node at `level` on the branch whose
     /// level-1 ancestor has palette index `level1Index` (F-STY-3):
-    /// theme → level style → branch color → (per-node overrides via
-    /// `applyingOverrides`, a later slice).
+    /// theme → level style → branch color → per-node overrides.
     public func resolvedStyle(
         level: Int,
         level1Index: Int,
@@ -190,7 +189,11 @@ extension Theme {
         overrides: NodeStylePatch? = nil
     ) -> ResolvedNodeStyle {
         let scheme = scheme(for: variant)
-        let levelStyle = scheme.levels.style(forLevel: level)
+        let levelStyle = Self.recast(
+            scheme.levels.style(forLevel: level),
+            override: overrides?.shape,
+            donor: shapeDonor(override: overrides?.shape, level: level, variant: variant),
+            levels: scheme.levels)
         let branchColor = paletteColor(level1Index: level1Index, in: scheme)
         let textColor = ThemeHex.color(levelStyle.textColor) ?? PaperTheme.color(fromHex: 0x1C1C1E)
 
@@ -254,6 +257,63 @@ extension Theme {
                 minWidth: CGFloat(levelStyle.minWidth ?? 0),
                 maxWidth: CGFloat(levelStyle.maxWidth)),
             variant: variant)
+    }
+
+    // MARK: the Box|Line class flip (ADR-0037)
+
+    /// Which donor level a stored shape override selects for a node at
+    /// `level` (ADR-0037): the Box|Line control persists ONLY a
+    /// `shape`, so flipping the class the level style draws has to
+    /// carry the looks that make the choice read as its class — a
+    /// bare `shape` swap would draw a filled rectangle with no line (a
+    /// "Line" that lost its line) or an outlined box with the
+    /// underline level's cramped padding (a "Box" nobody would
+    /// recognize).
+    ///
+    /// - `.box`: a background shape on an underline level — the
+    ///   level-1 style's fill, border, corner radius and padding (a
+    ///   sensible filled box), keeping the node's own typography and
+    ///   widths.
+    /// - `.line`: `.underline` on a box level — the level-3+ style's
+    ///   border and padding, i.e. text on a line in the branch color,
+    ///   the theme's own underline look.
+    /// - `.none`: same-class or absent overrides keep the level style.
+    public func shapeDonor(override: NodeShape?, level: Int, variant: ThemeVariant) -> ShapeDonor {
+        guard let override else { return .none }
+        let levelShape = scheme(for: variant).levels.style(forLevel: level).shape
+        if !levelShape.drawsBackground, override.drawsBackground { return .box }
+        if levelShape.drawsBackground, override == .underline { return .line }
+        return .none
+    }
+
+    /// `base`'s shape, fill, border, radius and padding become the
+    /// donor's; font, text color, width bounds and shadows stay the
+    /// node's own level's. A patch's explicit fill/border/padding
+    /// still win afterwards, in `applyingOverrides`.
+    static func recast(
+        _ base: ThemeLevelStyle, override: NodeShape?, donor: ShapeDonor, levels: ThemeLevels
+    ) -> ThemeLevelStyle {
+        switch donor {
+        case .none:
+            return base
+        case .box:
+            return Self.recast(base, to: override ?? base.shape, donor: levels.level1)
+        case .line:
+            return Self.recast(base, to: .underline, donor: levels.level3Plus)
+        }
+    }
+
+    private static func recast(
+        _ base: ThemeLevelStyle, to shape: NodeShape, donor: ThemeLevelStyle
+    ) -> ThemeLevelStyle {
+        var style = base
+        style.shape = shape
+        style.fill = donor.fill
+        style.border = donor.border
+        style.cornerRadius = donor.cornerRadius
+        style.paddingWidth = donor.paddingWidth
+        style.paddingHeight = donor.paddingHeight
+        return style
     }
 
     /// The document's stored theme overrides (SPEC §8.2

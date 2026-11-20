@@ -102,10 +102,17 @@ final class MapDocument: NSDocument {
     /// Adopts an imported (foreign-format) model: replaces the store,
     /// refreshes the package meta to the imported document's id, and
     /// leaves the document untitled and edited (SPEC §5.17: imports
-    /// become a new Arbor document).
+    /// become a new Arbor document). A foreign file carries no Arbor
+    /// theme, so the import keeps the untitled document's default
+    /// theme (F-STY-6) instead of silently rendering as the engine's
+    /// Paper fallback (ADR-0037).
     func adoptImportedModel(_ imported: MapModel) {
-        store.replaceModel(imported)
-        meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: imported.docID)
+        var model = imported
+        if model.theme == nil {
+            model.theme = store.model.theme
+        }
+        store.replaceModel(model)
+        meta = PackageMeta(appVersion: AppIdentity.appVersion, docID: model.docID)
         packageWrapper = nil
     }
 

@@ -603,15 +603,24 @@ extension DocumentWindowController {
     /// returning it. `inheritingSide`: a sibling or inserted parent
     /// copies the anchor's pinned side (F-LAY-1), so it lands on the
     /// same side of the balanced map; a child keeps no pin.
+    /// `shapeFor` is the ADR-0037 creation default, per anchor (nil =
+    /// the theme's level style decides): a sibling inherits the
+    /// anchor's explicit shape, a child copies the last sibling with
+    /// one.
     @discardableResult
     func addCommand(
-        inheritingSide: Bool = false, _ make: (String, Node) -> MapCommand
+        inheritingSide: Bool = false,
+        shapeFor: ((String) -> NodeShape?)? = nil,
+        _ make: (String, Node) -> MapCommand
     ) -> String? {
         let anchors = selectedIDs
         let nodes = anchors.map { anchor in
             var node = Node(id: UUID().uuidString)
             if inheritingSide {
                 node.side = store?.model.nodes[anchor]?.side
+            }
+            if let shape = shapeFor?(anchor) {
+                node.style = NodeStylePatch(shape: shape)
             }
             return node
         }

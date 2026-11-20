@@ -197,6 +197,20 @@ public struct ThemeLevelStyle: Codable, Sendable, Hashable {
     }
 }
 
+/// Which donor level a stored Box|Line shape override resolves through
+/// (ADR-0037). Public so the scene's style cache can key off the same
+/// buckets the theme resolver uses — see `Theme.shapeDonor`.
+public enum ShapeDonor: String, Codable, Sendable, Hashable {
+    /// The level's own style (no override, or a same-class one).
+    case none
+    /// The level-1 style's box look (a background shape on an
+    /// underline level).
+    case box
+    /// The level-3+ style's underline look (`.underline` on a box
+    /// level).
+    case line
+}
+
 /// The four level styles every theme defines (F-STY-3): root, level 1,
 /// level 2, level 3+.
 public struct ThemeLevels: Codable, Sendable, Hashable {

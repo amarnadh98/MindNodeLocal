@@ -54,19 +54,25 @@ extension DocumentWindowController {
         case .none:
             break
         case .child:
-            createAfterCommit(anchor: id, inheritingSide: false) {
+            createAfterCommit(anchor: id, inheritingSide: false, shape: childCreationShape(parent: id)) {
                 .addChild(parent: $0, index: nil, node: $1)
             }
         case .siblingBelow:
-            createAfterCommit(anchor: id, inheritingSide: true) {
+            createAfterCommit(
+                anchor: id, inheritingSide: true, shape: siblingCreationShape(anchor: id)
+            ) {
                 .addSibling(anchor: $0, before: false, node: $1)
             }
         case .siblingAbove:
-            createAfterCommit(anchor: id, inheritingSide: true) {
+            createAfterCommit(
+                anchor: id, inheritingSide: true, shape: siblingCreationShape(anchor: id)
+            ) {
                 .addSibling(anchor: $0, before: true, node: $1)
             }
         case .insertParent:
-            freshInsertedParentID = createAfterCommit(anchor: id, inheritingSide: true) {
+            // The inserted parent keeps the theme's level style for its
+            // new depth (ADR-0037 leaves it to the theme).
+            freshInsertedParentID = createAfterCommit(anchor: id, inheritingSide: true, shape: nil) {
                 .insertParent(anchor: $0, node: $1)
             }
         }
@@ -136,13 +142,19 @@ extension DocumentWindowController {
     /// wherever the balanced layout's unpinned alternation would put
     /// it. A new child keeps no pin — only a root's children carry
     /// one, and the Node Well pins those by the clicked side itself.
+    /// `shape` is the ADR-0037 creation default (nil = the theme's
+    /// level style decides): side and shape compose, so a new node can
+    /// inherit BOTH its anchor's side and its shape.
     @discardableResult
     private func createAfterCommit(
-        anchor: String, inheritingSide: Bool, _ make: (String, Node) -> MapCommand
+        anchor: String, inheritingSide: Bool, shape: NodeShape?, _ make: (String, Node) -> MapCommand
     ) -> String {
         var node = Node(id: UUID().uuidString)
         if inheritingSide {
             node.side = store?.model.nodes[anchor]?.side
+        }
+        if let shape {
+            node.style = NodeStylePatch(shape: shape)
         }
         perform(make(anchor, node)) { _ in [node.id] }
         canvas.beginEditing(nodeID: node.id)
@@ -207,7 +219,7 @@ extension DocumentWindowController {
             ai.acceptAll()
             return
         }
-        addCommand { .addChild(parent: $0, index: nil, node: $1) }
+        addCommand(shapeFor: childCreationShape) { .addChild(parent: $0, index: nil, node: $1) }
     }
 
     @objc func addSiblingBelowAction(_ sender: Any?) {
@@ -220,14 +232,18 @@ extension DocumentWindowController {
             canvas.beginEditing(nodeID: id)
             return
         }
-        addCommand(inheritingSide: true) { .addSibling(anchor: $0, before: false, node: $1) }
+        addCommand(inheritingSide: true, shapeFor: siblingCreationShape) {
+            .addSibling(anchor: $0, before: false, node: $1)
+        }
     }
 
     /// Always creates a sibling below the selection, without ⏎'s
     /// enter-edit rule — for callers with no keyboard context, such as
     /// VoiceOver's Add Sibling action and the toolbar button.
     @objc func addSiblingBelow(_ sender: Any?) {
-        addCommand(inheritingSide: true) { .addSibling(anchor: $0, before: false, node: $1) }
+        addCommand(inheritingSide: true, shapeFor: siblingCreationShape) {
+            .addSibling(anchor: $0, before: false, node: $1)
+        }
     }
 
     @objc func addSiblingAboveAction(_ sender: Any?) {
@@ -235,7 +251,9 @@ extension DocumentWindowController {
             canvas.commitEditing(next: .siblingAbove)
             return
         }
-        addCommand(inheritingSide: true) { .addSibling(anchor: $0, before: true, node: $1) }
+        addCommand(inheritingSide: true, shapeFor: siblingCreationShape) {
+            .addSibling(anchor: $0, before: true, node: $1)
+        }
     }
 
     @objc func insertParentAction(_ sender: Any?) {
