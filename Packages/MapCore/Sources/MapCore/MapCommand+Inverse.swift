@@ -147,6 +147,61 @@ extension MapCommand {
         case .setSummaries:
             return .setSummaries(model.summaries)
 
+        case .addConnection(let connection):
+            if let existing = model.connections?.first(where: { $0.id == connection.id }) {
+                return .editConnection(id: connection.id, connection: existing)
+            }
+            return .removeConnection(id: connection.id)
+
+        case .removeConnection(let id):
+            guard model.connections?.contains(where: { $0.id == id }) == true else {
+                return .group(name: "Delete Connection", commands: [])
+            }
+            // A fine-grained remove whose exact restore is the whole
+            // list snapshot: `addConnection` re-appends at the end, which
+            // would reorder the list when the removed entry wasn't last.
+            return .setConnections(model.connections)
+
+        case .editConnection(let id, _):
+            guard let existing = model.connections?.first(where: { $0.id == id }) else {
+                throw ArborError.commandFailure("missing connection \(id)")
+            }
+            return .editConnection(id: id, connection: existing)
+
+        case .addBoundary(let boundary):
+            if let existing = model.boundaries?.first(where: { $0.id == boundary.id }) {
+                return .editBoundary(id: boundary.id, boundary: existing)
+            }
+            return .removeBoundary(id: boundary.id)
+
+        case .removeBoundary(let id):
+            guard model.boundaries?.contains(where: { $0.id == id }) == true else {
+                return .group(name: "Delete Boundary", commands: [])
+            }
+            return .setBoundaries(model.boundaries)
+
+        case .editBoundary(let id, _):
+            guard let existing = model.boundaries?.first(where: { $0.id == id }) else {
+                throw ArborError.commandFailure("missing boundary \(id)")
+            }
+            return .editBoundary(id: id, boundary: existing)
+
+        case .addSummary(let summary):
+            if let existing = model.summaries?.first(where: { $0.id == summary.id }) {
+                // There is no `editSummary` command, so the restore is a
+                // two-step group (remove the new value, add the snapshot).
+                return .group(
+                    name: "Add Summary",
+                    commands: [.removeSummary(id: summary.id), .addSummary(existing)])
+            }
+            return .removeSummary(id: summary.id)
+
+        case .removeSummary(let id):
+            guard model.summaries?.contains(where: { $0.id == id }) == true else {
+                return .group(name: "Delete Summary", commands: [])
+            }
+            return .setSummaries(model.summaries)
+
         case .recolorBranches(let assignments):
             // Exact snapshot of the pre-state's indices (nil included).
             let snapshot = try assignments.map { assignment -> PaletteIndexAssignment in

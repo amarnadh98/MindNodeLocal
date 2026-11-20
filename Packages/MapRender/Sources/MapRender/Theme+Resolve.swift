@@ -131,4 +131,139 @@ extension Theme {
         return ThemeHex.color(raw)
             ?? PaperTheme.color(fromHex: PaperTheme.paletteHexes[index % PaperTheme.paletteHexes.count])
     }
+
+    /// A connection's resolved style (F-REL-1): the theme's connection
+    /// placeholder (§7.2: 1.5 pt, dashed, arrow at the end) with the
+    /// document's per-connection overrides folded over it. `nil` style
+    /// fields keep the theme default.
+    public func resolvedConnectionStyle(
+        variant: ThemeVariant, overrides: ConnectionStyle? = nil
+    ) -> ResolvedConnectionStyle {
+        let base = connection
+        var resolved = ResolvedConnectionStyle(
+            color: ThemeHex.color(base.color)
+                ?? PaperTheme.color(fromHex: 0x8E8E93),
+            width: CGFloat(base.width),
+            dash: base.dash,
+            arrowheads: base.arrowEnd ? .end : .none,
+            lineStyle: .curve)
+        if let overrides {
+            resolved.apply(overrides)
+        }
+        return resolved
+    }
+
+    /// A boundary's resolved style (F-REL-2): the theme placeholder
+    /// (§7.2: 1 pt stroke at 60%, tinted fill, 16 pt radius, 14 pt
+    /// padding) with the boundary's stored style folded over it. A
+    /// boundary reuses `ConnectionStyle` on disk; its `lineStyle`
+    /// selects the outline shape (`.curve` = organic, §5.5 F-REL-2).
+    public func resolvedBoundaryStyle(
+        variant: ThemeVariant, overrides: ConnectionStyle? = nil
+    ) -> ResolvedBoundaryStyle {
+        let base = boundary
+        let stroke = ThemeHex.color(base.strokeColor) ?? PaperTheme.color(fromHex: 0x8E8E93)
+        let tint = ThemeHex.color(base.fillColor) ?? stroke
+        var resolved = ResolvedBoundaryStyle(
+            stroke: stroke.copy(alpha: 0.6) ?? stroke,
+            fill: tint.copy(alpha: 0.10) ?? tint,
+            lineWidth: 1,
+            dash: false,
+            cornerRadius: CGFloat(base.cornerRadius),
+            padding: CGFloat(base.padding),
+            organic: false)
+        if let overrides {
+            resolved.apply(overrides)
+        }
+        return resolved
+    }
+}
+
+/// A connection's flattened style after theme + per-connection
+/// overrides (F-REL-1). Render types carry `CGColor`; not `Sendable`.
+public struct ResolvedConnectionStyle {
+    public var color: CGColor
+    public var width: CGFloat
+    public var dash: Bool
+    public var arrowheads: Arrowheads
+    public var lineStyle: ConnectionLineStyle
+
+    public init(
+        color: CGColor, width: CGFloat, dash: Bool, arrowheads: Arrowheads,
+        lineStyle: ConnectionLineStyle
+    ) {
+        self.color = color
+        self.width = width
+        self.dash = dash
+        self.arrowheads = arrowheads
+        self.lineStyle = lineStyle
+    }
+
+    /// Folds a stored `ConnectionStyle` (only the non-nil fields) over
+    /// this style.
+    public mutating func apply(_ overrides: ConnectionStyle) {
+        if let hex = overrides.color, let color = ThemeHex.color(hex) {
+            self.color = color
+        }
+        if let width = overrides.width {
+            self.width = CGFloat(width)
+        }
+        if let dash = overrides.dash {
+            self.dash = dash
+        }
+        if let arrowheads = overrides.arrowheads {
+            self.arrowheads = arrowheads
+        }
+        if let lineStyle = overrides.lineStyle {
+            self.lineStyle = lineStyle
+        }
+    }
+}
+
+/// A boundary's flattened style after theme + per-boundary overrides
+/// (F-REL-2).
+public struct ResolvedBoundaryStyle {
+    public var stroke: CGColor
+    public var fill: CGColor
+    public var lineWidth: CGFloat
+    public var dash: Bool
+    public var cornerRadius: CGFloat
+    public var padding: CGFloat
+    /// `true` draws the smoothed hull instead of the rounded rect.
+    public var organic: Bool
+
+    public init(
+        stroke: CGColor, fill: CGColor, lineWidth: CGFloat, dash: Bool,
+        cornerRadius: CGFloat, padding: CGFloat, organic: Bool
+    ) {
+        self.stroke = stroke
+        self.fill = fill
+        self.lineWidth = lineWidth
+        self.dash = dash
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.organic = organic
+    }
+
+    /// Folds a stored boundary style over this style. The reused
+    /// `ConnectionStyle.lineStyle` carries the outline shape:
+    /// `.curve` = organic (F-REL-2), `.straight`/nil = rounded.
+    public mutating func apply(_ overrides: ConnectionStyle) {
+        if let hex = overrides.color, let color = ThemeHex.color(hex) {
+            // §7.2's alphas are part of the boundary look, not the
+            // color: an override recolors but keeps 60% stroke / 10%
+            // fill.
+            stroke = color.copy(alpha: 0.6) ?? color
+            fill = color.copy(alpha: 0.10) ?? color
+        }
+        if let width = overrides.width {
+            lineWidth = CGFloat(width)
+        }
+        if let dash = overrides.dash {
+            self.dash = dash
+        }
+        if let lineStyle = overrides.lineStyle {
+            organic = lineStyle == .curve
+        }
+    }
 }

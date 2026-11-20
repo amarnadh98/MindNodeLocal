@@ -38,11 +38,36 @@ public struct SceneBranch {
 }
 
 /// A whole map prepared for rendering: laid out in model space (y grows
-/// down, matching the canvas and `TreeLayout` conventions).
+/// down, matching the canvas and `TreeLayout` conventions), plus the
+/// cross-node relation overlays (F-REL-1/2/3) derived from the same
+/// frames.
 public struct CanvasScene {
     public let nodes: [String: SceneNode]
     public let branches: [SceneBranch]
     public let canvasColor: CGColor
+    /// Cross-links (F-REL-1), between node-edge anchors.
+    public let connections: [SceneConnection]
+    /// Grouping outlines (F-REL-2), around member subtrees.
+    public let boundaries: [SceneBoundary]
+    /// Summary braces (F-REL-3); the summary node itself is an ordinary
+    /// scene node.
+    public let summaries: [SceneSummary]
+
+    public init(
+        nodes: [String: SceneNode],
+        branches: [SceneBranch],
+        canvasColor: CGColor,
+        connections: [SceneConnection] = [],
+        boundaries: [SceneBoundary] = [],
+        summaries: [SceneSummary] = []
+    ) {
+        self.nodes = nodes
+        self.branches = branches
+        self.canvasColor = canvasColor
+        self.connections = connections
+        self.boundaries = boundaries
+        self.summaries = summaries
+    }
 
     public var bounds: CGRect {
         var result: CGRect = .null
@@ -245,6 +270,10 @@ public enum SceneGeometry {
         let progress = TaskProgress.index(model)
         let tagByID = Dictionary(uniqueKeysWithValues: (model.tags ?? []).map { ($0.id, $0) })
         let hasTagDefinitions = !tagByID.isEmpty
+        // The overlays (F-REL) need each node's root and that root's
+        // layout axis: summary braces go right (below for org charts).
+        var rootAxes: [String: LayoutAxis] = [:]
+        var rootOf: [String: String] = [:]
 
         for rootID in model.roots {
             guard model.nodes[rootID] != nil else { continue }
@@ -283,16 +312,32 @@ public enum SceneGeometry {
             let treeMinY = frames.values.map(\.minY).min() ?? (frames[rootID]?.minY ?? 0)
             let offsetY = cursorY - treeMinY
             let rootLevel1Index = levelOneIndices(model: model, rootID: rootID, theme: theme)
+            let axis: LayoutAxis =
+                structure == .orgDown || structure == .orgUp ? .vertical : .horizontal
+            rootAxes[rootID] = axis
+
+            // Final placed frames: auto layout + root stacking + manual
+            // offsets. The summary placement (F-REL-3, ADR-0026) reads
+            // the range frames from here and nudges the summary node
+            // beyond the brace; the node pass below folds the nudge in.
+            var placed: [String: CGRect] = [:]
+            for (id, frame) in frames {
+                let offset = offsets[id] ?? .zero
+                placed[id] = frame.offsetBy(dx: offset.x, dy: offsetY + offset.y)
+                rootOf[id] = rootID
+            }
+            let adjustments = summaryAdjustments(
+                model: model, placed: placed, axis: axis)
 
             var bottom = (frames[rootID]?.maxY ?? 0)
-            for (id, frame) in frames {
+            for (id, frame) in placed {
                 guard let node = model.nodes[id] else { continue }
                 let info = ancestry[id] ?? AncestryInfo(depth: 0, level1AncestorID: id)
-                let offset = offsets[id] ?? .zero
-                let translated = frame.offsetBy(dx: offset.x, dy: offsetY + offset.y)
                 let level1Index =
                     info.depth == 0 ? 0 : rootLevel1Index[info.level1AncestorID] ?? 0
                 let title = id == editingTitle?.id ? editingTitle?.title : node.title
+                let adjust = adjustments[id] ?? .zero
+                let translated = frame.offsetBy(dx: adjust.x, dy: adjust.y)
                 nodes[id] = SceneNode(
                     id: id,
                     frame: translated,
@@ -316,10 +361,21 @@ public enum SceneGeometry {
             cursorY = bottom + rootStackGap
         }
 
+        // The relation overlays (F-REL-1/2/3): pure functions of the
+        // placed frames — recomputed on every build, so boundaries
+        // follow layout and braces track their ranges through folds,
+        // moves and undos alike.
+        let overlays = RelationGeometry.build(
+            model: model, theme: theme, variant: variant, nodes: nodes,
+            rootAxes: rootAxes, rootOf: rootOf, measurer: measurer)
+
         return CanvasScene(
             nodes: nodes,
             branches: branches,
-            canvasColor: theme.canvasColor(for: variant))
+            canvasColor: theme.canvasColor(for: variant),
+            connections: overlays.connections,
+            boundaries: overlays.boundaries,
+            summaries: overlays.summaries)
     }
 
     /// The structure of a root's tree: the root's own override, else the

@@ -23,6 +23,19 @@ public final class CanvasAccessibility {
     /// land in M3, so this hook stays unset until then.
     public var taskProgressText: ((String) -> String?)?
 
+    /// F-REL-2/3: extra value text for a node inside a boundary or a
+    /// summarized range ("in boundary <title>", "summarized"). Set by
+    /// the host, which owns the model.
+    public var relationValueText: ((String) -> String?)?
+
+    /// F-REL-1: the node's connection peers — each becomes a
+    /// "Connected to <title>" custom action on the row.
+    public var connectionPeers: ((String) -> [(id: String, title: String)])?
+
+    /// Performs the "Connected to" jump (F-REL-1): the host selects and
+    /// reveals the peer node.
+    public var onSelectConnectionPeer: ((String) -> Void)?
+
     /// The per-node row elements, rebuilt lazily after scene or source
     /// model changes; frames stay live through the camera, so no
     /// rebuild is needed for pan or zoom.

@@ -92,6 +92,28 @@ public indirect enum MapCommand: Sendable, Equatable {
     case setBoundaries(_ boundaries: [Boundary]?)
     /// Replaces the whole summary list (see `setConnections`).
     case setSummaries(_ summaries: [Summary]?)
+    /// Adds `connection` (F-REL-1), or replaces the existing connection
+    /// with the same id — the fine-grained creation/edit path, so one
+    /// connection never rewinds the whole list on undo.
+    case addConnection(_ connection: Connection)
+    /// Removes the connection with `id` (⌫ on a selected connection);
+    /// a no-op when the id is absent.
+    case removeConnection(id: String)
+    /// Replaces the whole connection value carrying `id` — the
+    /// label/control/style edit path (one connection, one undo step).
+    case editConnection(id: String, connection: Connection)
+    /// Adds `boundary` (F-REL-2), or replaces the existing boundary with
+    /// the same id.
+    case addBoundary(_ boundary: Boundary)
+    /// Removes the boundary with `id`; a no-op when absent.
+    case removeBoundary(id: String)
+    /// Replaces the whole boundary value carrying `id` (title/style).
+    case editBoundary(id: String, boundary: Boundary)
+    /// Adds `summary` (F-REL-3), or replaces the existing summary with
+    /// the same id.
+    case addSummary(_ summary: Summary)
+    /// Removes the summary with `id`; a no-op when absent.
+    case removeSummary(id: String)
     /// Assigns persistent branch palette indices (F-STY-8 "Recolor
     /// Branches", ADR-0009). Each assignment sets `paletteIndex` — `nil`
     /// clears it back to positional fallback. Exact inverse: the inverse
@@ -164,6 +186,12 @@ public indirect enum MapCommand: Sendable, Equatable {
         case .setFolded: "Fold Node"
         case .setOffset: "Move Node"
         case .setConnections, .setBoundaries, .setSummaries: "Delete Node"
+        case .addConnection, .editConnection: "Add Connection"
+        case .removeConnection: "Delete Connection"
+        case .addBoundary, .editBoundary: "Add Boundary"
+        case .removeBoundary: "Delete Boundary"
+        case .addSummary: "Add Summary"
+        case .removeSummary: "Delete Summary"
         case .recolorBranches: "Recolor Branches"
         case .setTheme: "Set Theme"
         case .setPresentations: "Edit Slides"

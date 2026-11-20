@@ -405,15 +405,17 @@ private final class DragHarness {
     }
 
     /// mouseDown on `id` (its center), selecting it — or a larger
-    /// selection for multi-drags.
-    func grab(_ id: String, selection: Set<String>? = nil) throws {
+    /// selection for multi-drags. `shift` pre-arms the F-REL-1
+    /// connection drag (⇧ held at grab time).
+    func grab(_ id: String, selection: Set<String>? = nil, shift: Bool = false) throws {
         let point = try center(of: id)
         view.setSelection(selection ?? [id])
         view.drag = .pending(
             PendingDrag(
                 grabbedID: id,
                 startView: screen(point),
-                startModel: point))
+                startModel: point,
+                shiftDown: shift))
     }
 
     func drag(to modelPoint: CGPoint) {
@@ -607,15 +609,16 @@ struct CanvasDragInteractionTests {
         #expect(store.model.nodes["root"]?.children == ["branch-0", "branch-2"])
     }
 
-    @Test func spaceDropIsANoOpToday() throws {
+    @Test func spaceDropCreatesAConnection() throws {
         let harness = DragHarness(model: sceneModel())
-        var dropCount = 0
+        var dropped: MapCommand?
         harness.view.onDrop = { command, _ in
-            if command != nil { dropCount += 1 }
+            if let command { dropped = command }
         }
 
-        // Space held during the drag: connection drop (TODO: no command
-        // exists yet, so nothing is performed).
+        // Space held during the drag (F-REL-1): the drop over another
+        // node is ONE addConnection command — one undo step — and the
+        // dragged node stays where it was (no reparent).
         try harness.grab("branch-1")
         let start = try harness.center(of: "branch-1")
         harness.drag(to: CGPoint(x: start.x + 5, y: start.y + 5))
@@ -623,7 +626,63 @@ struct CanvasDragInteractionTests {
         let end = try harness.center(of: "branch-0")
         harness.drag(to: end)
         harness.drop(at: end)
-        #expect(dropCount == 0)
+
+        var store = MapStore(model: harness.view.dragModel ?? sceneModel())
+        let before = store.model
+        if let command = dropped {
+            try store.perform(command)
+        }
+        guard case .addConnection(let connection)? = dropped else {
+            Issue.record("expected an addConnection drop, got \(String(describing: dropped))")
+            return
+        }
+        #expect(Set([connection.from, connection.to]) == Set(["branch-1", "branch-0"]))
+        #expect(store.model.connections?.count == 1)
+        // One undo step back to the pre-drop model.
+        store.undoManager.undo()
+        #expect(store.model == before)
+
+        // Dropping on the dragged node itself (or empty canvas) still
+        // performs nothing.
+        dropped = nil
+        try harness.grab("branch-1")
+        harness.drag(to: CGPoint(x: start.x + 5, y: start.y + 5))
+        #expect(harness.view.handleDragKey(" ", down: true))
+        harness.drag(to: start)
+        harness.drop(at: start)
+        #expect(dropped == nil)
+    }
+
+    @Test func shiftDragDropsAConnection() throws {
+        let harness = DragHarness(model: sceneModel())
+        var dropped: MapCommand?
+        harness.view.onDrop = { command, _ in
+            if let command { dropped = command }
+        }
+
+        // ⇧ held from the grab (F-REL-1): node-to-node drop connects.
+        try harness.grab("branch-1", shift: true)
+        let start = try harness.center(of: "branch-1")
+        harness.drag(to: CGPoint(x: start.x + 5, y: start.y + 5))
+        let end = try harness.center(of: "branch-0")
+        harness.drag(to: end)
+        harness.drop(at: end)
+        guard case .addConnection(let connection)? = dropped else {
+            Issue.record("expected an addConnection drop, got \(String(describing: dropped))")
+            return
+        }
+        #expect(Set([connection.from, connection.to]) == Set(["branch-1", "branch-0"]))
+
+        // Already connected: the same drop performs nothing. Apply the
+        // first command to the drag model first.
+        var model = try #require(harness.view.dragModel)
+        try MapCommand.addConnection(connection).apply(to: &model)
+        harness.view.dragModel = model
+        dropped = nil
+        try harness.grab("branch-1", shift: true)
+        harness.drag(to: end)
+        harness.drop(at: end)
+        #expect(dropped == nil)
     }
 
     @Test func draggingNearTheEdgeAutoScrolls() throws {

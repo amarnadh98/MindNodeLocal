@@ -142,6 +142,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "Paste with Style",
                         #selector(NSText.paste(_:)),
                         "v", modifiers: [.command, .option, .shift]),
+                    // F-REL-5: the selected node's cross-map link
+                    // (x-arbor://open?doc=…&node=…).
+                    item(
+                        "Copy Node Link",
+                        #selector(DocumentWindowController.copyNodeLinkAction(_:)),
+                        "c", modifiers: [.command, .control]),
                     .separator(),
                     // F-FOC-3 (SPEC §6.1 Find): the standard find bar
                     // with replace, next/previous (wrap-around) and
@@ -202,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         "d", modifiers: [.command, .shift]),
                     .separator(),
                 ]))
+        mainMenu.addItem(insertMenuItem())
         mainMenu.addItem(
             menu(
                 "Select",
@@ -249,6 +256,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .separator(),
                     item(
                         "Jump to Selection", #selector(CanvasView.jumpToSelectionAction(_:)), "j"),
+                    // F-REL-1: with a connection selected, jump to its
+                    // endpoints.
+                    item(
+                        "Jump to Connection Start",
+                        #selector(CanvasView.jumpToConnectionStartAction(_:)),
+                        "l", modifiers: [.command, .control]),
+                    item(
+                        "Jump to Connection End",
+                        #selector(CanvasView.jumpToConnectionEndAction(_:)),
+                        "l", modifiers: [.command, .shift]),
                     item(
                         "Deselect", #selector(DocumentWindowController.deselectAction(_:)),
                         "\u{1b}", modifiers: []),
@@ -469,6 +486,33 @@ extension AppDelegate {
                 #selector(DocumentWindowController.highlightTasksAction(_:)),
                 ""),
         ]
+    }
+
+    /// Insert (F-REL-1/2/3).
+    private func insertMenuItem() -> NSMenuItem {
+        menu(
+            "Insert",
+            [
+                // F-REL-1: ⌘L enters connect mode from the single
+                // selection (the next node click creates the
+                // connection); with two selected it connects them.
+                item(
+                    "Connection",
+                    #selector(DocumentWindowController.addConnectionAction(_:)),
+                    "l"),
+                // F-REL-2: a boundary around the selection's
+                // grouped subtrees.
+                item(
+                    "Boundary",
+                    #selector(DocumentWindowController.addBoundaryAction(_:)),
+                    "g", modifiers: [.command, .option]),
+                // F-REL-3: a summary over the selection's sibling
+                // span — the summary node opens for editing.
+                item(
+                    "Summary",
+                    #selector(DocumentWindowController.addSummaryAction(_:)),
+                    "]", modifiers: [.command, .shift]),
+            ])
     }
 
     /// Study (F-STD-1/2/4/6/7, SPEC §6.1).
