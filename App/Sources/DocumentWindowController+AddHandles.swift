@@ -16,7 +16,7 @@ extension DocumentWindowController {
         }
         canvas.setSelection([id])
         var node = Node(id: UUID().uuidString)
-        // ADR-0034: the new child copies the last sibling's explicit
+        // ADR-0037: the new child copies the last sibling's explicit
         // shape, so lines stay lines and boxes stay boxes.
         if let shape = childCreationShape(parent: id) {
             node.style = NodeStylePatch(shape: shape)

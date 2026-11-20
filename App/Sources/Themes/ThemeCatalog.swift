@@ -101,7 +101,7 @@ final class ThemeCatalog {
     /// one-shot flag and prove the migration against a stale domain.
     static let stalePaperClearKey = "arbor.defaultThemeStalePaperCleared"
 
-    /// Once more (ADR-0034): the v1 migration's one-shot FLAG made a
+    /// Once more (ADR-0037): the v1 migration's one-shot FLAG made a
     /// stored "paper" immortal — the value was seen back in the
     /// defaults AFTER the flag was set (a pre-Studio build's picker
     /// writing its resolved default), so every new map since opened in

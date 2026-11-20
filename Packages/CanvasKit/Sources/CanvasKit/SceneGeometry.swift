@@ -110,7 +110,7 @@ final class BuildCaches {
     struct StyleKey: Hashable {
         let level: Int
         let level1Index: Int
-        /// ADR-0034: a stored Box|Line shape override that flips the
+        /// ADR-0037: a stored Box|Line shape override that flips the
         /// class the level draws resolves through a donor level; the
         /// donor is part of the key so at most two extra styles per
         /// level-index pair get resolved and memoized.
@@ -128,7 +128,7 @@ final class BuildCaches {
     }
 
     /// The resolved level style (F-STY-3), memoized per
-    /// level/branch-index — and per ADR-0034 donor when a node's
+    /// level/branch-index — and per ADR-0037 donor when a node's
     /// stored shape override flips the Box|Line class, so the recast
     /// base (the theme's own box/line look) is resolved once too.
     func style(level: Int, level1Index: Int, shapeOverride: NodeShape? = nil) -> ResolvedNodeStyle {
@@ -191,7 +191,7 @@ public final class SceneBuildCache {
     /// The size-affecting face of a `NodeStylePatch` (ADR-0028): the
     /// fields measurement consumes directly, plus `shape` — a Box|Line
     /// flip resolves through a donor level whose padding changes the
-    /// measured size (ADR-0034) — small enough to live inside `SizeKey`
+    /// measured size (ADR-0037) — small enough to live inside `SizeKey`
     /// on the §11.8 path. `nil` fields inherit from the theme.
     struct StyleFingerprint: Hashable {
         let shape: NodeShape?
@@ -461,7 +461,7 @@ public enum SceneGeometry {
                 // (the overwhelming majority) resolve to the memoized
                 // level style directly — keeping the cross-module call
                 // off the §11.8 fast path. The recast base carries the
-                // Box|Line donor look (ADR-0034) before the patch's own
+                // Box|Line donor look (ADR-0037) before the patch's own
                 // fields land.
                 let baseStyle =
                     caches.style(level: info.depth, level1Index: level1Index, shapeOverride: node.style?.shape)
@@ -580,7 +580,7 @@ public enum SceneGeometry {
             let children = node.folded ? [] : node.children
             guard !children.isEmpty else { return }
             // Same nil-patch fast path as the assembly loop, with the
-            // ADR-0034 recast base for a Box|Line flip.
+            // ADR-0037 recast base for a Box|Line flip.
             let parentBaseStyle =
                 caches.style(level: parentInfo.level, level1Index: parentInfo.index, shapeOverride: node.style?.shape)
             let parentStyle =

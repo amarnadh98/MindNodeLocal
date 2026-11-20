@@ -14,8 +14,12 @@ enum DocumentImporter {
     }
 
     /// Sniffs the format for `url` by extension (the open panel keys off
-    /// the same registry). `.mindnode` is a package: the importer wants
-    /// its `contents.xml`; every other format reads the raw bytes.
+    /// the same registry). A `.mindnode` file is either layout MindNode
+    /// has shipped: the legacy **directory package** (MindNode 1-2,
+    /// importer wants its `contents.xml`) or the current **stored zip**
+    /// (MindNode 2026+, `Contents.data` protobuf — ADR-0035); the
+    /// importer reads the whole file and sniffs which. Every other
+    /// format reads the raw bytes.
     static func importModel(at url: URL) throws -> MapModel {
         let fileExtension = url.pathExtension.lowercased()
         guard
@@ -28,7 +32,13 @@ enum DocumentImporter {
         }
         let data: Data
         if format.id == DocumentFormats.mindnode.id {
-            data = try Data(contentsOf: url.appendingPathComponent("contents.xml"))
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if isDirectory.boolValue {
+                data = try Data(contentsOf: url.appendingPathComponent("contents.xml"))
+            } else {
+                data = try Data(contentsOf: url)
+            }
         } else {
             data = try Data(contentsOf: url)
         }
@@ -65,16 +75,26 @@ enum DocumentImporter {
         return document
     }
 
-    /// An error alert for a failed import, carrying the importer's own
-    /// message (SPEC §5.17 — including the MindNode OPML fallback hint,
-    /// which `DocumentIOError.errorDescription` renders).
+    /// The alert a failed import shows (SPEC §5.17): the title names
+    /// the file; the detail carries the importer's own message — the
+    /// underlying reason, never just "Import failed". Built as a pure
+    /// function so tests can assert what the user actually reads.
+    @MainActor
+    static func makeImportErrorAlert(for error: Error) -> NSAlert {
+        let alert = NSAlert(error: error)
+        if let url = (error as? ImportContextError)?.url {
+            alert.messageText = "Import failed — \(url.lastPathComponent)"
+        }
+        alert.informativeText =
+            (error as? ImportContextError)?.underlying.localizedDescription
+            ?? error.localizedDescription
+        return alert
+    }
+
+    /// Presents the import-failure sheet on `window` (modal when nil).
     @MainActor
     static func presentImportError(_ error: Error, for window: NSWindow?) {
-        let alert = NSAlert(error: error)
-        alert.messageText = "Import failed"
-        if let url = (error as? ImportContextError)?.url {
-            alert.informativeText = url.lastPathComponent
-        }
+        let alert = makeImportErrorAlert(for: error)
         if let window {
             alert.beginSheetModal(for: window)
         } else {

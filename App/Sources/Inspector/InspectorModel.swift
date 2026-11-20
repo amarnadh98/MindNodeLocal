@@ -115,7 +115,7 @@ final class InspectorModel: ObservableObject {
         return selectedNodes.allSatisfy { $0.storedPatch?.hasOverride(key) == true }
     }
 
-    // MARK: Box or Line (ADR-0034)
+    // MARK: Box or Line (ADR-0037)
 
     /// The selection's Box|Line state: each node's stored shape
     /// override's class, else the theme's level shape; `nil` when the

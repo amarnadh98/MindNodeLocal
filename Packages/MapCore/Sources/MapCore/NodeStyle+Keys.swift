@@ -115,7 +115,7 @@ extension NodeStylePatch {
     /// The keys whose changes can move the node's **measured size**
     /// (font, padding, width floors — and `shape`, because a Box|Line
     /// class flip resolves through a donor level whose padding
-    /// changes, ADR-0034): the layout-dirty set of a
+    /// changes, ADR-0037): the layout-dirty set of a
     /// `setStyle`/`resetStyle` is exactly these (SPEC §11.3); every
     /// other field (colors, borders, branch styling) only repaints.
     /// Same-class shape swaps over-mark — always safe (§11.3).

@@ -50,7 +50,7 @@ struct InspectorStyleTab: View {
 
     // MARK: node section (F-STY-1 shapes)
 
-    /// ADR-0034's Box|Line control: the discoverable two-way shape
+    /// ADR-0037's Box|Line control: the discoverable two-way shape
     /// choice, above the full shape list. One `setStyle` command per
     /// pick over the whole selection (through `model.onStylePatch`,
     /// the same route every row takes); a mixed selection lights no

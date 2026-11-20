@@ -7,7 +7,7 @@ import Testing
 
 @testable import CanvasKit
 
-/// ADR-0034 at the scene level: a stored Box|Line flip resolves
+/// ADR-0037 at the scene level: a stored Box|Line flip resolves
 /// through the theme's donor look in `SceneGeometry` (the recast base
 /// is memoized per donor), in both appearances, for levels 0–3 — and
 /// the donor's padding reaches the measured frame.

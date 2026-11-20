@@ -137,7 +137,7 @@ final class ContextualBarController {
     }
 
     /// §6.3's node-selection controls. The leading Box|Line segmented
-    /// control (ADR-0034) is the discoverable shape choice; fill is a
+    /// control (ADR-0037) is the discoverable shape choice; fill is a
     /// palette popup; B/I are the text style toggles; the rest route
     /// to the existing first-responder actions. The full eleven-shape
     /// list stays in the inspector's Style tab and Format ▸ Style.

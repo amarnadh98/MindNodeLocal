@@ -259,10 +259,10 @@ extension Theme {
             variant: variant)
     }
 
-    // MARK: the Box|Line class flip (ADR-0034)
+    // MARK: the Box|Line class flip (ADR-0037)
 
     /// Which donor level a stored shape override selects for a node at
-    /// `level` (ADR-0034): the Box|Line control persists ONLY a
+    /// `level` (ADR-0037): the Box|Line control persists ONLY a
     /// `shape`, so flipping the class the level style draws has to
     /// carry the looks that make the choice read as its class — a
     /// bare `shape` swap would draw a filled rectangle with no line (a

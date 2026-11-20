@@ -1,7 +1,7 @@
 import AppKit
 import MapCore
 
-/// The contextual bar's leading control (ADR-0034): a "Box | Line"
+/// The contextual bar's leading control (ADR-0037): a "Box | Line"
 /// segmented control for the selection's shape class — the choice
 /// MindNode users reach for first, in plain words instead of the
 /// eleven-entry shape menu (which stays in the inspector's Style tab

@@ -5,7 +5,7 @@ import Testing
 
 @testable import MapRender
 
-/// ADR-0034: the Box|Line control stores only a `shape`, so the
+/// ADR-0037: the Box|Line control stores only a `shape`, so the
 /// resolver carries the class-flip look. For every level 0–3 in both
 /// appearances: "Line" is text on a line in the branch color (no
 /// fill), and "Box" on an underline level is the theme's own box look

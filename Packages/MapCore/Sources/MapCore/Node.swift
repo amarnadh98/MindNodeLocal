@@ -84,7 +84,7 @@ public enum NodeShape: String, Codable, Sendable, CaseIterable {
 }
 
 extension NodeShape {
-    /// The two classes the Box|Line control speaks (F-STY-1, ADR-0034):
+    /// The two classes the Box|Line control speaks (F-STY-1, ADR-0037):
     /// shapes that draw a background/border box around the title, versus
     /// the text-on-a-line (`underline`) and text-only looks. Choosing
     /// "Box" stores a background shape; "Line" stores `.underline`.

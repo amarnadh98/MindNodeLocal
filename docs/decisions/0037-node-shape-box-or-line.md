@@ -1,4 +1,4 @@
-# ADR-0034: Box or Line — a per-node shape choice that carries its own look
+# ADR-0037: Box or Line — a per-node shape choice that carries its own look
 
 - **Status:** Accepted
 - **Date:** 2026-11-20

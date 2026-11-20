@@ -11,8 +11,11 @@ extension DocumentIOError: LocalizedError {
         case .emptyDocument(let format):
             "The \(format) document contains no nodes to import."
         case .unsupportedVersion(let format, let found, let hint):
-            "The \(format) document uses version \(found), which Arbor does not "
-                + "support. \(hint)"
+            // The import sheet surfaces this string verbatim (SPEC
+            // §5.17), so the hint — e.g. MindNode's OPML fallback —
+            // rides along.
+            "This \(format) file uses version \(found), which Arbor can't read yet. "
+                + hint
         case .notImplemented(let what):
             what
         }

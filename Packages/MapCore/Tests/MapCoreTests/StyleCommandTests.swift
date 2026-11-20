@@ -243,7 +243,7 @@ struct StyleCommandTests {
         // The layout-dirty contract (SPEC §11.3): font/padding/width
         // fields can move a node's frame — and so can `shape`, because
         // a Box|Line class flip resolves through a donor level whose
-        // padding changes (ADR-0034). Same-class shape picks
+        // padding changes (ADR-0037). Same-class shape picks
         // over-mark; §11.3 makes over-marking safe.
         #expect(NodeStylePatch(shape: .cloud, fill: "#E5484D").affectsMeasuredSize)
         #expect(

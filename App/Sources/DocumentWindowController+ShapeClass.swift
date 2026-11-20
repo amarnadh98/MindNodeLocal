@@ -2,7 +2,7 @@ import CanvasKit
 import MapCore
 import MapRender
 
-/// The Box|Line control's host side (ADR-0034): the one selection
+/// The Box|Line control's host side (ADR-0037): the one selection
 /// action the contextual bar and the inspector both funnel through,
 /// and the creation-default hooks every create path consults (F-EDT-1/
 /// F-EDT-3) — pure rules in `NodeCreationShape` (MapCore), model
@@ -16,7 +16,7 @@ extension DocumentWindowController {
     /// background shape — the theme's own box look resolves around it
     /// (F-STY-3); Line stores `.underline` — text on a line in the
     /// branch color. The class-flip look lives in the theme resolver
-    /// (`Theme.shapeDonor`, ADR-0034), never in a stored hex, so it
+    /// (`Theme.shapeDonor`, ADR-0037), never in a stored hex, so it
     /// respects light/dark and survives theme changes.
     func setNodeShapeClass(box: Bool) {
         performStyleCommandOnSelection {
@@ -50,7 +50,7 @@ extension DocumentWindowController {
         return classes.count == 1 ? classes.first : nil
     }
 
-    // MARK: creation defaults (ADR-0034)
+    // MARK: creation defaults (ADR-0037)
 
     /// The shape a new sibling beside `anchor` stores: the anchor's
     /// own shape when it has an explicit override, else nothing (the

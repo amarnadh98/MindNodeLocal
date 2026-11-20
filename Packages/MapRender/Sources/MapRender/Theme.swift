@@ -198,7 +198,7 @@ public struct ThemeLevelStyle: Codable, Sendable, Hashable {
 }
 
 /// Which donor level a stored Box|Line shape override resolves through
-/// (ADR-0034). Public so the scene's style cache can key off the same
+/// (ADR-0037). Public so the scene's style cache can key off the same
 /// buckets the theme resolver uses — see `Theme.shapeDonor`.
 public enum ShapeDonor: String, Codable, Sendable, Hashable {
     /// The level's own style (no override, or a same-class one).

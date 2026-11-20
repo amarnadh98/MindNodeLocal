@@ -1,21 +1,30 @@
 import Foundation
 import MapCore
 
-/// MindNode `.mindnode` import (F-IO, SPEC §5.17): a MindNode package is
-/// a directory whose `contents.xml` is a *binary property list*; the App
-/// layer opens the package and hands this importer that entry's bytes.
-/// `PropertyListSerialization` reads them; titles, notes, structure,
-/// tasks, tags and cross connections map onto the Arbor model. The plist
-/// key names are read tolerantly (several plausible spellings per field,
-/// string/UUID/Date-tolerant values), because the importer is written
-/// from MindNode's publicly documented structure without access to real
-/// files; a document whose version is not "9" fails with a clear error
-/// suggesting the documented fallback: **export OPML from MindNode** and
-/// import that instead. There is no MindNode export.
+/// MindNode `.mindnode` import (F-IO, SPEC §5.17). Two layouts, chosen
+/// by what the bytes turn out to be:
+///
+/// - **Legacy (MindNode 1-2):** a directory package whose
+///   `contents.xml` is a *binary property list* (`importDocument(contentsXML:)`,
+///   kept for packages and for callers that extracted the entry).
+/// - **Current (MindNode 2026+, file format 1):** a stored ZIP with a
+///   protobuf `Contents.data`, `Metadata.json` and preview images —
+///   reverse-engineered in ADR-0035 and decoded by
+///   `MindNodeCurrentFormat` (no third-party protobuf dependency).
+///
+/// `importDocument(archive:)` sniffs which: a readable zip with a
+/// `Contents.data` entry goes down the current path (gated on
+/// `Metadata.json`'s `minFileFormatVersionForReading`), a zip with
+/// `contents.xml` down the legacy path, and anything that is not a
+/// zip at all falls back to the legacy contract (the bytes *are* a
+/// `contents.xml`). Importers never crash on malformed input: every
+/// failure is a thrown `DocumentIOError` with the reason the error
+/// sheet shows. There is no MindNode export.
 ///
 /// Lossy fields (docs/io/format-matrix.md): node uuids, images,
 /// per-node style overrides, MindNode-only layout state, tag colors,
-/// task due-date precision beyond the ISO day, connection styles.
+/// task due-date precision beyond the ISO day, connection styles; the
+/// current format's unmapped fields are listed in ADR-0035.
 public enum MindNodeIO {
     /// The versions this importer understands (SPEC §14 mentions the v9
     /// binary-plist layout). Other versions get the OPML-fallback error.
@@ -23,7 +32,61 @@ public enum MindNodeIO {
 
     private static let id = DocumentFormats.mindnode.id
 
-    /// Parses the `contents.xml` bytes of a `.mindnode` package into a
+    /// The current format's zip entries.
+    private static let contentsEntry = "Contents.data"
+    private static let metadataEntry = "Metadata.json"
+    private static let legacyContentsEntry = "contents.xml"
+
+    /// Imports a whole `.mindnode` file: the current format's zip
+    /// archive, or — for the legacy package layout — the extracted
+    /// `contents.xml` bytes (a non-zip input is that legacy contract).
+    public static func importDocument(archive: Data) throws -> MapModel {
+        if let entries = try? MiniZip.entries(of: archive) {
+            let entry = { (name: String) -> Data? in
+                entries.first { $0.name == name }?.data
+            }
+            if let contents = entry(contentsEntry) {
+                return try importCurrentFormat(contents: contents, metadata: entry(metadataEntry))
+            }
+            if let legacy = entry(legacyContentsEntry) {
+                return try importDocument(contentsXML: legacy)
+            }
+            throw DocumentIOError.malformed(
+                format: id,
+                reason: "the archive has neither \(contentsEntry) nor \(legacyContentsEntry) "
+                    + "— it is not a MindNode document Arbor recognizes")
+        }
+        // Not a zip: the legacy contract — the bytes are the package's
+        // `contents.xml` property list.
+        return try importDocument(contentsXML: archive)
+    }
+
+    /// The current-format path: gate on `Metadata.json`, then decode
+    /// the protobuf contents.
+    private static func importCurrentFormat(contents: Data, metadata: Data?) throws -> MapModel {
+        guard let metadata else {
+            throw DocumentIOError.malformed(
+                format: id,
+                reason: "the package has \(contentsEntry) but no \(metadataEntry)")
+        }
+        let meta = try MindNodeCurrentFormat.parseMetadata(metadata)
+        if let required = meta.minFileFormatVersionForReading,
+            required > MindNodeCurrentFormat.supportedMinFileFormatVersionForReading
+        {
+            throw DocumentIOError.unsupportedVersion(
+                format: id, found: String(required),
+                hint: "This MindNode file uses a format Arbor can't read yet"
+                    + " (it needs file format version \(required); Arbor understands version "
+                    + "\(MindNodeCurrentFormat.supportedMinFileFormatVersionForReading))"
+                    + " and MindNode "
+                    + (meta.exportAppVersion.map { "version \($0) " } ?? "")
+                    + "wrote it. Open it in MindNode and export it as OPML, "
+                    + "then import the OPML file instead.")
+        }
+        return try MindNodeCurrentFormat.importContents(contents)
+    }
+
+    /// Parses the `contents.xml` bytes of a legacy `.mindnode` package into a
     /// validated `MapModel`. Throws `DocumentIOError` — unreadable
     /// plist, unknown version, no recognizable node tree.
     public static func importDocument(contentsXML plistData: Data) throws -> MapModel {

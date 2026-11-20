@@ -8,7 +8,7 @@ import Testing
 
 @testable import Arbor
 
-/// Hosted app tests for the Box|Line control (ADR-0034): the real
+/// Hosted app tests for the Box|Line control (ADR-0037): the real
 /// document → window → canvas → contextual bar / inspector wiring.
 /// Every mutation is one `MapStore` command (one undo step), persists
 /// through save/reopen, multi-selection applies in one step with the
@@ -186,7 +186,7 @@ struct BoxLineControlTests {
         #expect(reopened.model.nodes["three"]?.style?.shape == .underline)
     }
 
-    // MARK: creation defaults (ADR-0034)
+    // MARK: creation defaults (ADR-0037)
 
     @Test func newSiblingInheritsTheAnchorShapeOverride() throws {
         let (document, controller, source) = try makeShownDocument()

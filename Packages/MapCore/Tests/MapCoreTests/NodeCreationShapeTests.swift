@@ -3,7 +3,7 @@ import Testing
 
 @testable import MapCore
 
-/// ADR-0034's creation defaults (pure): a sibling inherits the shape
+/// ADR-0037's creation defaults (pure): a sibling inherits the shape
 /// of the node it is created next to when that node has an explicit
 /// override; a child follows the theme level style unless a sibling
 /// already carries an explicit shape, in which case the last such

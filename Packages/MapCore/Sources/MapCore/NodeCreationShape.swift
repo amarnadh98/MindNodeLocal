@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Box|Line creation defaults (ADR-0034): the shape a freshly
+/// The Box|Line creation defaults (ADR-0037): the shape a freshly
 /// created node should *store* so it matches what the user has been
 /// shaping around it — `nil` means "follow the theme's level style,
 /// persist nothing".

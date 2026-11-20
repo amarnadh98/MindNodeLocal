@@ -121,9 +121,12 @@ struct CanvasInteractionTests {
         #expect(document.model.nodes[created] == nil)
         #expect(canvas.selection == [before[0]], "selection returns to the parent")
         #expect(document.model.nodes[rootID]?.children == before)
-        // The creation was undone, not followed by a delete: nothing is
-        // left to undo, and ⌘Z can't bring the blank box back.
-        #expect(document.undoManager?.canUndo == false)
+        // The drop is an ordinary delete step: ⌘Z restores the blank box
+        // (and only it — every other node's text is untouched).
+        #expect(document.undoManager?.canUndo == true)
+        document.undoManager?.undo()
+        #expect(document.model.nodes[created] != nil)
+        #expect(document.model.nodes[before[0]]?.title.text == "Alpha")
     }
 
     @Test func tabOnAnEmptyNodeStopsInsteadOfChainingBlankChildren() throws {
