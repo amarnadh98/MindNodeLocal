@@ -257,7 +257,9 @@ final class MapDocument: NSDocument {
     /// blocks the test host from exiting (CI hung for hours after the
     /// tests had passed). Explicit `autosave(withImplicitCancellability:)`
     /// calls still run.
-    nonisolated static let schedulesAutosaving = NSClassFromString("XCTestCase") == nil
+    nonisolated static let schedulesAutosaving = !isTestHost
+    /// Running inside the hosted XCTest runner.
+    nonisolated static let isTestHost = NSClassFromString("XCTestCase") != nil
 
     override func scheduleAutosaving() {
         guard Self.schedulesAutosaving else { return }
