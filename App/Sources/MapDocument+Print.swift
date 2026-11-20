@@ -7,7 +7,7 @@ import SystemIntegration
 /// F-INT-9: printing. `MapDocument` presents the standard Print panel
 /// with the Arbor options accessory (fit to page / tile across pages /
 /// outline print; header/footer toggles), then composes the job as a
-/// paper-sized vector PDF through the shared scene renderer (ADR-0027:
+/// paper-sized vector PDF through the shared scene renderer (ADR-0029:
 /// print == export) and prints it via PDFKit's `NSPrintOperation`. Page
 /// Setup works through the panel's own paper controls and the standard
 /// File ▸ Page Setup… item.

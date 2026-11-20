@@ -7,7 +7,7 @@ import SystemIntegration
 /// every save when it is fresh and covers the requested size, and
 /// re-renders through the shared scene exporters otherwise (headless —
 /// this target links `SystemIntegration`/`SceneExport`, never the app's
-/// canvas code; ADR-0027).
+/// canvas code; ADR-0029).
 final class ThumbnailProvider: QLThumbnailProvider {
     override func provideThumbnail(
         for request: QLFileThumbnailRequest,

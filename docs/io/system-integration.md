@@ -9,7 +9,7 @@ SPEC §5.16 ships three app-extension targets alongside the app:
 | `SpotlightImporter` | `com.apple.spotlight-importer` | `CSImportExtension`: indexes the title, every node title and note (`textContent`), tag names (`keywords`), and the created/modified dates from `meta.json` |
 
 All three link the **`SystemIntegration`** product (CanvasKit package,
-ADR-0027) — the same pure code the app's save path and the tests use —
+ADR-0029) — the same pure code the app's save path and the tests use —
 plus its `MapCore`/`MapRender`/`SceneExport` graph. They never link the
 app's canvas code.
 

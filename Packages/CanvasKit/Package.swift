@@ -62,14 +62,14 @@ let package = Package(
         // (M5): the Quick Look thumbnail/preview choice (stored payload
         // vs. re-render), Spotlight attribute extraction, and the print
         // pagination math. The app's save path, the extension targets
-        // and the hosted tests all call this one target (ADR-0027).
+        // and the hosted tests all call this one target (ADR-0029).
         .target(
             name: "SystemIntegration",
             dependencies: [
                 .target(name: "SceneExport"),
                 // `SceneGeometry` (the headless scene build) and the
                 // shared `SceneRenderer.sharedMeasurer` live here; the
-                // target imports no AppKit of its own (ADR-0027).
+                // target imports no AppKit of its own (ADR-0029).
                 .target(name: "CanvasKit"),
                 .product(name: "MapCore", package: "MapCore"),
                 .product(name: "MapRender", package: "MapRender"),

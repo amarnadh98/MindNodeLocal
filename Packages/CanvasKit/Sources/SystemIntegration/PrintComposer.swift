@@ -8,14 +8,14 @@ import SceneExport
 
 /// Composes the print job (F-INT-9) as a paper-sized vector PDF through
 /// the SAME shared `ScenePainter`/`TextMeasurer` primitives the canvas
-/// and every export use — so print == export (ADR-0027). The App hands
+/// and every export use — so print == export (ADR-0029). The App hands
 /// the bytes to `PDFView.printOperation`, which honors the paper size
 /// and printable area the user chose in the Print panel and Page Setup.
 ///
 /// Print always renders the LIGHT appearance: the destination is white
 /// paper, and a dark canvas background would waste a sheet of ink. The
 /// decision (and the whole composed-PDF pipeline) is recorded in
-/// ADR-0027.
+/// ADR-0029.
 public enum PrintComposer {
     /// Everything the composer needs from the AppKit side (NSPrintInfo
     /// distilled): paper size, the printable area inside it (in paper

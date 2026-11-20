@@ -8,7 +8,7 @@ import SceneExport
 import SystemIntegration
 import Testing
 
-/// F-INT-3's shared choice logic (ADR-0027): freshness of the stored
+/// F-INT-3's shared choice logic (ADR-0029): freshness of the stored
 /// payloads, the stored-vs-render thumbnail decision, the render
 /// fallbacks the Quick Look extensions use, and the appearance/title
 /// derivations.

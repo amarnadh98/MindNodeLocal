@@ -269,7 +269,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
   # F-INT-3 (M5): the Quick Look thumbnail extension. Links only
   # `SystemIntegration` (+ its MapCore/MapRender/SceneExport graph) —
-  # headless, never the app's canvas code (ADR-0027).
+  # headless, never the app's canvas code (ADR-0029).
   QuickLookThumbnail:
     type: app-extension
     platform: macOS

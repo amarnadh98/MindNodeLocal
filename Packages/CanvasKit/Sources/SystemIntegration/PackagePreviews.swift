@@ -29,7 +29,7 @@ public struct PackagePreviewPayload: Sendable, Equatable {
 /// decides where a thumbnail or preview should come from: the files the
 /// app writes on every explicit save (fresh), or a fresh render through
 /// `SceneExport`. One choice rule serves the app's save path, the
-/// Quick Look extension targets, and the hosted tests (ADR-0027).
+/// Quick Look extension targets, and the hosted tests (ADR-0029).
 public enum PackagePreviews {
     /// The long edge the app's save path writes `Thumbnail.png` at
     /// (SPEC §5.16 F-INT-3).

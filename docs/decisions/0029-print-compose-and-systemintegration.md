@@ -1,4 +1,4 @@
-# ADR-0027: print == export via a composed paper-sized PDF, and a shared `SystemIntegration` target
+# ADR-0029: print == export via a composed paper-sized PDF, and a shared `SystemIntegration` target
 
 - **Status:** accepted
 - **Date:** 2026-11-19
