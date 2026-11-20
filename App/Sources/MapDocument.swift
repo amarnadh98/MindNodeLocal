@@ -236,6 +236,14 @@ final class MapDocument: NSDocument {
 
     override static var autosavesInPlace: Bool { true }
 
+    override func willPresentError(_ error: Error) -> Error {
+        let ns = error as NSError
+        NSLog("ARBOR-DIAG presentError: %@ underlying: %@ fileURL: %@ autosaved: %@",
+            ns.debugDescription, String(describing: ns.userInfo[NSUnderlyingErrorKey]),
+            String(describing: fileURL), String(describing: autosavedContentsFileURL))
+        return super.willPresentError(error)
+    }
+
     /// The native package plus every importable foreign format (F-IO):
     /// the open panel offers them, and the `read(from:ofType:)` override
     /// imports them as new untitled documents.
