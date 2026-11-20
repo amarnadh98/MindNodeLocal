@@ -81,16 +81,22 @@ struct Entry {
     let parent: [UInt8]?
     let node: Node
     let childUUIDs: [[UInt8]]
+    /// The record's `4 → 1 → 2` varint: MindNode's display-order key
+    /// (default 200, ×2 insert-after, ÷2 insert-before; 50 for
+    /// detached, as in the real file). ADR-0035.
+    let position: UInt64
 }
 
 func walk(_ root: Node) -> [Entry] {
     final class Info {
         let node: Node
         let parent: [UInt8]?
+        let position: UInt64
         var childUUIDs: [[UInt8]] = []
-        init(node: Node, parent: [UInt8]?) {
+        init(node: Node, parent: [UInt8]?, position: UInt64) {
             self.node = node
             self.parent = parent
+            self.position = position
         }
     }
     var infos: [[UInt8]: Info] = [:]
@@ -100,18 +106,28 @@ func walk(_ root: Node) -> [Entry] {
         defer { counter += 1 }
         return (0..<16).map { UInt8((counter >> (8 * $0)) & 0xFF) }
     }
-    func visit(_ node: Node, parent: [UInt8]?) -> [UInt8] {
+    // UUIDs are handed out with children visited in REVERSE visual
+    // order, so the wire's protobuf map order differs from the
+    // display order — the exact property the real file has, and the
+    // trap the importer must see through.
+    func visit(_ node: Node, parent: [UInt8]?, siblingIndex: Int) -> [UInt8] {
         let id = nextUUID()
         order.append(id)
-        let info = Info(node: node, parent: parent)
+        let position = node.detached ? 50 : UInt64(200 << siblingIndex)
+        let info = Info(node: node, parent: parent, position: position)
         infos[id] = info
-        info.childUUIDs = node.children.map { visit($0, parent: id) }
+        let reversedChildren = node.children.enumerated().reversed().map { pair in
+            visit(pair.element, parent: id, siblingIndex: pair.offset)
+        }
+        info.childUUIDs = Array(reversedChildren.reversed())
         return id
     }
-    _ = visit(root, parent: nil)
+    _ = visit(root, parent: nil, siblingIndex: 0)
     return order.map { id in
         let info = infos[id]!
-        return Entry(uuid: id, parent: info.parent, node: info.node, childUUIDs: info.childUUIDs)
+        return Entry(
+            uuid: id, parent: info.parent, node: info.node,
+            childUUIDs: info.childUUIDs, position: info.position)
     }
 }
 
@@ -141,14 +157,18 @@ func tree(_ entries: [Entry]) -> [UInt8] {
     let rootUUID = entries[0].uuid
     var body = PB.bytesField(1, documentUUID)
     body += PB.messageField(2, PB.bytesField(1, documentUUID) + PB.bytesField(3, rootUUID))
-    for entry in entries {
+    // Records in UUID (protobuf map) order, like the real file — NOT
+    // display order; the `4 → 1 → 2` position key orders siblings.
+    for entry in entries.sorted(by: { $0.uuid.lexicographicallyPrecedes($1.uuid) }) {
         var record = PB.bytesField(1, entry.uuid)
         if let parent = entry.parent {
             record += PB.bytesField(2, parent)
         }
-        for child in entry.childUUIDs {
+        for child in entry.childUUIDs.sorted(by: { $0.lexicographicallyPrecedes($1) }) {
             record += PB.bytesField(3, child)
         }
+        record += PB.messageField(
+            4, PB.messageField(1, PB.bytesField(1, styleUUID) + PB.varintField(2, entry.position)))
         body += PB.messageField(2, record)
     }
     for entry in entries where entry.node.detached {

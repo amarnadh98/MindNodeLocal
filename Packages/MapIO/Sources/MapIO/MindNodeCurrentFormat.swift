@@ -26,11 +26,22 @@ import MapCore
 ///   repeated `2` = one record per subject (protobuf map, UUID-keyed):
 ///   `1` = subject UUID, `2` = parent UUID (the root's parent is the
 ///   document itself; a record without `2` is the document's own
-///   record), repeated `3` = the subject's children **in order**
-///   (confirmed — order is data), `4` = branch style (ignored);
-///   repeated `3` at container level = detached node UUIDs (below);
-///   repeated `4` = top-level branch list (mirrors the root's
-///   children; redundant, ignored).
+///   record), repeated `3` = the subject's children in *wire* order,
+///   `4` → `1` → `2` = the sibling **position key**; repeated `3` at
+///   container level = detached node UUIDs (see below); repeated `4` =
+///   top-level branch list (mirrors the root's children; redundant,
+///   ignored).
+///
+/// **Order:** the child lists ride in the UUID-sorted (protobuf map)
+/// order of the stream, NOT MindNode's display order. The display
+/// order is the record's `4 → 1 → 2` varint (confirmed on the one
+/// sample: root children 4th=100 / 2nd=200 / 3rd=400 sort to exactly
+/// the visual order [4th, 2nd, 3rd]; the pattern — default 200, ×2
+/// insert-after, ÷2 insert-before — reads like a CRDT/fractional
+/// sibling index; `Metadata.json`'s `exportingPeerID` supports that).
+/// The rest of the `4` message is a style reference, ignored. The
+/// importer sorts every sibling list by the key ascending, with the
+/// wire order as the tie-break for missing or equal keys.
 ///
 /// Nodes whose UUID appears in the tree container's detached list are
 /// *excluded* from the assembled tree: in the reverse-engineered
@@ -129,7 +140,8 @@ enum MindNodeCurrentFormat {
                 format: Self.id, reason: "the document carries no nodes")
         }
 
-        // 2. Tree records: subject → ordered children.
+        // 2. Tree records: subject → ordered children + the sibling
+        //    position key.
         guard let tree = try store.message(3) else {
             throw DocumentIOError.malformed(
                 format: Self.id, reason: "the document carries no node tree")
@@ -137,8 +149,18 @@ enum MindNodeCurrentFormat {
         let documentID = tree.bytes(1).flatMap(Self.uuidString(_:))
         var parents: [String: String] = [:]
         var children: [String: [String]] = [:]
+        /// The sibling order key from each record's `4 → 1 → 2`
+        /// varint — NOT the wire order of the `3` child list. In the
+        /// reverse-engineered sample MindNode stores the child lists
+        /// in UUID (map) order while this key encodes the visual
+        /// order (100 / 200 / 400 — plausibly a fractional index:
+        /// default 200, ×2 insert-after, ÷2 insert-before); sorting
+        /// by it reproduces the order MindNode displays, exactly
+        /// (ADR-0035). The rest of the `4` message is a style
+        /// reference, ignored.
+        var positions: [String: Int] = [:]
         var roots: [String] = []
-        var documentChildren: [String]? = nil
+        var documentRecordID: String? = nil
         for record in tree.all(2) {
             guard
                 let recordFields = try Self.fields(of: record),
@@ -150,6 +172,11 @@ enum MindNodeCurrentFormat {
                 guard case .delimited(let id, _) = field.value else { return nil }
                 return Self.uuidString(id)
             }
+            if let style = try recordFields.message(4),
+                let keyed = try style.message(1)
+            {
+                positions[subject] = keyed.varint(2)
+            }
             if let parent = recordFields.bytes(2).flatMap(Self.uuidString(_:)) {
                 parents[subject] = parent
             } else if nodes[subject] != nil, subject != documentID {
@@ -157,16 +184,9 @@ enum MindNodeCurrentFormat {
                 roots.append(subject)
             } else {
                 // The document's own record: no parent, no node data;
-                // its children are the map's roots, in order.
-                documentChildren = children[subject]
+                // its children are the map's roots.
+                documentRecordID = subject
             }
-        }
-        // Root order prefers the document record's child list, then
-        // the parent-of-document set, then the no-parent fallback.
-        if let listed = documentChildren, !listed.isEmpty {
-            roots = listed
-        } else if roots.isEmpty, let documentID {
-            roots = parents.filter { $0.value == documentID }.keys.map { $0 }
         }
         // Detached nodes (container-level repeated field 3): excluded
         // from the tree, exactly as MindNode's outline excludes them.
@@ -175,7 +195,38 @@ enum MindNodeCurrentFormat {
                 guard case .delimited(let id, _) = field.value else { return nil }
                 return Self.uuidString(id)
             })
-
+        /// A parent's attached children in MindNode's display order:
+        /// the position key ascending, with the wire (map) order as
+        /// the tie-break for missing or equal keys.
+        func orderedChildren(of parent: String) -> [String] {
+            (children[parent] ?? [])
+                .enumerated()
+                .filter { !detached.contains($0.element) }
+                .sorted {
+                    (positions[$0.element] ?? Int.max, $0.offset)
+                        < (positions[$1.element] ?? Int.max, $1.offset)
+                }
+                .map(\.element)
+        }
+        // Root order prefers the document record's child list, then
+        // the parent-of-document set, then the no-parent fallback —
+        // each in display order.
+        if let recordID = documentRecordID, let listed = children[recordID], !listed.isEmpty {
+            roots = orderedChildren(of: recordID)
+        } else {
+            if roots.isEmpty, let documentID {
+                roots = Array(parents.filter { $0.value == documentID }.keys)
+            }
+            roots =
+                roots
+                .filter { !detached.contains($0) }
+                .enumerated()
+                .sorted {
+                    (positions[$0.element] ?? Int.max, $0.offset)
+                        < (positions[$1.element] ?? Int.max, $1.offset)
+                }
+                .map(\.element)
+        }
         // 3. Assemble. The visited set makes a cyclic or duplicated
         //    tree record harmless — this is untrusted input.
         let assembler = DocumentAssembler(title: nil)
@@ -185,7 +236,7 @@ enum MindNodeCurrentFormat {
             visited.insert(id)
             let box = nodes[id] ?? DocumentBox(title: NodeTitle(text: ""))
             box.externalID = id
-            for child in children[id] ?? [] where !detached.contains(child) {
+            for child in orderedChildren(of: id) {
                 if let childBox = assemble(child) {
                     box.children.append(childBox)
                 }

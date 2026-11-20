@@ -34,12 +34,17 @@ enum MindNodeSyntheticFile {
         }
     }
 
-    /// One walked node: its wire uuid, parent uuid and spec.
+    /// One walked node: its wire uuid, parent uuid, visual child
+    /// order and the sibling position key MindNode writes for it.
     private struct Entry {
         let uuid: [UInt8]
         let parent: [UInt8]?
         let node: Node
         let childUUIDs: [[UInt8]]
+        /// The record's `4 → 1 → 2` varint: MindNode's display-order
+        /// key (default 200, next 400, …; 50 for detached, as in the
+        /// real file). ADR-0035.
+        let position: UInt64
     }
 
     /// The committed golden fixture's map: a root with two ordered
@@ -114,41 +119,57 @@ enum MindNodeSyntheticFile {
 
     // MARK: - wire serialization (the schema under test)
 
-    /// Walks the tree in pre-order, assigning a deterministic
-    /// 16-byte uuid counter to every node (the root is always
-    /// `entries.first`).
+    /// Walks the tree, assigning a deterministic 16-byte uuid counter
+    /// to every node. UUIDs are handed out with children visited in
+    /// REVERSE visual order, so the protobuf map (UUID) order of the
+    /// wire differs from the display order — the exact property the
+    /// real file has, and the trap the importer must see through. The
+    /// root is always `entries.first`.
     private static func walk(_ root: Node) -> [Entry] {
         final class Info {
             let node: Node
             let parent: [UInt8]?
+            let position: UInt64
             var childUUIDs: [[UInt8]] = []
-            init(node: Node, parent: [UInt8]?) {
+            init(node: Node, parent: [UInt8]?, position: UInt64) {
                 self.node = node
                 self.parent = parent
+                self.position = position
             }
         }
         var counter = 1
         func nextUUID() -> [UInt8] {
             defer { counter += 1 }
-            return (0..<16).map { position in
-                UInt8((counter >> (8 * position)) & 0xFF)
+            return (0..<16).map { byte in
+                UInt8((counter >> (8 * byte)) & 0xFF)
             }
         }
         var infos: [[UInt8]: Info] = [:]
         var order: [[UInt8]] = []
-        func visit(_ node: Node, parent: [UInt8]?) -> [UInt8] {
+        func visit(_ node: Node, parent: [UInt8]?, siblingIndex: Int) -> [UInt8] {
             let id = nextUUID()
             order.append(id)
-            let info = Info(node: node, parent: parent)
+            // MindNode's default position is 200; inserting *after*
+            // doubles, *before* halves. Display index i → 200 << i.
+            let position = node.detached ? 50 : UInt64(200 << siblingIndex)
+            let info = Info(node: node, parent: parent, position: position)
             infos[id] = info
-            info.childUUIDs = node.children.map { visit($0, parent: id) }
+            // UUIDs flow to children in reverse visual order (so the
+            // wire's map order differs from display order); each child
+            // carries its own visual sibling index for the position
+            // key, and `childUUIDs` keeps the visual order.
+            let reversedChildren = node.children.enumerated().reversed().map { pair in
+                visit(pair.element, parent: id, siblingIndex: pair.offset)
+            }
+            info.childUUIDs = Array(reversedChildren.reversed())
             return id
         }
-        _ = visit(root, parent: nil)
+        _ = visit(root, parent: nil, siblingIndex: 0)
         return order.map { id in
             let info = infos[id]!
             return Entry(
-                uuid: id, parent: info.parent, node: info.node, childUUIDs: info.childUUIDs)
+                uuid: id, parent: info.parent, node: info.node,
+                childUUIDs: info.childUUIDs, position: info.position)
         }
     }
 
@@ -171,21 +192,25 @@ enum MindNodeSyntheticFile {
     }
 
     /// The tree container: the document's own record (children =
-    /// roots, in order), one record per node with its parent and
-    /// ordered children, the detached list, and the redundant
-    /// top-level branch list.
+    /// roots), one record per node in UUID (protobuf map) order —
+    /// like the real file, NOT display order — each carrying its
+    /// parent, its child list in map order, and the `4 → 1 → 2`
+    /// position key that actually orders siblings (ADR-0035); then
+    /// the detached list and the redundant top-level branch list.
     private static func tree(entries: [Entry]) -> [UInt8] {
         let rootUUID = entries.first?.uuid ?? []
         var body = PB.bytes(1, documentUUID)
         body += PB.message(2, PB.bytes(1, documentUUID) + PB.bytes(3, rootUUID))
-        for entry in entries {
+        for entry in entries.sorted(by: { $0.uuid.lexicographicallyPrecedes($1.uuid) }) {
             var record = PB.bytes(1, entry.uuid)
             if let parent = entry.parent {
                 record += PB.bytes(2, parent)
             }
-            for child in entry.childUUIDs {
+            for child in entry.childUUIDs.sorted(by: { $0.lexicographicallyPrecedes($1) }) {
                 record += PB.bytes(3, child)
             }
+            record += PB.message(
+                4, PB.message(1, PB.bytes(1, styleUUID) + PB.varint(2, entry.position)))
             body += PB.message(2, record)
         }
         for entry in entries where entry.node.detached {

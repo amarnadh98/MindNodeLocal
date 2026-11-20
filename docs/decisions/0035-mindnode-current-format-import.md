@@ -60,7 +60,8 @@ per SPEC §11.2; no new dependencies):
    | store, repeated `2`, `2`, `11` → `1` → `4` → `1` | node title UTF-8 (empty container = untitled node) | confirmed |
    | store, repeated `2`, `2`, `2` | node note, same string shape as the title (accepted wrapped or bare) | **guessed** — empty in the sample, so unverifiable |
    | store, `3` (tree), `1` | the document UUID again (root container subject) | confirmed |
-   | tree, repeated `2` | one record per subject: `1` subject UUID, `2` parent UUID, repeated `3` children **in order**, `4` branch style | confirmed (structure + order) |
+   | tree, repeated `2` | one record per subject: `1` subject UUID, `2` parent UUID, repeated `3` children in *wire* (UUID map) order, `4 → 1 → 2` the sibling **position key** | confirmed (structure); see order below |
+   | **sibling order** | each record's `4 → 1 → 2` varint: ascending sort within a parent reproduces MindNode's display order exactly — root children 4th=100 / 2nd=200 / 3rd=400 → [4th, 2nd, 3rd]; '2nd's attached children empty=100 / 2b=200 / 2c=400 → [(empty), 2b, 2c]. The pattern (default 200, ×2 insert-after, ÷2 insert-before, detached=50) reads like a CRDT/fractional sibling index — `Metadata.json`'s `exportingPeerID` supports that — but the *semantics* are confirmed on one sample only; the importer sorts by the key with the wire order as tie-break. The `4 → 1 → 1` UUID is a style reference, ignored. | **confirmed ordering** (rule verified against the sample's screenshot order); mechanism guessed |
    | tree, repeated `3` (container level) | detached node UUIDs | **interpreted** — see below |
    | tree, repeated `4` | top-level branch list (mirrors the root's children) | confirmed redundant, ignored |
    | node data `5` (two doubles), `6`/`10`, `7`, `9`, `12`, `13`; store `4`; store `5` (sticker with RGBA color); document wrapper `2` (32-byte digest), `3` (timestamp + peer) | position/size/style/session state | ignored |
@@ -112,21 +113,21 @@ otherwise — CI never depends on personal data.
 
 ## Consequences
 
-- Current-format `.mindnode` files import: titles, hierarchy, child
-  order, empty nodes, the floating-text node; the result is a normal
-  `MapModel` (validator-clean, opens untitled, round-trips through a
-  native `.arbor` save).
-- The stored child order is authoritative: for the sample the file
-  stores root children as ['3rd thought', '4th thought',
-  '2nd thought'] — the same set the user described, in the order the
-  file records. If MindNode's outline order is in fact computed
-  differently, a second sample will tell; the decoder takes order
-  only from the repeated child lists.
+- Current-format `.mindnode` files import: titles, hierarchy,
+  **MindNode's display order** (the position key, not the wire order of
+  the child lists), empty nodes, the floating-text node; the result is
+  a normal `MapModel` (validator-clean, opens untitled, round-trips
+  through a native `.arbor` save).
+- The wire order of the repeated child lists is protobuf-map (UUID)
+  order, NOT display order — an importer that trusts it shows rotated
+  sibling lists (this feature's first cut did, until the position key
+  was found). The key is confirmed on exactly one sample; if a future
+  file uses a different sequence scheme (or MindNode changes the
+  field), the tie-break degrades to wire order rather than failing,
+  and a second sample will settle it.
 - A future MindNode format bump (`minFileFormatVersionForReading` ≥ 2)
   is refused with the clear error and the OPML fallback, until
   someone reverse-engineers version 2 from a real file.
 - If MindNode's actual note/task/tag wire fields are ever confirmed,
   `MindNodeCurrentFormat` grows them without touching the reader or
   the routing.
-- Root child order for multi-root documents comes from the document
-  record's child list, matching MindNode's own ordering source.

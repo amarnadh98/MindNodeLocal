@@ -39,9 +39,12 @@ struct MindNodeCurrentFormatTests {
     @Test func importsTheSyntheticCurrentFormatDocument() throws {
         let model = try importArchive(MindNodeSyntheticFile.archive())
 
-        // Root order, child order, the empty node, the floating-text
-        // node and the detached empty (excluded, like MindNode's own
-        // outline) all survive the trip.
+        // The builder writes the child lists in UUID (protobuf map)
+        // order — root children appear in the WIRE as
+        // [Second, First] — while the `4 → 1 → 2` position keys say
+        // [First(200), Second(400)]. Display order must win, together
+        // with the empty node, the floating-text node and the
+        // detached empty's exclusion (as in MindNode's own outline).
         #expect(
             outline(model) == """
                 Golden Root
@@ -67,6 +70,88 @@ struct MindNodeCurrentFormatTests {
         #expect(model.nodes[second.children[0]]?.title.text == "Floating text")
         // Exactly one empty-titled node — the attached one.
         #expect(model.nodes.values.filter { $0.title.text.isEmpty }.count == 1)
+    }
+
+    /// The real file's ordering trap, distilled: MindNode stores child
+    /// lists in map order and the DISPLAY order in each record's
+    /// `4 → 1 → 2` varint (a fractional index — 100 / 200 / 400 in the
+    /// sample). A file whose wire order is [X, Y, Z] but whose keys say
+    /// [Y, Z, X] must import as [Y, Z, X]; a tie or a missing key
+    /// falls back to the wire order.
+    @Test func ordersSiblingsByThePositionKeyNotTheWireOrder() throws {
+        let doc = [UInt8](repeating: 0xAB, count: 16)
+        func uuid(_ tag: UInt8) -> [UInt8] {
+            [tag] + [UInt8](repeating: 0, count: 15)
+        }
+        let root = uuid(0x01)
+        let x = uuid(0x02)
+        let y = uuid(0x03)
+        let z = uuid(0x04)
+        let tieOne = uuid(0x05)
+        let tieTwo = uuid(0x06)
+        let style = [UInt8](repeating: 0x5A, count: 16)
+
+        func nodeRecord(_ subject: [UInt8], title: String) -> [UInt8] {
+            let attributed =
+                PB.message(1, PB.message(4, PB.bytes(1, Array(title.utf8))))
+            return PB.message(
+                2, PB.bytes(1, subject) + PB.message(2, PB.message(11, attributed)))
+        }
+        func treeRecord(
+            _ subject: [UInt8], parent: [UInt8]? = nil, children: [[UInt8]] = [],
+            position: UInt64? = nil
+        ) -> [UInt8] {
+            var record = PB.bytes(1, subject)
+            if let parent {
+                record += PB.bytes(2, parent)
+            }
+            for child in children {
+                record += PB.bytes(3, child)
+            }
+            if let position {
+                record += PB.message(4, PB.message(1, PB.bytes(1, style) + PB.varint(2, position)))
+            }
+            return PB.message(2, record)
+        }
+
+        // Wire order [X, Y, Z, tieOne, tieTwo]; keys X=400, Y=100,
+        // Z=200, ties absent → display [Y, Z, X, tieOne, tieTwo].
+        let tree =
+            PB.bytes(1, doc)
+            + treeRecord(doc, children: [root])
+            + treeRecord(root, parent: doc, children: [x, y, z, tieOne, tieTwo], position: 200)
+            + treeRecord(x, parent: root, position: 400)
+            + treeRecord(y, parent: root, position: 100)
+            + treeRecord(z, parent: root, position: 200)
+            + treeRecord(tieOne, parent: root)
+            + treeRecord(tieTwo, parent: root)
+        let store: [[UInt8]] = [
+            nodeRecord(root, title: "R"),
+            nodeRecord(x, title: "X"),
+            nodeRecord(y, title: "Y"),
+            nodeRecord(z, title: "Z"),
+            nodeRecord(tieOne, title: "tie one"),
+            nodeRecord(tieTwo, title: "tie two"),
+            PB.message(3, tree),
+        ]
+        let document =
+            PB.message(
+                1, PB.bytes(1, doc) + PB.message(2, PB.message(1, store.reduce([], +))))
+        let archive = TestZip.archive(entries: [
+            ("Metadata.json", MindNodeSyntheticFile.metadata()),
+            ("Contents.data", Data(document)),
+        ])
+
+        let model = try importArchive(archive)
+        #expect(
+            outline(model) == """
+                R
+                  Y
+                  Z
+                  X
+                  tie one
+                  tie two
+                """)
     }
 
     @Test func importsTheCommittedGoldenFixture() throws {
@@ -256,6 +341,24 @@ struct MindNodeCurrentFormatTests {
         let model = try importArchive(data)
         #expect(!model.roots.isEmpty)
         #expect(MapValidator.validate(model).isEmpty)
-        print("Real-file import outline:\n\(outline(model))")
+        // The exact outline MindNode displays for this document (its
+        // screenshot): root children [4th, 2nd, 3rd] top to bottom,
+        // '2nd' children [(empty), 2b, 2c], '2c' carrying the floating
+        // text '3t6782t2', '3rd' carrying '3a' — reproduced by sorting
+        // each sibling list on the record's position key.
+        let printed = outline(model)
+        print("Real-file import outline:\n\(printed)")
+        #expect(
+            printed == """
+                My own thought 1
+                  4th thought
+                  2nd thought
+                    «empty»
+                    2b
+                    2c
+                      3t6782t2
+                  3rd thought
+                    3a
+                """)
     }
 }
