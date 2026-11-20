@@ -53,8 +53,9 @@ private func chainModel() -> MapModel {
 
 /// An org chart whose child row is narrower than the wide root, so
 /// hovering inside the root's frame precedes (left edge) or follows
-/// (right edge) both children.
-private func orgModel() -> MapModel {
+/// (right edge) both children. Internal: shared with the root-move
+/// tests.
+func orgModel() -> MapModel {
     var model = MapModel.emptyDocument(docID: "org")
     var root = Node(id: "root", title: NodeTitle(text: "Central Idea Text"))
     root.structure = "orgchart.down"
@@ -72,7 +73,7 @@ private func orgModel() -> MapModel {
     return model
 }
 
-private func buildScene(_ model: MapModel) -> CanvasScene {
+func buildScene(_ model: MapModel) -> CanvasScene {
     SceneGeometry.build(model: model, variant: .light, measurer: SceneRenderer.sharedMeasurer)
 }
 
@@ -297,13 +298,6 @@ struct DragCommandsTests {
         #expect(DragCommands.topmost(["y", "d1"], in: model) == ["d1", "y"])
     }
 
-    @Test func newRootsAppendAfterTheSurvivors() throws {
-        let model = chainModel()
-        let command = try #require(DragCommands.newRoots(model: model, dragged: ["d"]))
-        #expect(command == .moveNode(id: "d", parent: nil, index: 1))
-        #expect(!DragCommands.isNoOp(command, in: model))
-    }
-
     @Test func detachSkipsRoots() throws {
         let model = chainModel()
         let command = try #require(
@@ -374,9 +368,10 @@ struct SceneManualOffsetTests {
 
 /// A canvas with the scene centered at scale 1, like the app's fitted
 /// view: drag points stay mid-viewport, so auto-scroll never fires
-/// unless a test drives right at an edge.
+/// unless a test drives right at an edge. Internal: shared with the
+/// root-move tests.
 @MainActor
-private final class DragHarness {
+final class DragHarness {
     let view: CanvasView
     let scene: CanvasScene
 

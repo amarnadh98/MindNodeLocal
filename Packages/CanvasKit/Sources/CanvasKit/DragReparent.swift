@@ -500,15 +500,16 @@ public enum DragCommands {
         return grouped(commands)
     }
 
-    /// Drops `dragged` as new roots (empty canvas), appended after the
-    /// surviving roots in their current order.
-    public static func newRoots(model: MapModel, dragged: [String]) -> MapCommand? {
-        let survivors = model.roots.filter { !dragged.contains($0) }.count
-        var commands: [MapCommand] = []
-        for (position, id) in dragged.enumerated() {
-            commands.append(.moveNode(id: id, parent: nil, index: survivors + position))
-        }
-        return grouped(commands)
+    /// ADR-0032: a plain drag whose every dragged node is a root moves
+    /// the map. Roots carry no absolute position — only a manual
+    /// `offset` from their auto slot — so "grab the root and drag the
+    /// map" is exactly the F-LAY-11 free-position mechanism: the drop
+    /// becomes one `setOffset` per root carrying the drag delta, and
+    /// the whole subtree travels along (offsets apply after auto
+    /// layout). The one exception is a cursor over another node's
+    /// frame, which keeps the reparent drop (F-EDT-5).
+    public static func movesRoots(_ dragged: [String], in model: MapModel) -> Bool {
+        !dragged.isEmpty && dragged.allSatisfy { model.nodes[$0]?.parent == nil }
     }
 
     /// Detaches each dragged node into a new root (roots have nothing to
@@ -539,14 +540,19 @@ public enum DragCommands {
     }
 
     /// True when performing `command` would leave the model unchanged
-    /// (dropped straight back into its own slot), so the drag should
-    /// register no undo step.
+    /// (dropped straight back into its own slot, or an offset that
+    /// snap-back already clears), so the drag should register no undo
+    /// step.
     public static func isNoOp(_ command: MapCommand, in model: MapModel) -> Bool {
         switch command {
         case .moveNode(let id, let parent, let index):
             guard model.nodes[id]?.parent == parent else { return false }
             let siblings = parent.flatMap { model.nodes[$0]?.children } ?? model.roots
             return siblings.firstIndex(of: id) == index
+        case .setOffset(let id, let offset):
+            // ADR-0032: a root dropped inside the snap-back radius with
+            // no stored offset performs nothing — no phantom undo step.
+            return model.nodes[id]?.offset == offset
         case .group(_, let commands):
             return !commands.isEmpty && commands.allSatisfy { isNoOp($0, in: model) }
         default:

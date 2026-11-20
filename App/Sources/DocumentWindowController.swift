@@ -449,6 +449,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 editingTitle: editingDraftTitle,
                 theme: ThemeCatalog.shared.theme(for: model))
             canvas.scene = scene
+            // F-CAN-6: the minimap mirrors the rebuilt scene here too —
+            // the incremental path also moves frames (a drag, a root
+            // move), and the minimap's cached image re-renders on scene
+            // change only.
+            minimap?.scene = scene
             canvas.dragModel = model
         } else {
             updateScene(preserveCamera: true)
