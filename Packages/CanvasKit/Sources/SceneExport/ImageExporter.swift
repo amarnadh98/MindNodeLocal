@@ -164,12 +164,11 @@ public enum ImageExporter {
                 context.saveGState()
                 context.clip(to: deviceTile)
                 // The canvas's y-down convention: (0,0) at the top-left of
-                // the bitmap, then the render scale and bounds offset —
-                // the same transform the on-screen camera composes.
+                // the bitmap, then the render scale. `ScenePainter`
+                // subtracts the bounds origin itself.
                 context.translateBy(x: 0, y: CGFloat(height))
                 context.scaleBy(x: 1, y: -1)
                 context.scaleBy(x: renderScale, y: renderScale)
-                context.translateBy(x: -export.bounds.minX, y: -export.bounds.minY)
                 ScenePainter.draw(export, measurer: measurer, in: context, background: nil)
                 context.restoreGState()
             }
